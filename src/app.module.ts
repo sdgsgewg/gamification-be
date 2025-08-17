@@ -3,9 +3,9 @@ import { ConfigModule } from '@nestjs/config';
 import { SupabaseModule } from './supabase/supabase.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { UserController } from './user/user.controller';
-import { UserModule } from './user/user.module';
-import { UserService } from './user/user.service';
+import { UserModule } from './users/users.module';
+import { AuthModule } from './auth/auth.module';
+import { GradeModule } from './grades/grades.module';
 
 @Module({
   imports: [
@@ -13,9 +13,11 @@ import { UserService } from './user/user.service';
       isGlobal: true, // agar bisa diakses di semua module
     }),
     SupabaseModule,
+    AuthModule,
+    GradeModule,
     UserModule,
   ],
-  controllers: [AppController, UserController],
-  providers: [AppService, UserService],
+  controllers: [AppController],
+  providers: [AppService],
 })
 export class AppModule {}
