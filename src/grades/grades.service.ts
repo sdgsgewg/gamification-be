@@ -2,13 +2,18 @@ import { Injectable } from '@nestjs/common';
 import { SupabaseService } from 'src/supabase/supabase.service';
 
 @Injectable()
-export class UserService {
+export class GradeService {
   constructor(private readonly supabaseService: SupabaseService) {}
 
-  async findAll() {
+  async findAllGrades() {
     const supabase = this.supabaseService.getClient();
-    const { data, error } = await supabase.from('users').select('*');
+    const { data, error } = await supabase.from('grades').select('*');
+
     if (error) throw new Error(error.message);
-    return data;
+    
+    return data.map((grade) => ({
+      gradeId: grade.grade_id,
+      name: grade.name,
+    }));
   }
 }
