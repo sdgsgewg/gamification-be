@@ -10,14 +10,19 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
 
-  app.use(cookieParser()); // 🟢 ini wajib
+  app.use(cookieParser()); // ini wajib
+
+  app.use((req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store');
+    next();
+  });
 
   app.useGlobalPipes(new ValidationPipe());
-  
+
   app.enableCors({
     origin: 'http://localhost:3000',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control'],
     credentials: true,
   });
 
