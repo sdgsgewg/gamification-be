@@ -12,7 +12,7 @@ export class Subject {
   @Column()
   slug: string;
 
-  @Column()
+  @Column({ nullable: true })
   description: string;
 
   @Column({ nullable: true })

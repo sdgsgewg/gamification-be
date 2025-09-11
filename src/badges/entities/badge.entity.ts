@@ -1,8 +1,8 @@
-import { Entity, Column, PrimaryColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity('badges')
 export class Badge {
-  @PrimaryColumn()
+  @PrimaryGeneratedColumn('uuid')
   badge_id: string;
 
   @Column()
@@ -20,6 +20,15 @@ export class Badge {
   @Column()
   criteria_value: number;
 
+  @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
+  created_at: Date;
+
   @Column()
-  created_at: string;
+  created_by: string;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  updated_at: Date;
+
+  @Column({ nullable: true })
+  updated_by: string;
 }

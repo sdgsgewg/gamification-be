@@ -1,13 +1,19 @@
 import { Grade } from 'src/grades/entities/grade.entity';
 import { Material } from 'src/materials/entities/material.entity';
-import { Entity, Column, PrimaryColumn, JoinColumn, ManyToOne } from 'typeorm';
+import {
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  JoinColumn,
+  ManyToOne,
+} from 'typeorm';
 
 @Entity('material_grades')
 export class MaterialGrade {
-  @PrimaryColumn()
+  @PrimaryGeneratedColumn('uuid')
   material_grade_id: string;
 
-  @Column()
+  @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
 
   @Column()

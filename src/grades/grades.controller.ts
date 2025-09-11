@@ -5,7 +5,7 @@ import { GradeService } from './grades.service';
 export class GradeController {
   constructor(private readonly gradeService: GradeService) {}
 
-  @Get('/get-all-grades')
+  @Get('')
   async getAllGrades() {
     return this.gradeService.findAllGrades();
   }
