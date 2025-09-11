@@ -3,7 +3,7 @@ import { Subject } from 'src/subjects/entities/subject.entity';
 import {
   Entity,
   Column,
-  PrimaryColumn,
+  PrimaryGeneratedColumn,
   ManyToOne,
   JoinColumn,
   OneToMany,
@@ -11,7 +11,7 @@ import {
 
 @Entity('materials')
 export class Material {
-  @PrimaryColumn()
+  @PrimaryGeneratedColumn('uuid')
   material_id: string;
 
   @Column()
@@ -20,14 +20,23 @@ export class Material {
   @Column()
   slug: string;
 
-  @Column()
+  @Column({ nullable: true })
   description: string;
 
   @Column({ nullable: true })
   image: string;
 
-  @Column()
+  @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
+
+  @Column()
+  created_by: string;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  updated_at: Date;
+
+  @Column({ nullable: true })
+  updated_by: string;
 
   @Column()
   subject_id: string;

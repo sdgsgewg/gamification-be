@@ -2,32 +2,32 @@ import { User } from 'src/users/entities/user.entity';
 import {
   Entity,
   Column,
-  PrimaryColumn,
+  PrimaryGeneratedColumn,
   JoinColumn,
   ManyToOne,
 } from 'typeorm';
 
 @Entity('user_sessions')
 export class UserSession {
-  @PrimaryColumn()
+  @PrimaryGeneratedColumn('uuid')
   user_session_id: string;
 
-  @Column()
+  @Column({ nullable: true })
   device_info: string;
 
-  @Column()
+  @Column({ nullable: true })
   refresh_token: string;
 
-  @Column()
+  @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
 
-  @Column()
+  @Column({ type: 'timestamptz', nullable: true })
   expires_at: Date;
 
-  @Column()
+  @Column({ nullable: true })
   is_revoked: boolean;
 
-  @Column()
+  @Column({ nullable: true })
   user_id: string;
 
   @ManyToOne(() => User, (u) => u.userSessions)
