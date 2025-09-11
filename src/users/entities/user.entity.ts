@@ -5,7 +5,7 @@ import { UserSession } from 'src/user-sessions/entities/user-sessions.entity';
 import {
   Entity,
   Column,
-  PrimaryColumn,
+  PrimaryGeneratedColumn,
   ManyToOne,
   JoinColumn,
   OneToMany,
@@ -13,7 +13,7 @@ import {
 
 @Entity('users')
 export class User {
-  @PrimaryColumn()
+  @PrimaryGeneratedColumn('uuid')
   user_id: string;
 
   @Column()
@@ -43,10 +43,10 @@ export class User {
   @Column({ nullable: true })
   dob: Date;
 
-  @Column({ nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   email_verified_at: Date;
 
-  @Column()
+  @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
 
   @Column({ nullable: true })

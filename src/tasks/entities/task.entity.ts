@@ -9,7 +9,7 @@ import { User } from 'src/users/entities/user.entity';
 import {
   Entity,
   Column,
-  PrimaryColumn,
+  PrimaryGeneratedColumn,
   ManyToOne,
   JoinColumn,
   OneToMany,
@@ -17,7 +17,7 @@ import {
 
 @Entity('tasks')
 export class Task {
-  @PrimaryColumn()
+  @PrimaryGeneratedColumn('uuid')
   task_id: string;
 
   @Column()
@@ -41,8 +41,17 @@ export class Task {
   @Column()
   is_globally_assigned: boolean;
 
-  @Column()
+  @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
+
+  @Column()
+  created_by: string;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  updated_at: Date;
+
+  @Column({ nullable: true })
+  updated_by: string;
 
   @Column()
   creator_id: string;
