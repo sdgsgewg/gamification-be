@@ -15,7 +15,7 @@ import { SubjectService } from './subjects.service';
 import { FilterSubjectDto } from './dto/requests/filter-subject.dto';
 import { CreateSubjectDto } from './dto/requests/create-subject.dto';
 import { UpdateSubjectDto } from './dto/requests/update-subject.dto';
-import { AnyFilesInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 @Controller('/subjects')
 export class SubjectController {
@@ -35,46 +35,28 @@ export class SubjectController {
   }
 
   @Post()
-  @UseInterceptors(AnyFilesInterceptor())
+  @UseInterceptors(FileInterceptor('imageFile'))
   async create(
     @UploadedFile() file: Express.Multer.File,
     @Body('data') rawData: string,
   ) {
-    try {
-      const dto: CreateSubjectDto = JSON.parse(rawData);
+    console.log('Uploaded file:', file?.originalname, file?.size);
 
-      let cover: Express.Multer.File | undefined;
-      if (file.fieldname === 'imageFile') {
-        cover = file;
-      }
-
-      return this.subjectService.createSubject(dto, cover);
-    } catch (e) {
-      console.error('Error create subject:', e);
-      throw e;
-    }
+    const dto: CreateSubjectDto = JSON.parse(rawData);
+    return this.subjectService.createSubject(dto, file);
   }
 
   @Put(':id')
-  @UseInterceptors(AnyFilesInterceptor())
+  @UseInterceptors(FileInterceptor('imageFile'))
   async update(
     @Param('id') id: string,
     @UploadedFile() file: Express.Multer.File,
-    @Body() rawData: string,
+    @Body('data') rawData: string,
   ) {
-    try {
-      const dto: UpdateSubjectDto = JSON.parse(rawData);
+    console.log('Uploaded file:', file?.originalname, file?.size);
 
-      let cover: Express.Multer.File | undefined;
-      if (file.fieldname === 'imageFile') {
-        cover = file;
-      }
-
-      return this.subjectService.updateSubject(id, dto, cover);
-    } catch (e) {
-      console.error('Error update subject:', e);
-      throw e;
-    }
+    const dto: UpdateSubjectDto = JSON.parse(rawData);
+    return this.subjectService.updateSubject(id, dto, file);
   }
 
   @Delete(':id')

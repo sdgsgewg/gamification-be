@@ -1,3 +1,31 @@
+export function getDateTime(date: Date): string {
+  if (!date) return '';
+
+  const monthsShort = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'Mei',
+    'Jun',
+    'Jul',
+    'Agu',
+    'Sep',
+    'Okt',
+    'Nov',
+    'Des',
+  ];
+
+  const day = date.getDate().toString().padStart(2, '0');
+  const month = monthsShort[date.getMonth()];
+  const year = date.getFullYear();
+
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+
+  return `${day} ${month} ${year} (${hours}:${minutes} WIB)`;
+}
+
 export function getTimePeriod(startTime: Date, endTime: Date): string {
   if (!startTime || !endTime) return '';
 
@@ -22,7 +50,7 @@ export function getTimePeriod(startTime: Date, endTime: Date): string {
   return parts.join(' ');
 }
 
-export function getDateTime(date: Date, name?: string): string {
+export function getDateTimeWithName(date: Date, name?: string): string {
   if (!date) return '';
 
   const monthsShort = [

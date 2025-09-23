@@ -8,7 +8,7 @@ import { CreateSubjectDto } from './dto/requests/create-subject.dto';
 import { UpdateSubjectDto } from './dto/requests/update-subject.dto';
 import { SubjectOverviewResponseDto } from './dto/responses/subject-overview-response.dto';
 import { SubjectDetailResponseDto } from './dto/responses/subject-detail-reponse.dto';
-import { getDateTime } from 'src/common/utils/date-modifier.util';
+import { getDateTimeWithName } from 'src/common/utils/date-modifier.util';
 import { DetailResponseDto } from 'src/common/responses/detail-response.dto';
 import { BaseResponseDto } from 'src/common/responses/base-response.dto';
 import { getDbColumn } from 'src/common/database/get-db-column.util';
@@ -68,9 +68,9 @@ export class SubjectService {
       slug: subject.slug,
       description: subject.description ?? null,
       image: subject.image ?? null,
-      createdBy: `${getDateTime(subject.created_at, subject.created_by)}`,
+      createdBy: `${getDateTimeWithName(subject.created_at, subject.created_by)}`,
       updatedBy: subject.updated_by
-        ? `${getDateTime(subject.updated_at, subject.updated_by)}`
+        ? `${getDateTimeWithName(subject.updated_at, subject.updated_by)}`
         : null,
     };
 
@@ -201,6 +201,7 @@ export class SubjectService {
         fileDto,
         existingSubject.subject_id,
         'subjects',
+        false,
       );
 
       imageUrl = uploadResult.url;

@@ -1,7 +1,9 @@
+import { Injectable } from '@nestjs/common';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import * as path from 'path';
-import { FileUploadDto } from '../../common/dto/file-upload.dto'; // Import DTO
+import { FileUploadDto } from '../../common/dto/file-upload.dto';
 
+@Injectable()
 export class SupabaseStorageService {
   private supabase: SupabaseClient;
 
@@ -39,8 +41,10 @@ export class SupabaseStorageService {
         .from(bucket)
         .upload(fileNameWithExt, file.buffer, {
           contentType: file.mimetype,
-          cacheControl: '3600',
-          upsert: false,
+          // cacheControl: '3600',
+          cacheControl: '0', // biar nggak cache lama
+          // upsert: false,
+          upsert: true, // biar bisa replace gambar lama
         });
 
       if (error) {
@@ -50,7 +54,7 @@ export class SupabaseStorageService {
       // Get public URL
       const { data: publicUrlData } = this.supabase.storage
         .from(bucket)
-        .getPublicUrl(fileName);
+        .getPublicUrl(fileNameWithExt);
 
       return publicUrlData.publicUrl;
     } catch (error) {
@@ -66,6 +70,8 @@ export class SupabaseStorageService {
     try {
       // Extract file path from public URL
       const filePath = this.getFilePathFromPublicUrl(publicUrl, bucket);
+
+      console.log('File path from public URL: ', filePath);
 
       const { error } = await this.supabase.storage
         .from(bucket)
@@ -165,4 +171,4 @@ export class SupabaseStorageService {
 }
 
 // Export singleton instance
-export const supabaseStorage = new SupabaseStorageService();
+// export const supabaseStorage = new SupabaseStorageService();

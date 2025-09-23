@@ -71,26 +71,28 @@ export class TaskController {
   async update(
     @Param('id') id: string,
     @UploadedFiles() files: Express.Multer.File[],
-    @Body() rawData: string,
+    @Body('data') rawData: string,
   ) {
     try {
       const dto: UpdateTaskDto = JSON.parse(rawData);
 
       let cover: Express.Multer.File | undefined;
-      files.forEach((file) => {
-        if (file.fieldname === 'imageFile') {
-          cover = file;
-        }
-        if (file.fieldname.startsWith('questionImage_')) {
-          const index = parseInt(
-            file.fieldname.replace('questionImage_', ''),
-            10,
-          );
-          if (!isNaN(index) && dto.questions[index]) {
-            dto.questions[index].imageFile = file;
+      if (files) {
+        files.forEach((file) => {
+          if (file.fieldname === 'imageFile') {
+            cover = file;
           }
-        }
-      });
+          if (file.fieldname.startsWith('questionImage_')) {
+            const index = parseInt(
+              file.fieldname.replace('questionImage_', ''),
+              10,
+            );
+            if (!isNaN(index) && dto.questions[index]) {
+              dto.questions[index].imageFile = file;
+            }
+          }
+        });
+      }
 
       return this.taskService.updateTask(id, dto, cover);
     } catch (e) {

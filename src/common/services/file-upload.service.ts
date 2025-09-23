@@ -10,7 +10,7 @@ export class FileUploadService {
     file: FileUploadDto,
     fileName: string, // pakai id dari data yang mau diupload gambarnya
     bucket: string,
-    hasFolder: boolean = false,
+    hasFolder: boolean,
     folder?: string, // pakai id dari parent data (cth: data taskQuestion kirim taskId)
     subfolder?: string,
   ): Promise<UploadResponseDto> {
@@ -30,9 +30,13 @@ export class FileUploadService {
           bucket,
           folderPath,
         );
+      } else {
+        publicUrl = await this.supabaseStorage.uploadFile(
+          file,
+          fileName,
+          bucket,
+        );
       }
-
-      publicUrl = await this.supabaseStorage.uploadFile(file, fileName, bucket);
 
       return {
         url: publicUrl,

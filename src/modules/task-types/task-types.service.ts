@@ -10,7 +10,7 @@ import { TaskTypeDetailResponseDto } from './dto/responses/task-type-detail-resp
 import { capitalizeFirstLowerRest } from 'src/common/utils/string-modifier.util';
 import { DetailResponseDto } from 'src/common/responses/detail-response.dto';
 import { BaseResponseDto } from 'src/common/responses/base-response.dto';
-import { getDateTime } from 'src/common/utils/date-modifier.util';
+import { getDateTimeWithName } from 'src/common/utils/date-modifier.util';
 import { slugify } from 'src/common/utils/slug.util';
 import { SlugHelper } from 'src/common/helpers/slug.helper';
 import { getDbColumn } from 'src/common/database/get-db-column.util';
@@ -53,9 +53,9 @@ export class TaskTypeService {
         isCompetitive: tt.is_competitive,
         isRepeatable: tt.is_repeatable,
         pointMultiplier: tt.point_multiplier,
-        createdBy: `${getDateTime(tt.created_at, tt.created_by)}`,
+        createdBy: `${getDateTimeWithName(tt.created_at, tt.created_by)}`,
         updatedBy: tt.updated_by
-          ? `${getDateTime(tt.updated_at, tt.updated_by)}`
+          ? `${getDateTimeWithName(tt.updated_at, tt.updated_by)}`
           : null,
       }),
     );
@@ -73,9 +73,9 @@ export class TaskTypeService {
       isCompetitive: taskType.is_competitive,
       isRepeatable: taskType.is_repeatable,
       pointMultiplier: taskType.point_multiplier,
-      createdBy: `${getDateTime(taskType.created_at, taskType.created_by)}`,
+      createdBy: `${getDateTimeWithName(taskType.created_at, taskType.created_by)}`,
       updatedBy: taskType.updated_by
-        ? `${getDateTime(taskType.updated_at, taskType.updated_by)}`
+        ? `${getDateTimeWithName(taskType.updated_at, taskType.updated_by)}`
         : null,
     };
 

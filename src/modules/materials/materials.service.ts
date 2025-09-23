@@ -12,7 +12,7 @@ import { MaterialDetailResponseDto } from './dto/responses/material-detail-respo
 import { slugify } from '../../common/utils/slug.util';
 import { DetailResponseDto } from 'src/common/responses/detail-response.dto';
 import { BaseResponseDto } from 'src/common/responses/base-response.dto';
-import { getDateTime } from 'src/common/utils/date-modifier.util';
+import { getDateTimeWithName } from 'src/common/utils/date-modifier.util';
 import { SlugHelper } from 'src/common/helpers/slug.helper';
 
 @Injectable()
@@ -92,9 +92,9 @@ export class MaterialService {
               .map((mg) => mg.grade.name.replace('Kelas ', ''))
               .join(', ')
           : null,
-      createdBy: `${getDateTime(materialWithRelations.created_at, materialWithRelations.created_by)}`,
+      createdBy: `${getDateTimeWithName(materialWithRelations.created_at, materialWithRelations.created_by)}`,
       updatedBy: materialWithRelations.updated_by
-        ? `${getDateTime(materialWithRelations.updated_at, materialWithRelations.updated_by)}`
+        ? `${getDateTimeWithName(materialWithRelations.updated_at, materialWithRelations.updated_by)}`
         : null,
     };
 
@@ -162,14 +162,14 @@ export class MaterialService {
 
       const uploadResult = await this.fileUploadService.uploadImage(
         fileDto,
-        savedMaterial.subject_id,
+        savedMaterial.material_id,
         'materials',
         false,
       );
 
       imageUrl = uploadResult.url;
 
-      await this.materialRepository.update(savedMaterial.subject_id, {
+      await this.materialRepository.update(savedMaterial.material_id, {
         image: imageUrl,
       });
       savedMaterial.image = imageUrl;
@@ -245,6 +245,7 @@ export class MaterialService {
         fileDto,
         existingMaterial.material_id,
         'materials',
+        false,
       );
 
       imageUrl = uploadResult.url;

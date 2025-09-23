@@ -1,28 +1,45 @@
-import { BadRequestException, Controller, Get, Param, Req, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Controller,
+  Get,
+  Param,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { UserService } from './users.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { FilterUserDto } from './dto/requests/filter-user.dto';
 
 @Controller('/users')
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
-  @Get('/get-all-users')
-  async getAllUsers() {
-    return this.userService.findAllUsers();
+  @Get('')
+  async getAllUsers(@Query() filterDto: FilterUserDto) {
+    return this.userService.findAllUsers(filterDto);
   }
 
   @UseGuards(JwtAuthGuard)
-  @Get('get-logged-in-user')
+  @Get('me')
   async getLoggedInUser(@Req() req) {
     const userId = req.user?.uid; // asumsi payload token punya uid
-    return this.userService.getUserById(userId);
+    return this.userService.findUserBy('id', userId);
   }
 
-  @Get('/get-user-detail/:uid')
-  async getUserDetail(@Param('uid') uid: string) {
-    if (!uid) {
+  @Get(':id')
+  async getUserById(@Param('id') id: string) {
+    if (!id) {
       throw new BadRequestException('User ID is required');
     }
-    return this.userService.getUserById(uid);
+    return this.userService.findUserBy('id', id);
+  }
+
+  @Get('username/:username')
+  async getUserByUsername(@Param('username') username: string) {
+    if (!username) {
+      throw new BadRequestException('Username is required');
+    }
+    return this.userService.findUserBy('username', username);
   }
 }

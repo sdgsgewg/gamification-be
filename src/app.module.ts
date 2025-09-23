@@ -13,6 +13,7 @@ import { SubjectModule } from './modules/subjects/subjects.module';
 import { MaterialModule } from './modules/materials/materials.module';
 import { TaskTypeModule } from './modules/task-types/task-types.module';
 import { TaskModule } from './modules/tasks/tasks.module';
+import { RoleModule } from './modules/roles/roles.module';
 
 @Module({
   imports: [
@@ -34,8 +35,9 @@ import { TaskModule } from './modules/tasks/tasks.module';
         synchronize: true, // ⚠️ jangan pakai di production
       }),
     }),
-    SupabaseModule, // masih bisa dipakai kalau ada kebutuhan
+    SupabaseModule,
     AuthModule,
+    RoleModule,
     GradeModule,
     UserModule,
     SubjectModule,

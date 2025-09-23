@@ -11,7 +11,7 @@ import {
 
 @Entity('task_question_options')
 export class TaskQuestionOption {
-  @PrimaryGeneratedColumn()
+  @PrimaryGeneratedColumn('uuid')
   task_question_option_id: string;
 
   @Column({ type: 'text' })

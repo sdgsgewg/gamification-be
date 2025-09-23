@@ -15,7 +15,7 @@ import { slugify } from '../../common/utils/slug.util';
 import { DetailResponseDto } from 'src/common/responses/detail-response.dto';
 import { BaseResponseDto } from 'src/common/responses/base-response.dto';
 import {
-  getDateTime,
+  getDateTimeWithName,
   getTimePeriod,
 } from 'src/common/utils/date-modifier.util';
 import { TaskGrade } from 'src/modules/task-grades/entities/task-grade.entity';
@@ -155,9 +155,9 @@ export class TaskService {
         taskWithRelations.start_time,
         taskWithRelations.end_time,
       ),
-      createdBy: `${getDateTime(taskWithRelations.created_at, taskWithRelations.created_by)}`,
+      createdBy: `${getDateTimeWithName(taskWithRelations.created_at, taskWithRelations.created_by)}`,
       updatedBy: taskWithRelations.updated_by
-        ? `${getDateTime(taskWithRelations.updated_at, taskWithRelations.updated_by)}`
+        ? `${getDateTimeWithName(taskWithRelations.updated_at, taskWithRelations.updated_by)}`
         : null,
       questions:
         taskWithRelations.taskQuestions?.map((q) => ({
@@ -286,12 +286,13 @@ export class TaskService {
 
           // Simpan ke task_questions
           const savedQuestion =
-            await this.taskQuestionOptionRepository.save(question);
+            await this.taskQuestionRepository.save(question);
 
           if (q.imageFile) {
             const fileDto = this.fileUploadService.convertMulterFileToDto(
               q.imageFile,
             );
+
             const uploadResult = await this.fileUploadService.uploadImage(
               fileDto,
               savedQuestion.task_question_id,
@@ -300,7 +301,14 @@ export class TaskService {
               savedTask.task_id,
               'questions',
             );
+
             questionImageUrl = uploadResult.url;
+
+            // update record question dengan URL
+            await this.taskQuestionRepository.update(savedQuestion, {
+              image: questionImageUrl,
+            });
+            savedQuestion.image = questionImageUrl;
           }
 
           return question;
