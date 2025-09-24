@@ -15,7 +15,7 @@ import { MaterialService } from './materials.service';
 import { FilterMaterialDto } from './dto/requests/filter-material.dto';
 import { CreateMaterialDto } from './dto/requests/create-material.dto';
 import { UpdateMaterialDto } from './dto/requests/update-material.dto';
-import { AnyFilesInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 @Controller('/materials')
 export class MaterialController {
@@ -35,46 +35,24 @@ export class MaterialController {
   }
 
   @Post()
-  @UseInterceptors(AnyFilesInterceptor())
+  @UseInterceptors(FileInterceptor('imageFile'))
   async create(
     @UploadedFile() file: Express.Multer.File,
     @Body('data') rawData: string,
   ) {
-    try {
-      const dto: CreateMaterialDto = JSON.parse(rawData);
-
-      let cover: Express.Multer.File | undefined;
-      if (file.fieldname === 'imageFile') {
-        cover = file;
-      }
-
-      return this.materialService.createMaterial(dto, cover);
-    } catch (e) {
-      console.error('Error create material:', e);
-      throw e;
-    }
+    const dto: CreateMaterialDto = JSON.parse(rawData);
+    return this.materialService.createMaterial(dto, file);
   }
 
   @Put(':id')
-  @UseInterceptors(AnyFilesInterceptor())
+  @UseInterceptors(FileInterceptor('imageFile'))
   async update(
     @Param('id') id: string,
     @UploadedFile() file: Express.Multer.File,
-    @Body() rawData: string,
+    @Body('data') rawData: string,
   ) {
-    try {
-      const dto: UpdateMaterialDto = JSON.parse(rawData);
-
-      let cover: Express.Multer.File | undefined;
-      if (file.fieldname === 'imageFile') {
-        cover = file;
-      }
-
-      return this.materialService.updateMaterial(id, dto, cover);
-    } catch (e) {
-      console.error('Error update material:', e);
-      throw e;
-    }
+    const dto: UpdateMaterialDto = JSON.parse(rawData);
+    return this.materialService.updateMaterial(id, dto, file);
   }
 
   @Delete(':id')

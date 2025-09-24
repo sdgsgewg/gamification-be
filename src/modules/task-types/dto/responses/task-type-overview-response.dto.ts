@@ -7,6 +7,4 @@ export class TaskTypeOverviewResponseDto {
   isCompetitive: boolean;
   isRepeatable: boolean;
   pointMultiplier: number;
-  createdBy: string;
-  updatedBy?: string;
 }

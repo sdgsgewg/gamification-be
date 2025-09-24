@@ -53,10 +53,6 @@ export class TaskTypeService {
         isCompetitive: tt.is_competitive,
         isRepeatable: tt.is_repeatable,
         pointMultiplier: tt.point_multiplier,
-        createdBy: `${getDateTimeWithName(tt.created_at, tt.created_by)}`,
-        updatedBy: tt.updated_by
-          ? `${getDateTimeWithName(tt.updated_at, tt.updated_by)}`
-          : null,
       }),
     );
 
@@ -68,6 +64,7 @@ export class TaskTypeService {
       taskTypeId: taskType.task_type_id,
       name: taskType.name,
       slug: taskType.slug,
+      description: taskType.description,
       scope: capitalizeFirstLowerRest(taskType.scope),
       hasDeadline: taskType.has_deadline,
       isCompetitive: taskType.is_competitive,
@@ -138,7 +135,7 @@ export class TaskTypeService {
     const response: DetailResponseDto<TaskTypeDetailResponseDto> = {
       status: 200,
       isSuccess: true,
-      message: 'Task type created successfully',
+      message: 'Tipe tugas berhasil dibuat!',
       data: taskTypeDetail,
     };
 
@@ -206,7 +203,7 @@ export class TaskTypeService {
     const response: DetailResponseDto<TaskTypeDetailResponseDto> = {
       status: 200,
       isSuccess: true,
-      message: 'Material updated successfully',
+      message: 'Tipe tugas berhasil diperbarui!',
       data: taskTypeDetail,
     };
 

@@ -40,8 +40,6 @@ export class SubjectController {
     @UploadedFile() file: Express.Multer.File,
     @Body('data') rawData: string,
   ) {
-    console.log('Uploaded file:', file?.originalname, file?.size);
-
     const dto: CreateSubjectDto = JSON.parse(rawData);
     return this.subjectService.createSubject(dto, file);
   }
@@ -53,8 +51,6 @@ export class SubjectController {
     @UploadedFile() file: Express.Multer.File,
     @Body('data') rawData: string,
   ) {
-    console.log('Uploaded file:', file?.originalname, file?.size);
-
     const dto: UpdateSubjectDto = JSON.parse(rawData);
     return this.subjectService.updateSubject(id, dto, file);
   }
