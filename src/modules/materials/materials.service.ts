@@ -14,6 +14,7 @@ import { DetailResponseDto } from 'src/common/responses/detail-response.dto';
 import { BaseResponseDto } from 'src/common/responses/base-response.dto';
 import { getDateTimeWithName } from 'src/common/utils/date-modifier.util';
 import { SlugHelper } from 'src/common/helpers/slug.helper';
+import { getDbColumn } from 'src/common/database/get-db-column.util';
 
 @Injectable()
 export class MaterialService {
@@ -43,14 +44,33 @@ export class MaterialService {
       .groupBy('material.material_id')
       .addGroupBy('subject.name');
 
+    // filter
     if (filterDto.searchText) {
-      qb.andWhere(
-        'material.name ILIKE :searchText OR subject.name ILIKE :searchText',
-        {
-          searchText: `%${filterDto.searchText}%`,
-        },
-      );
+      qb.andWhere('material.name ILIKE :searchText', {
+        searchText: `%${filterDto.searchText}%`,
+      });
     }
+
+    if (filterDto.subjectId) {
+      qb.andWhere('material.subject_id = :subjectId', {
+        subjectId: filterDto.subjectId,
+      });
+    }
+
+    if (filterDto.gradeIds && filterDto.gradeIds.length > 0) {
+      qb.andWhere('materialGrade.grade_id IN (:...gradeIds)', {
+        gradeIds: filterDto.gradeIds,
+      });
+    }
+
+    // order by
+    const orderBy = filterDto.orderBy ?? 'createdAt';
+    const orderState = filterDto.orderState ?? 'DESC';
+
+    // otomatis mapping property → nama kolom DB, fallback ke created_at
+    const dbColumn = getDbColumn(Material, orderBy as keyof Material);
+
+    qb.orderBy(`material.${dbColumn}`, orderState);
 
     const rawMaterials = await qb.getRawMany();
 

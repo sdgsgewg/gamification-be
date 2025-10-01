@@ -1,4 +1,5 @@
-import { IsArray, IsIn, IsOptional, IsString } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsIn, IsOptional, IsString } from 'class-validator';
 
 export class FilterTaskDto {
   @IsOptional()
@@ -18,12 +19,14 @@ export class FilterTaskDto {
   taskTypeId?: string;
 
   @IsOptional()
-  @IsArray()
-  taskGradeIds?: string[];
+  @Transform(({ value }) =>
+    Array.isArray(value) ? value : value ? [value] : [],
+  )
+  gradeIds: string[];
 
   @IsOptional()
-  @IsIn(['createdAt', 'updatedAt', 'name'])
-  orderBy?: 'createdAt' | 'updatedAt' | 'name';
+  @IsIn(['createdAt', 'updatedAt', 'title'])
+  orderBy?: 'createdAt' | 'updatedAt' | 'title';
 
   @IsOptional()
   @IsIn(['ASC', 'DESC'])

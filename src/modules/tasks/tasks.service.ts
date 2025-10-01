@@ -1,14 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Task } from './entities/task.entity';
 import { FilterTaskDto } from './dto/requests/filter-task.dto';
 import { CreateTaskDto } from './dto/requests/create-task.dto';
-import {
-  UpdateTaskDto,
-  UpdateTaskQuestionDto,
-  UpdateTaskQuestionOptionDto,
-} from './dto/requests/update-task.dto';
+import { UpdateTaskDto } from './dto/requests/update-task.dto';
 import { TaskOverviewResponseDto } from './dto/responses/task-overview-response.dto';
 import { TaskDetailResponseDto } from './dto/responses/task-detail-response.dto';
 import { slugify } from '../../common/utils/slug.util';
@@ -19,10 +15,10 @@ import {
   getTimePeriod,
 } from 'src/common/utils/date-modifier.util';
 import { TaskGrade } from 'src/modules/task-grades/entities/task-grade.entity';
-import { TaskQuestion } from 'src/modules/task-questions/entities/task-question.entity';
-import { TaskQuestionOption } from 'src/modules/task-question-options/entities/task-question-option.entity';
 import { FileUploadService } from 'src/common/services/file-upload.service';
 import { SlugHelper } from 'src/common/helpers/slug.helper';
+import { TaskQuestionService } from '../task-questions/task-questions.service';
+import { getDbColumn } from 'src/common/database/get-db-column.util';
 
 @Injectable()
 export class TaskService {
@@ -31,10 +27,7 @@ export class TaskService {
     private readonly taskRepository: Repository<Task>,
     @InjectRepository(TaskGrade)
     private readonly taskGradeRepository: Repository<TaskGrade>,
-    @InjectRepository(TaskQuestion)
-    private readonly taskQuestionRepository: Repository<TaskQuestion>,
-    @InjectRepository(TaskQuestionOption)
-    private readonly taskQuestionOptionRepository: Repository<TaskQuestionOption>,
+    private readonly taskQuestionService: TaskQuestionService,
     private readonly fileUploadService: FileUploadService,
   ) {}
 
@@ -68,8 +61,9 @@ export class TaskService {
       .addGroupBy('subject.name')
       .addGroupBy('material.name');
 
+    // filter
     if (filterDto.searchText) {
-      qb.andWhere('task.title ILIKE :searchText ILIKE :searchText', {
+      qb.andWhere('task.title ILIKE :searchText', {
         searchText: `%${filterDto.searchText}%`,
       });
     }
@@ -92,11 +86,20 @@ export class TaskService {
       });
     }
 
-    if (filterDto.taskGradeIds && filterDto.taskGradeIds.length > 0) {
-      qb.andWhere('taskGrade.grade_id IN (:...taskGradeIds)', {
-        taskGradeIds: filterDto.taskGradeIds,
+    if (filterDto.gradeIds && filterDto.gradeIds.length > 0) {
+      qb.andWhere('taskGrade.grade_id IN (:...gradeIds)', {
+        gradeIds: filterDto.gradeIds,
       });
     }
+
+    // order by
+    const orderBy = filterDto.orderBy ?? 'createdAt';
+    const orderState = filterDto.orderState ?? 'DESC';
+
+    // otomatis mapping property → nama kolom DB, fallback ke created_at
+    const dbColumn = getDbColumn(Task, orderBy as keyof Task);
+
+    qb.orderBy(`task.${dbColumn}`, orderState);
 
     const rawTasks = await qb.getRawMany();
 
@@ -192,7 +195,8 @@ export class TaskService {
         'taskQuestionOption',
       )
       .where('task.slug = :slug', { slug })
-      .orderBy('grade.name', 'ASC');
+      .orderBy('taskQuestion.order', 'ASC')
+      .addOrderBy('taskQuestionOption.order', 'ASC');
 
     const task = await qb.getOne();
 
@@ -266,77 +270,13 @@ export class TaskService {
       await this.taskGradeRepository.save(grades);
     }
 
-    // simpan ke task_questions
-    let savedQuestions: TaskQuestion[] = [];
+    // simpan ke task_questions (otomatis include options)
     if (dto.questions?.length > 0) {
-      const questions = await Promise.all(
-        dto.questions.map(async (q) => {
-          let questionImageUrl = '';
-
-          const question = this.taskQuestionRepository.create({
-            text: q.text,
-            type: q.type,
-            point: q.point,
-            image: questionImageUrl,
-            time_limit: q.timeLimit,
-            created_at: new Date(),
-            created_by: dto.createdBy,
-            task_id: savedTask.task_id,
-          });
-
-          // Simpan ke task_questions
-          const savedQuestion =
-            await this.taskQuestionRepository.save(question);
-
-          if (q.imageFile) {
-            const fileDto = this.fileUploadService.convertMulterFileToDto(
-              q.imageFile,
-            );
-
-            const uploadResult = await this.fileUploadService.uploadImage(
-              fileDto,
-              savedQuestion.task_question_id,
-              'tasks',
-              true,
-              savedTask.task_id,
-              'questions',
-            );
-
-            questionImageUrl = uploadResult.url;
-
-            // update record question dengan URL
-            await this.taskQuestionRepository.update(savedQuestion, {
-              image: questionImageUrl,
-            });
-            savedQuestion.image = questionImageUrl;
-          }
-
-          return question;
-        }),
+      await this.taskQuestionService.createTaskQuestions(
+        dto.questions,
+        savedTask.task_id,
+        dto.createdBy,
       );
-
-      savedQuestions = await this.taskQuestionRepository.save(questions);
-    }
-
-    // simpan ke task_question_options
-    if (savedQuestions.length > 0) {
-      // flatten semua options jadi 1 array
-      const allOptions = savedQuestions.flatMap((question, index) => {
-        const dtoOptions = dto.questions[index].options || [];
-        return dtoOptions.map((o) =>
-          this.taskQuestionOptionRepository.create({
-            text: o.text,
-            is_correct: o.isCorrect,
-            created_at: new Date(),
-            created_by: dto.createdBy,
-            question_id: question.task_question_id,
-          }),
-        );
-      });
-
-      if (allOptions.length > 0) {
-        await this.taskQuestionOptionRepository.save(allOptions);
-      }
     }
 
     // Query ulang untuk ambil tabel relasinya
@@ -405,177 +345,6 @@ export class TaskService {
     }
   }
 
-  private async syncTaskQuestionOptions(
-    questionId: string,
-    optionsDto: UpdateTaskQuestionOptionDto[],
-    updatedBy?: string,
-  ) {
-    const existingOptions = await this.taskQuestionOptionRepository.find({
-      where: { question_id: questionId },
-    });
-
-    const existingOptionIds = existingOptions.map(
-      (o) => o.task_question_option_id,
-    );
-    const incomingOptionIds =
-      optionsDto?.filter((o) => !!o.optionId).map((o) => o.optionId) || [];
-
-    // Hapus yang tidak ada di DTO
-    const toDelete = existingOptions.filter(
-      (o) => !incomingOptionIds.includes(o.task_question_option_id),
-    );
-    if (toDelete.length > 0) {
-      await this.taskQuestionOptionRepository.remove(toDelete);
-    }
-
-    // Insert / Update
-    for (const oDto of optionsDto || []) {
-      if (oDto.optionId && existingOptionIds.includes(oDto.optionId)) {
-        // Update
-        const option = existingOptions.find(
-          (o) => o.task_question_option_id === oDto.optionId,
-        );
-        option.text = oDto.text;
-        option.is_correct = oDto.isCorrect;
-        option.updated_at = new Date();
-        option.updated_by = updatedBy ?? null;
-        await this.taskQuestionOptionRepository.save(option);
-      } else {
-        // Insert baru
-        const newOption = this.taskQuestionOptionRepository.create({
-          text: oDto.text,
-          is_correct: oDto.isCorrect,
-          created_at: new Date(),
-          created_by: updatedBy ?? null,
-          question_id: questionId,
-        });
-        await this.taskQuestionOptionRepository.save(newOption);
-      }
-    }
-  }
-
-  private async syncTaskQuestions(
-    taskId: string,
-    questionsDto: UpdateTaskQuestionDto[],
-    updatedBy?: string,
-  ) {
-    const existingQuestions = await this.taskQuestionRepository.find({
-      where: { task_id: taskId },
-    });
-
-    const existingQuestionIds = existingQuestions.map(
-      (q) => q.task_question_id,
-    );
-    const incomingQuestionIds =
-      questionsDto?.filter((q) => !!q.questionId).map((q) => q.questionId) ||
-      [];
-
-    // Hapus pertanyaan (beserta options) yang tidak ada di DTO
-    const toDelete = existingQuestions.filter(
-      (q) => !incomingQuestionIds.includes(q.task_question_id),
-    );
-    if (toDelete.length > 0) {
-      const idsToDelete = toDelete.map((q) => q.task_question_id);
-      await this.taskQuestionOptionRepository.delete({
-        question_id: In(idsToDelete),
-      });
-      await this.taskQuestionRepository.delete(idsToDelete);
-    }
-
-    // Insert / Update pertanyaan
-    for (const qDto of questionsDto || []) {
-      if (qDto.questionId && existingQuestionIds.includes(qDto.questionId)) {
-        // Update existing
-        const question = existingQuestions.find(
-          (q) => q.task_question_id === qDto.questionId,
-        );
-
-        if (qDto.imageFile) {
-          // Hapus file lama kalau ada
-          if (question.image) {
-            await this.fileUploadService.deleteImage(question.image, 'tasks');
-          }
-
-          const fileDto = this.fileUploadService.convertMulterFileToDto(
-            qDto.imageFile,
-          );
-          const uploadResult = await this.fileUploadService.uploadImage(
-            fileDto,
-            qDto.questionId,
-            'tasks',
-            true,
-            taskId,
-            'questions',
-          );
-
-          question.image = uploadResult.url;
-        }
-
-        question.text = qDto.text;
-        question.type = qDto.type;
-        question.point = qDto.point;
-        question.time_limit = qDto.timeLimit;
-        question.updated_at = new Date();
-        question.updated_by = updatedBy ?? null;
-        const savedQ = await this.taskQuestionRepository.save(question);
-
-        // sync options
-        await this.syncTaskQuestionOptions(
-          savedQ.task_question_id,
-          qDto.options,
-          updatedBy,
-        );
-      } else {
-        let imageUrl = '';
-
-        // Insert baru
-        const newQuestion = this.taskQuestionRepository.create({
-          text: qDto.text,
-          type: qDto.type,
-          point: qDto.point,
-          image: imageUrl,
-          time_limit: qDto.timeLimit,
-          created_at: new Date(),
-          created_by: updatedBy ?? null,
-          task_id: taskId,
-        });
-        const savedQ = await this.taskQuestionRepository.save(newQuestion);
-
-        // Upload image jika ada file
-        if (qDto.imageFile) {
-          const fileDto = this.fileUploadService.convertMulterFileToDto(
-            qDto.imageFile,
-          );
-
-          const uploadResult = await this.fileUploadService.uploadImage(
-            fileDto,
-            savedQ.task_question_id,
-            'tasks',
-            true,
-            taskId,
-            'questions',
-          );
-
-          imageUrl = uploadResult.url;
-        }
-
-        // insert options baru
-        if (qDto.options?.length > 0) {
-          const newOptions = qDto.options.map((o) =>
-            this.taskQuestionOptionRepository.create({
-              text: o.text,
-              is_correct: o.isCorrect,
-              created_at: new Date(),
-              created_by: updatedBy ?? null,
-              question_id: savedQ.task_question_id,
-            }),
-          );
-          await this.taskQuestionOptionRepository.save(newOptions);
-        }
-      }
-    }
-  }
-
   async updateTask(
     id: string,
     dto: UpdateTaskDto,
@@ -633,7 +402,7 @@ export class TaskService {
     }
 
     if (dto.questions) {
-      await this.syncTaskQuestions(
+      await this.taskQuestionService.syncTaskQuestions(
         updatedTask.task_id,
         dto.questions,
         dto.updatedBy,
@@ -673,16 +442,8 @@ export class TaskService {
     // Hapus seluruh folder tasks/{taskId} dari storage (termasuk image task & question)
     await this.fileUploadService.deleteFolder('tasks', id);
 
-    // Hapus data di task_question_options
-    const questions = await this.taskQuestionRepository.find({
-      where: { task_id: id },
-    });
-    await this.taskQuestionOptionRepository.delete({
-      question_id: In(questions.map((q) => q.task_question_id)),
-    });
-
-    // Hapus data di task_questions
-    await this.taskQuestionRepository.delete({ task_id: id });
+    // Hapus data di task_questions (otomatis hapus options)
+    await this.taskQuestionService.deleteTaskQuestion(id);
 
     // Hapus data di task_grades
     await this.taskGradeRepository.delete({ task_id: id });

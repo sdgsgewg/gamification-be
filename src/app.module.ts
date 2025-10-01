@@ -14,6 +14,8 @@ import { MaterialModule } from './modules/materials/materials.module';
 import { TaskTypeModule } from './modules/task-types/task-types.module';
 import { TaskModule } from './modules/tasks/tasks.module';
 import { RoleModule } from './modules/roles/roles.module';
+import { TaskQuestionModule } from './modules/task-questions/task-questions.module';
+import { TaskQuestionOptionModule } from './modules/task-question-options/task-question-options.module';
 
 @Module({
   imports: [
@@ -44,6 +46,8 @@ import { RoleModule } from './modules/roles/roles.module';
     MaterialModule,
     TaskTypeModule,
     TaskModule,
+    TaskQuestionModule,
+    TaskQuestionOptionModule,
     // tambah module baru di sini
   ],
   controllers: [AppController],
