@@ -34,6 +34,14 @@ export class SubjectService {
         'subject.slug AS "slug"',
       ]);
 
+    // filter
+    if (filterDto.searchText) {
+      qb.andWhere('subject.name ILIKE :searchText', {
+        searchText: `%${filterDto.searchText}%`,
+      });
+    }
+
+    // order by
     const orderBy = filterDto.orderBy ?? 'createdAt';
     const orderState = filterDto.orderState ?? 'DESC';
 
@@ -41,12 +49,6 @@ export class SubjectService {
     const dbColumn = getDbColumn(Subject, orderBy as keyof Subject);
 
     qb.orderBy(`subject.${dbColumn}`, orderState);
-
-    if (filterDto.searchText) {
-      qb.andWhere('subject.name ILIKE :searchText', {
-        searchText: `%${filterDto.searchText}%`,
-      });
-    }
 
     const rawSubjects = await qb.getRawMany();
 

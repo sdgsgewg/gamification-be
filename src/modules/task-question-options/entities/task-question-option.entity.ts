@@ -20,6 +20,9 @@ export class TaskQuestionOption {
   @Column({ type: 'boolean', default: false })
   is_correct: boolean;
 
+  @Column({ type: 'int', nullable: true })
+  order: number;
+
   @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
 

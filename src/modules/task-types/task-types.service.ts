@@ -27,6 +27,44 @@ export class TaskTypeService {
   ): Promise<TaskTypeOverviewResponseDto[]> {
     const qb = this.taskTypeRepository.createQueryBuilder('taskType');
 
+    // filter
+    if (filterDto.searchText) {
+      qb.andWhere('taskType.name ILIKE :searchText', {
+        searchText: `%${filterDto.searchText}%`,
+      });
+    }
+
+    if (filterDto.scope) {
+      qb.andWhere('taskType.scope = :scope', {
+        scope: filterDto.scope,
+      });
+    }
+
+    if (filterDto.hasDeadline) {
+      qb.andWhere('taskType.has_deadline = :hasDeadline', {
+        hasDeadline: filterDto.hasDeadline === 'true' ? true : false,
+      });
+    }
+
+    if (filterDto.isCompetitive) {
+      qb.andWhere('taskType.is_competitive = :isCompetitive', {
+        isCompetitive: filterDto.isCompetitive === 'true' ? true : false,
+      });
+    }
+
+    if (filterDto.isRepeatable) {
+      qb.andWhere('taskType.is_repeatable = :isRepeatable', {
+        isRepeatable: filterDto.isRepeatable === 'true' ? true : false,
+      });
+    }
+
+    if (filterDto.pointMultiplier) {
+      qb.andWhere('taskType.point_multiplier = :pointMultiplier', {
+        pointMultiplier: filterDto.pointMultiplier,
+      });
+    }
+
+    // order by
     const orderBy = filterDto.orderBy ?? 'createdAt';
     const orderState = filterDto.orderState ?? 'DESC';
 
@@ -34,12 +72,6 @@ export class TaskTypeService {
     const dbColumn = getDbColumn(TaskType, orderBy as keyof TaskType);
 
     qb.orderBy(`taskType.${dbColumn}`, orderState);
-
-    if (filterDto.searchText) {
-      qb.andWhere('taskType.name ILIKE :searchText', {
-        searchText: `%${filterDto.searchText}%`,
-      });
-    }
 
     const rawTaskTypes = await qb.getMany();
 

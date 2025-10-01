@@ -22,7 +22,12 @@ async function bootstrap() {
   app.use(json({ limit: '10mb' }));
   app.use(urlencoded({ extended: true, limit: '10mb' }));
 
-  app.useGlobalPipes(new ValidationPipe());
+  app.useGlobalPipes(
+    new ValidationPipe({
+      transform: true, // ubah query string ke tipe sesuai DTO
+      whitelist: true,
+    }),
+  );
 
   app.enableCors({
     origin: configService.get('FRONTEND_URL'),

@@ -30,6 +30,9 @@ export class TaskQuestion {
   @Column({ type: 'int', nullable: true })
   time_limit: number;
 
+  @Column({ type: 'int' })
+  order: number;
+
   @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
 
