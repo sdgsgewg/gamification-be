@@ -28,11 +28,17 @@ export class SubjectService {
   ): Promise<SubjectOverviewResponseDto[]> {
     const qb = this.subjectRepository
       .createQueryBuilder('subject')
+      .leftJoin('subject.tasks', 'tasks')
       .select([
         'subject.subject_id AS "subjectId"',
         'subject.name AS "name"',
         'subject.slug AS "slug"',
-      ]);
+        'subject.image AS "image"',
+      ])
+      .addSelect('COUNT(DISTINCT tasks.task_id)', 'activityCount')
+      .groupBy('subject.subject_id')
+      .addGroupBy('subject.name')
+      .addGroupBy('subject.slug');
 
     // filter
     if (filterDto.searchText) {
@@ -57,6 +63,8 @@ export class SubjectService {
         subjectId: s.subjectId,
         name: s.name,
         slug: s.slug,
+        image: s.image,
+        activityCount: Number(s.activityCount) || 0,
       }),
     );
 

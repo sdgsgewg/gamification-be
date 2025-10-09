@@ -1,4 +1,5 @@
 import { Material } from 'src/modules/materials/entities/material.entity';
+import { Task } from 'src/modules/tasks/entities/task.entity';
 import { Entity, Column, PrimaryGeneratedColumn, OneToMany } from 'typeorm';
 
 @Entity('subjects')
@@ -32,4 +33,7 @@ export class Subject {
 
   @OneToMany(() => Material, (m) => m.subject)
   materials: Material[];
+
+  @OneToMany(() => Task, (t) => t.subject)
+  tasks: Task[];
 }
