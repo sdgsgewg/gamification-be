@@ -111,7 +111,7 @@ export class ActivityService {
       image: t.image,
       type: t.tasktype ?? t.taskType,
       subject: t.subject,
-      taskGrade: t.taskgrade ?? (t.taskGrade || null),
+      grade: t.taskgrade ?? (t.taskGrade || null),
       questionCount: Number(t.questioncount ?? t.questionCount) || 0,
       answeredCount: Number(t.answeredcount ?? t.answeredCount) || 0,
     }));
@@ -190,8 +190,16 @@ export class ActivityService {
     userId: string,
   ) {
     const favSubject = await this.getUserMostAttemptedSubject(userId);
+
     if (favSubject)
       qb.andWhere('subject.name = :subjectName', { subjectName: favSubject });
+
+    // exclude tasks that are in "continue" section
+    const continueSub = this.buildUserAttemptSubQuery(userId, false); // exclude completed
+    qb.andWhere(
+      `task.task_id NOT IN (${continueSub.getQuery()})`,
+    ).setParameters(continueSub.getParameters());
+
     qb.orderBy('task.created_at', 'DESC').limit(10);
   }
 
