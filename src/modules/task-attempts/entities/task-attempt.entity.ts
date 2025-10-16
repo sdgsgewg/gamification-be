@@ -5,7 +5,7 @@ import { User } from 'src/modules/users/entities/user.entity';
 import {
   Entity,
   Column,
-  PrimaryColumn,
+  PrimaryGeneratedColumn,
   JoinColumn,
   ManyToOne,
   OneToOne,
@@ -14,31 +14,34 @@ import {
 
 @Entity('task_attempts')
 export class TaskAttempt {
-  @PrimaryColumn()
+  @PrimaryGeneratedColumn('uuid')
   task_attempt_id: string;
 
-  @Column()
-  started_at: Date;
-
-  @Column()
-  completed_at: Date;
-
-  @Column()
+  @Column({ type: 'int4', nullable: true })
   points: number;
 
-  @Column()
+  @Column({ type: 'int4', nullable: true })
   xp_gained: number;
 
-  @Column()
+  @Column({ type: 'int4', default: 0 })
+  answered_question_count: number;
+
+  @Column({ type: 'varchar', default: 'on_progress' })
   status: string;
 
-  @Column()
-  created_at: Date;
+  @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
+  started_at: Date;
 
-  @Column()
+  @Column({ type: 'timestamptz', nullable: true })
+  last_accessed_at: Date;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  completed_at: Date;
+
+  @Column({ type: 'uuid' })
   task_id: string;
 
-  @Column()
+  @Column({ type: 'uuid' })
   student_id: string;
 
   @ManyToOne(() => Task)
