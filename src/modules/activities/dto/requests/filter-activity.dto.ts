@@ -1,7 +1,11 @@
 import { Transform } from 'class-transformer';
-import { IsIn, IsOptional, IsString } from 'class-validator';
+import { IsOptional, IsString } from 'class-validator';
 
-export class FilterTaskDto {
+export class FilterActivityDto {
+  @IsOptional()
+  @IsString()
+  section?: string;
+
   @IsOptional()
   @IsString()
   searchText?: string;
@@ -25,10 +29,6 @@ export class FilterTaskDto {
   gradeIds?: string[];
 
   @IsOptional()
-  @IsIn(['createdAt', 'updatedAt', 'title'])
-  orderBy?: 'createdAt' | 'updatedAt' | 'title';
-
-  @IsOptional()
-  @IsIn(['ASC', 'DESC'])
-  orderState?: 'ASC' | 'DESC';
+  @IsString()
+  userId?: string; // tambahan untuk kategori 'continue' & 'recommended'
 }

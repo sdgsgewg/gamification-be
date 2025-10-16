@@ -16,6 +16,7 @@ import { TaskModule } from './modules/tasks/tasks.module';
 import { RoleModule } from './modules/roles/roles.module';
 import { TaskQuestionModule } from './modules/task-questions/task-questions.module';
 import { TaskQuestionOptionModule } from './modules/task-question-options/task-question-options.module';
+import { ActivityModule } from './modules/activities/activities.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { TaskQuestionOptionModule } from './modules/task-question-options/task-q
     TaskModule,
     TaskQuestionModule,
     TaskQuestionOptionModule,
+    ActivityModule,
     // tambah module baru di sini
   ],
   controllers: [AppController],
