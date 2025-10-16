@@ -5,9 +5,11 @@ import {
   Param,
   Req,
   BadRequestException,
+  UseGuards,
 } from '@nestjs/common';
 import { ActivityService } from './activities.service';
 import { FilterActivityDto } from './dto/requests/filter-activity.dto';
+import { OptionalJwtAuthGuard } from 'src/auth/optional-jwt-auth.guard';
 
 @Controller('/activities')
 export class ActivityController {
@@ -19,16 +21,14 @@ export class ActivityController {
   }
 
   @Get(':slug')
-  async getActivityDetail(@Param('slug') slug: string, @Req() req: Request) {
+  @UseGuards(OptionalJwtAuthGuard)
+  async getActivityDetail(@Param('slug') slug: string, @Req() req: any) {
     if (!slug) {
-      throw new BadRequestException('Task slug is required');
+      throw new BadRequestException('Activity slug is required');
     }
 
     // Ambil userId dari request (kalau user login)
-    // const userId =
-    //   (req as any).user?.id || '814ac2c9-3b7b-4d57-a7a1-b3d378dbc05e';
-    const userId = (req as any).user?.id || null;
-    console.log('User Id: ', userId);
+    const userId = req.user?.id || null;
 
     return this.activityService.findActivityBySlug(slug, userId);
   }

@@ -159,7 +159,7 @@ export class AuthController {
 
     try {
       const payload = this.jwtService.verify(token, {
-        secret: process.env.SUPABASE_SERVICE_ROLE_KEY,
+        secret: process.env.JWT_SECRET,
         clockTolerance: 30, // 30 detik toleransi perbedaan waktu
         ignoreExpiration: false, // Pastikan false di production
       });

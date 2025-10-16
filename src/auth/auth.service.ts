@@ -129,17 +129,17 @@ export class AuthService {
 
       // Generate JWT token
       const payload = {
-        uid: existingUser.userId,
+        id: existingUser.userId,
         email: existingUser.email,
         role: existingUser.role.name || 'user',
       };
 
       const accessToken = this.jwtService.sign(payload, {
-        secret: process.env.SUPABASE_SERVICE_ROLE_KEY,
+        secret: process.env.JWT_SECRET,
         expiresIn: process.env.ACCESS_TOKEN_EXPIRY || '15m',
       });
       const refreshToken = this.jwtService.sign(payload, {
-        secret: process.env.SUPABASE_SERVICE_ROLE_KEY,
+        secret: process.env.JWT_SECRET,
         expiresIn: remember ? process.env.REFRESH_TOKEN_EXPIRY || '30d' : '1d',
       });
 

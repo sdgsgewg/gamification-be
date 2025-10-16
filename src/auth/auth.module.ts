@@ -22,7 +22,7 @@ import { User } from 'src/modules/users/entities/user.entity';
       // Changed from register to registerAsync
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('SUPABASE_SERVICE_ROLE_KEY'),
+        secret: configService.get<string>('JWT_SECRET'),
         signOptions: { expiresIn: '7d' },
       }),
       inject: [ConfigService],

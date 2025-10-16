@@ -39,6 +39,6 @@ async function bootstrap() {
   await app.listen(3001);
 
   console.log(`Application is running on: ${await app.getUrl()}`);
-  console.log('JWT Secret:', configService.get('SUPABASE_SERVICE_ROLE_KEY')); // Verify secret loads
+  console.log('JWT Secret:', configService.get('JWT_SECRET')); // Verify secret loads
 }
 bootstrap();
