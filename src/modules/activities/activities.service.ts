@@ -148,7 +148,7 @@ export class ActivityService {
       .addSelect('MAX(ta.last_accessed_at)', 'lastaccessedat')
       .addSelect('MAX(ta.completed_at)', 'completedat')
       .addSelect('MAX(ta.status)', 'status')
-      .addSelect('MAX(ta.started_at)', 'laststarted')
+      .addSelect('MAX(ta.started_at)', 'startedat')
       .where('ta.student_id = :userId', { userId });
 
     if (!includeCompleted)
@@ -244,6 +244,7 @@ export class ActivityService {
         .setParameters(attemptSub.getParameters())
         .addSelect([
           'attempt.answeredcount AS answeredcount',
+          'attempt.startedat AS startedat',
           'attempt.lastaccessedat AS lastaccessedat',
           'attempt.completedat AS completedat',
           'attempt.status AS status',
@@ -251,6 +252,7 @@ export class ActivityService {
     } else {
       qb.addSelect([
         '0 AS answeredcount',
+        'NULL AS startedat',
         'NULL AS lastaccessedat',
         'NULL AS completedat',
         `'not_started' AS status`,
@@ -266,6 +268,7 @@ export class ActivityService {
 
     return this.mapToDetailResponse(task, {
       answeredCount: meta.answeredcount ?? 0,
+      startedAt: meta.startecat ?? null,
       lastAccessedAt: meta.lastaccessedat ?? null,
       completedAt: meta.completedat ?? null,
       status: meta.status ?? 'not_started',

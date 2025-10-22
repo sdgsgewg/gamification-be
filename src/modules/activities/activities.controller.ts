@@ -29,6 +29,7 @@ export class ActivityController {
 
     // Ambil userId dari request (kalau user login)
     const userId = req.user?.id || null;
+    console.log("User Id: ", userId);
 
     return this.activityService.findActivityBySlug(slug, userId);
   }
