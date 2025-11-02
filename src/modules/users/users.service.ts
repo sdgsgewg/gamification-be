@@ -12,6 +12,7 @@ import { UserDetailResponseDto } from './dto/responses/user-detail-response.dto'
 import { getDateTime } from 'src/common/utils/date-modifier.util';
 import { CreateUserDto } from 'src/auth/dto/requests/create-user.dto';
 import { RoleService } from '../roles/roles.service';
+import { LevelHelper } from 'src/common/helpers/level.helper';
 
 @Injectable()
 export class UserService {
@@ -219,5 +220,22 @@ export class UserService {
         grade_id: gradeId ?? null,
       },
     );
+  }
+
+  async updateLevelAndXp(userId: string, xpGained: number): Promise<void> {
+    const existingUser = await this.userRepository.findOne({
+      where: { user_id: userId },
+    });
+    if (!existingUser) throw new Error('User not found');
+
+    const { newLevel, newXp } = LevelHelper.getUserLevel(
+      existingUser.level,
+      existingUser.xp,
+      xpGained,
+    );
+
+    existingUser.level = newLevel;
+    existingUser.xp = newXp;
+    await this.userRepository.save(existingUser);
   }
 }

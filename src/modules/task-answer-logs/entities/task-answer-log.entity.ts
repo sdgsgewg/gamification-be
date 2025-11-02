@@ -1,32 +1,32 @@
 import { TaskAttempt } from 'src/modules/task-attempts/entities/task-attempt.entity';
 import { TaskQuestion } from 'src/modules/task-questions/entities/task-question.entity';
 import { TaskQuestionOption } from 'src/modules/task-question-options/entities/task-question-option.entity';
-import { Entity, Column, PrimaryColumn, JoinColumn, ManyToOne } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, JoinColumn, ManyToOne } from 'typeorm';
 
 @Entity('task_answer_logs')
 export class TaskAnswerLog {
-  @PrimaryColumn()
+  @PrimaryGeneratedColumn('uuid')
   task_answer_log_id: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'text', nullable: true })
   answer_text: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'text', nullable: true })
   image: string;
 
-  @Column()
+  @Column({ type: 'boolean' })
   is_correct: boolean;
 
-  @Column()
+  @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
 
-  @Column()
+  @Column({ type: 'uuid' })
   task_attempt_id: string;
 
-  @Column()
+  @Column({ type: 'uuid' })
   question_id: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   option_id: string;
 
   @ManyToOne(() => TaskAttempt)

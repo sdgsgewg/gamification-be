@@ -32,7 +32,7 @@ export class TaskAttempt {
   @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   started_at: Date;
 
-  @Column({ type: 'timestamptz', nullable: true })
+  @Column({ type: 'timestamptz' })
   last_accessed_at: Date;
 
   @Column({ type: 'timestamptz', nullable: true })

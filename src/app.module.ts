@@ -17,6 +17,8 @@ import { RoleModule } from './modules/roles/roles.module';
 import { TaskQuestionModule } from './modules/task-questions/task-questions.module';
 import { TaskQuestionOptionModule } from './modules/task-question-options/task-question-options.module';
 import { ActivityModule } from './modules/activities/activities.module';
+import { TaskAnswerLogModule } from './modules/task-answer-logs/task-answer-logs.module';
+import { TaskAttemptModule } from './modules/task-attempts/task-attempts.module';
 
 @Module({
   imports: [
@@ -50,6 +52,8 @@ import { ActivityModule } from './modules/activities/activities.module';
     TaskQuestionModule,
     TaskQuestionOptionModule,
     ActivityModule,
+    TaskAttemptModule,
+    TaskAnswerLogModule
     // tambah module baru di sini
   ],
   controllers: [AppController],

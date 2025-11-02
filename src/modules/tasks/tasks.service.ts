@@ -273,8 +273,8 @@ export class TaskService {
     // simpan ke task_questions (otomatis include options)
     if (dto.questions?.length > 0) {
       await this.taskQuestionService.createTaskQuestions(
-        dto.questions,
         savedTask.task_id,
+        dto.questions,
         dto.createdBy,
       );
     }

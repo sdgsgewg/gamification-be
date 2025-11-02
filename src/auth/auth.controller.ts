@@ -166,8 +166,15 @@ export class AuthController {
 
       // Generate new token dengan secret yang sama
       const newAccessToken = this.jwtService.sign(
-        { uid: payload.uid, email: payload.email },
-        { expiresIn: process.env.ACCESS_TOKEN_EXPIRY || '15m' },
+        {
+          id: payload.id || payload.uid, // fallback kalau field-nya uid
+          email: payload.email,
+          role: payload.role || 'user',
+        },
+        {
+          secret: process.env.JWT_SECRET,
+          expiresIn: process.env.ACCESS_TOKEN_EXPIRY || '15m',
+        },
       );
 
       return res.json({ accessToken: newAccessToken });

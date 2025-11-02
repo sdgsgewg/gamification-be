@@ -24,8 +24,8 @@ export class TaskQuestionService {
   }
 
   async createTaskQuestions(
-    questionsDto: CreateTaskQuestionDto[],
     taskId: string,
+    questionsDto: CreateTaskQuestionDto[],
     createdBy: string,
   ): Promise<void> {
     const savedQuestions: TaskQuestion[] = [];
