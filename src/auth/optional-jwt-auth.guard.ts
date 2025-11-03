@@ -1,16 +1,26 @@
 import { Injectable, ExecutionContext } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { firstValueFrom, isObservable } from 'rxjs';
 
 @Injectable()
 export class OptionalJwtAuthGuard extends AuthGuard('jwt') {
-  canActivate(context: ExecutionContext) {
-    const request = context.switchToHttp().getRequest();
-    // Allow requests without JWT
-    return super.canActivate(context) || true;
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    try {
+      const result = super.canActivate(context);
+      if (isObservable(result)) {
+        await firstValueFrom(result);
+      } else if (result instanceof Promise) {
+        await result;
+      }
+      return true;
+    } catch (_error) {
+      // ✅ gunakan prefix _ agar lint tidak complain
+      return true;
+    }
   }
 
-  handleRequest(err: any, user: any, info: any) {
-    // Jika user tidak ada, jangan lempar error, biarkan null
+  handleRequest(_err: any, user: any, _info: any) {
+    // ✅ sama di sini
     return user || null;
   }
 }

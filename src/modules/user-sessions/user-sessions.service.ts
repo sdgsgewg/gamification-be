@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import * as dayjs from 'dayjs';
+import dayjs from 'dayjs';
 import { SupabaseService } from 'src/integrations/supabase/supabase.service';
 
 @Injectable()
@@ -24,13 +24,20 @@ export class UserSessionService {
     if (error) throw new Error(`Create session failed: ${error.message}`);
   }
 
+  private extractBrowser(userAgent: string) {
+    if (userAgent.includes('Chrome')) return 'Chrome';
+    if (userAgent.includes('Firefox')) return 'Firefox';
+    if (userAgent.includes('Safari')) return 'Safari';
+    return 'Unknown';
+  }
+
   async findValidSession(refreshToken: string, userAgent: string) {
     const { data, error } = await this.supabaseService
       .getClient()
       .from('user_sessions')
       .select('*')
       .eq('refresh_token', refreshToken)
-      .eq('device_info', userAgent)
+      .ilike('device_info', `%${this.extractBrowser(userAgent)}%`)
       .gte('expires_at', new Date().toISOString())
       .single();
 

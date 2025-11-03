@@ -28,6 +28,7 @@ export class ActivityController {
     }
 
     // Ambil userId dari request (kalau user login)
+    console.log('Req User: ', JSON.stringify(req.user, null, 2));
     const userId = req.user?.id || null;
     console.log('User Id: ', userId);
 
@@ -45,5 +46,18 @@ export class ActivityController {
     const userId = req.user?.id || null;
 
     return this.activityService.findActivityWithQuestions(slug, userId);
+  }
+
+  @Get('summary/:slug')
+  @UseGuards(OptionalJwtAuthGuard)
+  async getActivitySummaryFromAttempt(@Param('slug') slug: string, @Req() req: any) {
+    if (!slug) {
+      throw new BadRequestException('Activity slug is required');
+    }
+
+    // Ambil userId dari request (kalau user login)
+    const userId = req.user?.id || null;
+
+    return this.activityService.findActivitySummaryFromAttempt(slug, userId);
   }
 }

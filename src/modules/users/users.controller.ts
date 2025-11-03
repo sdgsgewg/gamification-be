@@ -23,7 +23,7 @@ export class UserController {
   @UseGuards(JwtAuthGuard)
   @Get('me')
   async getLoggedInUser(@Req() req) {
-    const userId = req.user?.uid; // asumsi payload token punya uid
+    const userId = req.user?.id || null;
     return this.userService.findUserBy('id', userId);
   }
 

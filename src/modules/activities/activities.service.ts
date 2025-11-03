@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, SelectQueryBuilder } from 'typeorm';
+import { Not, Repository, SelectQueryBuilder } from 'typeorm';
 import { FilterActivityDto } from './dto/requests/filter-activity.dto';
 import { Task } from '../tasks/entities/task.entity';
 import { TaskAttempt } from '../task-attempts/entities/task-attempt.entity';
@@ -544,27 +544,45 @@ export class ActivityService {
   }
 
   async findActivitySummaryFromAttempt(taskSlug: string, userId: string) {
-    const qb = this.taskAttemptRepository
-      .createQueryBuilder('attempt')
-      .leftJoinAndSelect('attempt.task', 'task')
-      .leftJoinAndSelect('task.taskQuestions', 'question')
-      .leftJoinAndSelect('question.taskQuestionOptions', 'option')
-      .leftJoinAndSelect('attempt.taskAnswerLogs', 'answerLog')
-      .leftJoinAndSelect('answerLog.question', 'answeredQuestion')
-      .where('task.slug = :slug', { slug: taskSlug })
-      .andWhere('attempt.student_id = :userId', { userId })
-      .andWhere('attempt.status != :completed', { completed: 'completed' })
-      .orderBy('question.order', 'ASC')
-      .addOrderBy('option.order', 'ASC')
-      .addOrderBy('answerLog.created_at', 'ASC');
+    const attempt = await this.taskAttemptRepository.findOne({
+      where: {
+        student_id: userId,
+        status: 'completed',
+        task: { slug: taskSlug },
+      },
+      relations: {
+        task: {
+          taskQuestions: {
+            taskQuestionOptions: true,
+          },
+        },
+        taskAnswerLogs: {
+          question: true,
+        },
+      },
+      order: {
+        completed_at: 'DESC',
+        task: {
+          taskQuestions: {
+            order: 'ASC',
+            taskQuestionOptions: {
+              order: 'ASC',
+            },
+          },
+        },
+        taskAnswerLogs: {
+          created_at: 'ASC',
+        },
+      },
+    });
 
-    // Ambil satu attempt paling baru
-    const attempt = await qb.getOne();
+    if (!attempt) {
+      console.log('No attempt found');
 
-    if (!attempt)
       throw new NotFoundException(
         `No attempt found for user ${userId} on task ${taskSlug}`,
       );
+    }
 
     return this.mapActivitySummaryFromAttempt(attempt);
   }
@@ -572,6 +590,7 @@ export class ActivityService {
   private mapActivitySummaryFromAttempt(
     attempt: TaskAttempt,
   ): ActivitySummaryResponseDto {
+    const { title, image, description } = attempt.task;
     const { points, xp_gained, completed_at, task, taskAnswerLogs } = attempt;
 
     const questions =
@@ -606,9 +625,12 @@ export class ActivityService {
       }) || [];
 
     return {
+      title,
+      image,
+      description,
       point: points,
       xpGained: xp_gained,
-      completedTime: getDateTime(completed_at),
+      completedAt: getDateTime(completed_at),
       questions,
     };
   }

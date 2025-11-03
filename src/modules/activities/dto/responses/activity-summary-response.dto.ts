@@ -25,8 +25,11 @@ export class Question {
 }
 
 export class ActivitySummaryResponseDto {
+  title: string;
+  image: string;
+  description: string;
   point: number;
   xpGained: number;
-  completedTime: string;
+  completedAt: string;
   questions: Question[];
 }
