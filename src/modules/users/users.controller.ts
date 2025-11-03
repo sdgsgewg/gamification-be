@@ -27,6 +27,13 @@ export class UserController {
     return this.userService.findUserBy('id', userId);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Get('stats')
+  async getUserStats(@Req() req) {
+    const userId = req.user?.id || null;
+    return this.userService.findUserStats(userId);
+  }
+
   @Get(':id')
   async getUserById(@Param('id') id: string) {
     if (!id) {

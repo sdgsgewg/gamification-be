@@ -4,8 +4,16 @@ export class LevelHelper {
    */
   static getTotalXpForLevel(level: number): number {
     if (level <= 1) return 0;
-    const total = (2 / 5) * Math.pow(level, 2.5) - 2 / 5;
+    const total = (2 / 5) * Math.pow(level, 1.8) - 2 / 5;
     return Math.floor(100 * total);
+  }
+
+  /**
+   * Hitung XP progress dari pengguna.
+   */
+  static getXpProgress(currXp: number, nextLvlMinXp): number {
+    const xpProgress = Math.round((currXp / nextLvlMinXp) * 100);
+    return xpProgress;
   }
 
   /**

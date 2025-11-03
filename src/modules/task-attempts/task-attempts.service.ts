@@ -1,6 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import {
+  In,
+  Repository,
+  Between,
+  MoreThanOrEqual,
+  LessThanOrEqual,
+  Raw,
+} from 'typeorm';
 import { TaskAttempt } from './entities/task-attempt.entity';
 import { CreateTaskAttemptDto } from './dto/requests/create-task-attempt.dto';
 import { UpdateTaskAttemptDto } from './dto/requests/update-task-attempt.dto';
@@ -11,6 +18,21 @@ import { UserService } from '../users/users.service';
 import { DetailResponseDto } from 'src/common/responses/detail-response.dto';
 import { UpsertTaskAttemptResponseDto } from './dto/responses/upsert-task-attempt.dto';
 import { LevelHelper } from 'src/common/helpers/level.helper';
+import {
+  TaskAttemptDetailResponseDto,
+  TaskAttemptProgress,
+  TaskAttemptStats,
+} from './dto/responses/task-attempt-detail.dto';
+import {
+  getDateTime,
+  getTime,
+  getTimePeriod,
+} from 'src/common/utils/date-modifier.util';
+import { ActivityAttemptStatus } from '../activities/enums/activity-attempt-status.enum';
+import { FilterTaskAttemptDto } from './dto/requests/filter-task-attempt.dto';
+import { format } from 'date-fns';
+import { id } from 'date-fns/locale';
+import { GroupedTaskAttemptResponseDto } from './dto/responses/grouped-task-attempt.dto';
 
 @Injectable()
 export class TaskAttemptService {
@@ -24,6 +46,261 @@ export class TaskAttemptService {
     private readonly taskAnswerLogService: TaskAnswerLogService,
     private readonly userService: UserService,
   ) {}
+
+  async findAllTaskAttemptsbyUser(
+    userId: string,
+    filterDto: FilterTaskAttemptDto,
+  ): Promise<GroupedTaskAttemptResponseDto[]> {
+    // Mulai dengan filter dasar: berdasarkan user
+    const where: any = {
+      student_id: userId,
+    };
+
+    // Tambahkan filter dinamis
+    if (filterDto.status) {
+      where.status = filterDto.status;
+    }
+
+    if (filterDto.dateFrom && filterDto.dateTo) {
+      where.last_accessed_at = Between(filterDto.dateFrom, filterDto.dateTo);
+    } else if (filterDto.dateFrom) {
+      where.last_accessed_at = MoreThanOrEqual(filterDto.dateFrom);
+    } else if (filterDto.dateTo) {
+      where.last_accessed_at = LessThanOrEqual(filterDto.dateTo);
+    }
+
+    // Filter by search text (task name)
+    if (filterDto.searchText) {
+      where.task = {
+        ...where.task,
+        name: Raw((alias) => `${alias} ILIKE :name`, {
+          name: `%${filterDto.searchText}%`,
+        }),
+      };
+    }
+
+    // Order dinamis
+    const orderBy = filterDto.orderBy ?? 'last_accessed_at';
+    const orderState = filterDto.orderState ?? 'DESC';
+
+    // Query
+    const attempts = await this.taskAttemptRepository.find({
+      where,
+      relations: {
+        task: true,
+      },
+      order: {
+        [orderBy]: orderState,
+      },
+    });
+
+    // Error handling
+    if (!attempts.length) {
+      throw new NotFoundException(
+        `No attempt found for user with id ${userId}`,
+      );
+    }
+
+    // Mapping
+    const groupByCompleted = filterDto.status?.toLowerCase() === 'completed';
+    return this.mapAndGroupTaskAttempts(attempts, groupByCompleted);
+  }
+
+  private mapAndGroupTaskAttempts(
+    attempts: TaskAttempt[],
+    groupByCompleted: boolean,
+  ): GroupedTaskAttemptResponseDto[] {
+    const grouped = attempts.reduce(
+      (acc, attempt) => {
+        const { title, image } = attempt.task;
+        const { task_attempt_id, status, last_accessed_at, completed_at } =
+          attempt;
+
+        // Pilih tanggal berdasarkan mode grouping
+        const dateValue = groupByCompleted ? completed_at : last_accessed_at;
+        if (!dateValue) return acc;
+
+        const date = new Date(dateValue);
+        if (isNaN(date.getTime())) return acc;
+
+        const dateKey = format(date, 'yyyy-MM-dd');
+        if (!acc[dateKey]) {
+          acc[dateKey] = {
+            dateLabel: format(date, 'd MMM yyyy', { locale: id }),
+            dayLabel: format(date, 'EEEE', { locale: id }),
+            attempts: [],
+          };
+        }
+
+        // Map langsung ke DTO kecil di sini
+        acc[dateKey].attempts.push({
+          id: task_attempt_id,
+          title,
+          image,
+          status,
+          lastAccessedTime: getTime(last_accessed_at),
+          completedTime: completed_at ? getTime(completed_at) : null,
+        });
+
+        return acc;
+      },
+      {} as Record<string, GroupedTaskAttemptResponseDto>,
+    );
+
+    return Object.values(grouped);
+  }
+
+  async findTaskAttemptById(attemptId: string) {
+    const attempt = await this.taskAttemptRepository.findOne({
+      where: {
+        task_attempt_id: attemptId,
+      },
+      relations: {
+        task: {
+          subject: true,
+          material: true,
+          taskType: true,
+          taskGrades: { grade: true },
+          taskQuestions: {
+            taskQuestionOptions: true,
+          },
+        },
+        taskAnswerLogs: {
+          question: true,
+        },
+      },
+      order: {
+        task: {
+          taskQuestions: {
+            order: 'ASC',
+            taskQuestionOptions: {
+              order: 'ASC',
+            },
+          },
+        },
+        taskAnswerLogs: {
+          created_at: 'ASC',
+        },
+      },
+    });
+
+    if (!attempt) {
+      throw new NotFoundException(`No attempt found for id ${attemptId}`);
+    }
+
+    return this.mapTaskAttemptDetail(attempt);
+  }
+
+  private mapTaskAttemptDetail(
+    attempt: TaskAttempt,
+  ): TaskAttemptDetailResponseDto {
+    const {
+      title,
+      image,
+      description,
+      subject,
+      material,
+      taskType,
+      taskGrades,
+      taskQuestions,
+      start_time,
+      end_time,
+      created_by,
+    } = attempt.task;
+    const {
+      points,
+      xp_gained,
+      started_at,
+      last_accessed_at,
+      completed_at,
+      status,
+      task,
+      taskAnswerLogs,
+    } = attempt;
+
+    const totalPoints = taskQuestions.reduce(
+      (acc, question) => acc + (question.point ?? 0),
+      0,
+    );
+
+    const score = Math.round((points / totalPoints) * 100);
+
+    const stats: TaskAttemptStats = {
+      pointGained: points,
+      xpGained: xp_gained,
+      totalPoints,
+      score,
+    };
+
+    const rawStatus = status as string | null;
+
+    const normalizedStatus = Object.values(ActivityAttemptStatus).includes(
+      rawStatus as ActivityAttemptStatus,
+    )
+      ? (rawStatus as ActivityAttemptStatus)
+      : ActivityAttemptStatus.NOT_STARTED;
+
+    const progress: TaskAttemptProgress = {
+      startedAt: getDateTime(started_at),
+      lastAccessedAt: getDateTime(last_accessed_at),
+      completedAt: getDateTime(completed_at),
+      status: normalizedStatus,
+    };
+
+    const questions =
+      task.taskQuestions?.map((q) => {
+        const userAnswer = taskAnswerLogs.find(
+          (log) => log.question_id === q.task_question_id,
+        );
+
+        return {
+          questionId: q.task_question_id,
+          text: q.text,
+          point: q.point,
+          type: q.type,
+          timeLimit: q.time_limit ?? null,
+          image: q.image ?? null,
+          options: q.taskQuestionOptions?.map((o) => ({
+            optionId: o.task_question_option_id,
+            text: o.text,
+            isCorrect: o.is_correct,
+            isSelected: userAnswer?.option_id === o.task_question_option_id,
+          })),
+          userAnswer: userAnswer
+            ? {
+                answerLogId: userAnswer.task_answer_log_id,
+                text: userAnswer.answer_text,
+                image: userAnswer.image,
+                optionId: userAnswer.option_id,
+                isCorrect: userAnswer.is_correct,
+              }
+            : null,
+        };
+      }) || [];
+
+    return {
+      title,
+      image,
+      description,
+      subject: subject.name,
+      material: material ? material.name : null,
+      type: taskType.name,
+      grade:
+        taskGrades.length > 0
+          ? taskGrades
+              .map((tg) => tg.grade.name.replace('Kelas ', ''))
+              .join(', ')
+          : null,
+      questionCount: taskQuestions.length,
+      startTime: start_time ?? null,
+      endTime: end_time ?? null,
+      duration: getTimePeriod(start_time, end_time),
+      createdBy: created_by || 'Unknown',
+      stats,
+      progress,
+      questions,
+    };
+  }
 
   // Helper: Hitung waktu selesai
   private getCompletedAt(
@@ -73,7 +350,7 @@ export class TaskAttemptService {
     // Ambil semua option terkait sekaligus (hindari N+1 query)
     const options = await this.taskQuestionOptionRepository.find({
       where: { task_question_option_id: In(optionIds) },
-      relations: ['question'], // bisa ambil question sekaligus
+      relations: ['question'],
     });
 
     // Buat map biar akses cepat
@@ -81,7 +358,7 @@ export class TaskAttemptService {
       options.map((opt) => [opt.task_question_option_id, opt]),
     );
 
-    // Hitung poin
+    // Hitung total poin dari jawaban benar
     for (const ans of answerLogs) {
       if (!ans.optionId) continue;
       const option = optionMap.get(ans.optionId);
@@ -90,16 +367,15 @@ export class TaskAttemptService {
       }
     }
 
-    // Kalikan dengan multiplier
-    points *= task.taskType.point_multiplier ?? 1;
+    // Kalikan dengan multiplier taskType (misal ujian final > latihan)
+    const taskMultiplier = task.taskType.point_multiplier ?? 1;
+    points *= taskMultiplier;
 
-    // Hitung XP
-    const questionCount = task.taskQuestions.length;
-    const correctCount = options.filter((o) => o.is_correct).length;
-    const accuracy = correctCount / questionCount;
-    const baseXp = points * 1.2;
-    const multiplier = task.taskType.point_multiplier ?? 1;
-    const xpGained = Math.round(baseXp * accuracy * multiplier);
+    // Revisi perhitungan XP
+    // XP diambil proporsional terhadap poin, bukan akurasi
+    // 1 poin = 3 XP (bisa diatur kalau mau lebih rewarding)
+    const xpBaseRate = 3;
+    const xpGained = Math.round(points * xpBaseRate);
 
     return { points, xpGained };
   }
@@ -111,20 +387,25 @@ export class TaskAttemptService {
     // Ambil XP / Level info dari user
     const user = await this.userService.findUserBy('id', userId);
 
-    // Hitung perubahan level
-    let levelChange: ReturnType<typeof LevelHelper.getLevelChangeSummary> =
-      null;
+    // Default nilai aman
+    let leveledUp = false;
+    let levelChangeSummary = null;
+
+    // Hitung perubahan level hanya jika XP ada (berarti task selesai)
     if (user && savedTaskAttempt.xp_gained != null) {
-      levelChange = LevelHelper.getLevelChangeSummary(
+      const levelChange = LevelHelper.getLevelChangeSummary(
         user.level,
         user.xp,
         savedTaskAttempt.xp_gained,
       );
+
+      leveledUp = levelChange.leveledUp;
+      levelChangeSummary = levelChange;
     }
 
     const data: UpsertTaskAttemptResponseDto = {
-      leveledUp: levelChange.leveledUp ?? false,
-      levelChangeSummary: levelChange ?? null,
+      leveledUp,
+      levelChangeSummary,
     };
 
     return data;

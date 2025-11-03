@@ -13,6 +13,7 @@ import { getDateTime } from 'src/common/utils/date-modifier.util';
 import { CreateUserDto } from 'src/auth/dto/requests/create-user.dto';
 import { RoleService } from '../roles/roles.service';
 import { LevelHelper } from 'src/common/helpers/level.helper';
+import { UserStatsResponseDto } from './dto/responses/user-stats-response.dto';
 
 @Injectable()
 export class UserService {
@@ -129,6 +130,32 @@ export class UserService {
     }
 
     return this.getUserDetailData(user);
+  }
+
+  async findUserStats(userId: string): Promise<UserStatsResponseDto> {
+    const user = await this.userRepository.findOne({
+      where: {
+        user_id: userId,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User with id ${userId} $ not found`);
+    }
+
+    const { user_id, level, xp } = user;
+    const nextLvlMinXp = LevelHelper.getTotalXpForLevel(level + 1);
+    const xpProgress = LevelHelper.getXpProgress(xp, nextLvlMinXp);
+
+    const data: UserStatsResponseDto = {
+      id: user_id,
+      level,
+      currXp: xp,
+      nextLvlMinXp,
+      xpProgress,
+    };
+
+    return data;
   }
 
   async createUser(dto: CreateUserDto): Promise<UserDetailResponseDto> {

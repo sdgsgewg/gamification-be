@@ -1,11 +1,41 @@
-import { Controller, Post, Put, Param, Body } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Param,
+  Body,
+  Query,
+  Req,
+  BadRequestException,
+} from '@nestjs/common';
 import { TaskAttemptService } from './task-attempts.service';
 import { CreateTaskAttemptDto } from './dto/requests/create-task-attempt.dto';
 import { UpdateTaskAttemptDto } from './dto/requests/update-task-attempt.dto';
+import { FilterTaskAttemptDto } from './dto/requests/filter-task-attempt.dto';
 
 @Controller('/task-attempts')
 export class TaskAttemptController {
   constructor(private readonly taskAttemptService: TaskAttemptService) {}
+
+  @Get('')
+  async getAllTaskAttemptsByUser(
+    @Query() filterDto: FilterTaskAttemptDto,
+    @Req() req: any,
+  ) {
+    // Ambil userId dari request (kalau user login)
+    const userId = req.user?.id || null;
+
+    return this.taskAttemptService.findAllTaskAttemptsbyUser(userId, filterDto);
+  }
+
+  @Get(':id')
+  async getTaskAttemptDetail(@Param('id') id: string) {
+    if (!id) {
+      throw new BadRequestException('Task attempt id is required');
+    }
+    return this.taskAttemptService.findTaskAttemptById(id);
+  }
 
   @Post()
   async create(@Body() dto: CreateTaskAttemptDto) {

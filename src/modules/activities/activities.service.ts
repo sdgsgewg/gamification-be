@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Not, Repository, SelectQueryBuilder } from 'typeorm';
+import { Repository, SelectQueryBuilder } from 'typeorm';
 import { FilterActivityDto } from './dto/requests/filter-activity.dto';
 import { Task } from '../tasks/entities/task.entity';
 import { TaskAttempt } from '../task-attempts/entities/task-attempt.entity';
@@ -243,69 +243,7 @@ export class ActivityService {
   // 🔍 DETAIL FETCH
   // ==========================
   async findActivityBySlug(slug: string, userId?: string) {
-    // === CASE: Ada userId → ambil dari task_attempts langsung ===
-    if (userId) {
-      const attempt = await this.taskAttemptRepository.findOne({
-        where: {
-          student_id: userId,
-          task: { slug },
-        },
-        relations: {
-          task: {
-            subject: true,
-            material: true,
-            taskType: true,
-            taskGrades: { grade: true },
-            taskQuestions: true,
-          },
-        },
-        order: { last_accessed_at: 'DESC' },
-      });
-
-      if (!attempt || !attempt.task)
-        throw new NotFoundException(`Activity with slug ${slug} not found`);
-
-      const {
-        answered_question_count,
-        started_at,
-        last_accessed_at,
-        status,
-        task,
-      } = attempt;
-
-      const rawStatus = status as string | null;
-
-      const normalizedStatus = Object.values(ActivityAttemptStatus).includes(
-        rawStatus as ActivityAttemptStatus,
-      )
-        ? (rawStatus as ActivityAttemptStatus)
-        : ActivityAttemptStatus.NOT_STARTED;
-
-      const meta = {
-        answeredCount: answered_question_count ?? 0,
-        startedAt: getDateTime(started_at) ?? null,
-        lastAccessedAt: getDateTime(last_accessed_at) ?? null,
-        status: normalizedStatus,
-      };
-
-      return this.mapActivityBySlugResponse(task, meta);
-    }
-
-    // Kalau user belum login → ambil dari task saja (tanpa attempt)
-    // const qb = this.taskRepository
-    //   .createQueryBuilder('task')
-    //   .leftJoinAndSelect('task.subject', 'subject')
-    //   .leftJoinAndSelect('task.material', 'material')
-    //   .leftJoinAndSelect('task.taskType', 'taskType')
-    //   .leftJoinAndSelect('task.taskGrades', 'taskGrade')
-    //   .leftJoinAndSelect('taskGrade.grade', 'grade')
-    //   .leftJoinAndSelect('task.taskQuestions', 'taskQuestion')
-    //   .where('task.slug = :slug', { slug })
-    //   .orderBy('taskQuestion.order', 'ASC');
-
-    // const task = await qb.getOne();
-
-    // === CASE: Tidak ada userId → ambil langsung dari tasks ===
+    // Ambil task dulu (selalu dari tabel tasks)
     const task = await this.taskRepository.findOne({
       where: { slug },
       relations: {
@@ -315,23 +253,40 @@ export class ActivityService {
         taskGrades: { grade: true },
         taskQuestions: true,
       },
-      order: {
-        taskQuestions: {
-          order: 'ASC',
-        },
-      },
+      order: { taskQuestions: { order: 'ASC' } },
     });
 
     if (!task)
       throw new NotFoundException(`Activity with slug ${slug} not found`);
 
-    const meta = {
+    // Default metadata
+    let meta: ActivityAttempt = {
       answeredCount: 0,
       startedAt: null,
       lastAccessedAt: null,
       status: ActivityAttemptStatus.NOT_STARTED,
     };
 
+    // Kalau userId ada → cari attempt user terbaru
+    if (userId) {
+      const latestAttempt = await this.taskAttemptRepository.findOne({
+        where: { student_id: userId, task: { slug } },
+        order: { last_accessed_at: 'DESC' },
+      });
+
+      if (latestAttempt) {
+        meta = {
+          answeredCount: latestAttempt.answered_question_count ?? 0,
+          startedAt: getDateTime(latestAttempt.started_at) ?? null,
+          lastAccessedAt: getDateTime(latestAttempt.last_accessed_at) ?? null,
+          status:
+            (latestAttempt.status as ActivityAttemptStatus) ??
+            ActivityAttemptStatus.NOT_STARTED,
+        };
+      }
+    }
+
+    // Mapping ke DTO final
     return this.mapActivityBySlugResponse(task, meta);
   }
 
@@ -374,113 +329,17 @@ export class ActivityService {
     };
   }
 
-  // async findActivityWithQuestions(slug: string, userId: string) {
-  //   const qb = this.taskRepository
-  //     .createQueryBuilder('task')
-  //     .leftJoinAndSelect('task.taskQuestions', 'taskQuestion')
-  //     .leftJoinAndSelect(
-  //       'taskQuestion.taskQuestionOptions',
-  //       'taskQuestionOption',
-  //     )
-  //     .where('task.slug = :slug', { slug })
-  //     .orderBy('taskQuestion.order', 'ASC')
-  //     .addOrderBy('taskQuestionOption.order', 'ASC');
-
-  //   let attemptAnswerLogs: TaskAnswerLog[] = [];
-  //   let lastAttemptId: string | null = null;
-
-  //   if (userId) {
-  //     const attemptSub = this.buildUserAttemptSubQuery(userId);
-  //     qb.leftJoin(
-  //       `(${attemptSub.getQuery()})`,
-  //       'attempt',
-  //       'attempt.task_id = task.task_id',
-  //     )
-  //       .setParameters(attemptSub.getParameters())
-  //       .addSelect(['attempt.task_attempt_id AS task_attempt_id']);
-
-  //     // Ambil jawaban user berdasarkan attempt
-  //     const attemptMeta = await attemptSub.getRawOne();
-  //     if (attemptMeta?.task_attempt_id) {
-  //       lastAttemptId = attemptMeta.task_attempt_id;
-
-  //       attemptAnswerLogs = await this.taskAnswerLogRepository.find({
-  //         where: { task_attempt_id: lastAttemptId },
-  //         relations: ['question', 'option'],
-  //       });
-  //     }
-  //   } else {
-  //     qb.addSelect(['NULL AS task_attempt_id']);
-  //   }
-
-  //   const { entities, raw } = await qb.getRawAndEntities();
-  //   const task = entities[0];
-  //   const meta = raw[0]; // ambil meta data tambahan (alias)
-
-  //   if (!task)
-  //     throw new NotFoundException(`Activity with slug ${slug} not found`);
-
-  //   return this.mapActivityWithQuestionsResponse(
-  //     task,
-  //     meta.task_attempt_id,
-  //     attemptAnswerLogs,
-  //   );
-  // }
-
   async findActivityWithQuestions(slug: string, userId?: string) {
-    // === CASE: Ada userId → ambil dari task_attempts langsung ===
-    if (userId) {
-      const attempt = await this.taskAttemptRepository.findOne({
-        where: {
-          student_id: userId,
-          task: { slug },
-        },
-        relations: {
-          task: {
-            taskQuestions: {
-              taskQuestionOptions: true,
-            },
-          },
-        },
-        order: { last_accessed_at: 'DESC' },
-      });
-
-      if (!attempt || !attempt.task)
-        throw new NotFoundException(`Activity with slug ${slug} not found`);
-
-      const task = attempt.task;
-
-      // Ambil semua jawaban user untuk attempt ini
-      const attemptAnswerLogs = await this.taskAnswerLogRepository.find({
-        where: { task_attempt_id: attempt.task_attempt_id },
-        relations: ['question', 'option'],
-      });
-
-      const meta = {
-        task_attempt_id: attempt.task_attempt_id,
-      };
-
-      return this.mapActivityWithQuestionsResponse(
-        task,
-        meta.task_attempt_id,
-        attemptAnswerLogs,
-      );
-    }
-
-    // === CASE: Tidak ada userId → ambil langsung dari tasks ===
+    // Ambil task dulu dari tabel tasks
     const task = await this.taskRepository.findOne({
       where: { slug },
       relations: {
-        taskQuestions: {
-          taskQuestionOptions: true,
-        },
+        taskQuestions: { taskQuestionOptions: true },
       },
       order: {
         taskQuestions: {
           order: 'ASC',
-          taskQuestionOptions: {
-            order: 'ASC',
-          },
+          taskQuestionOptions: { order: 'ASC' },
         },
       },
     });
@@ -488,8 +347,33 @@ export class ActivityService {
     if (!task)
       throw new NotFoundException(`Activity with slug ${slug} not found`);
 
-    // Jika user tidak login, tidak ada attempt atau answer logs
-    return this.mapActivityWithQuestionsResponse(task, null, []);
+    // Default values
+    let lastAttemptId: string | null = null;
+    let attemptAnswerLogs: TaskAnswerLog[] = [];
+
+    // Kalau userId ada → ambil attempt dan jawaban user (kalau ada)
+    if (userId) {
+      const latestAttempt = await this.taskAttemptRepository.findOne({
+        where: { student_id: userId, task: { slug } },
+        order: { last_accessed_at: 'DESC' },
+      });
+
+      if (latestAttempt) {
+        lastAttemptId = latestAttempt.task_attempt_id;
+
+        attemptAnswerLogs = await this.taskAnswerLogRepository.find({
+          where: { task_attempt_id: latestAttempt.task_attempt_id },
+          relations: ['question', 'option'],
+        });
+      }
+    }
+
+    // Return DTO
+    return this.mapActivityWithQuestionsResponse(
+      task,
+      lastAttemptId,
+      attemptAnswerLogs,
+    );
   }
 
   private mapActivityWithQuestionsResponse(
@@ -517,7 +401,7 @@ export class ActivityService {
             text: q.text,
             point: q.point,
             type: q.type,
-            timeLimit: q.time_limit ?? null,
+            timeLimit: q.time_limit && q.time_limit > 0 ? q.time_limit : null,
             image: q.image ?? null,
             options: q.taskQuestionOptions?.map((o) => ({
               optionId: o.task_question_option_id,

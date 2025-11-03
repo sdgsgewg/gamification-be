@@ -77,3 +77,12 @@ export function getDateTimeWithName(date: Date, name?: string): string {
 
   return `${name} (${day} ${month} ${year}, ${hours}:${minutes} WIB)`;
 }
+
+export function getTime(date: Date): string {
+  if (!date) return '';
+  return date.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
