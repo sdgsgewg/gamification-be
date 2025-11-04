@@ -17,6 +17,7 @@ import { ActivityWithQuestionsResponseDto } from './dto/responses/activity-with-
 import { TaskAnswerLog } from '../task-answer-logs/entities/task-answer-log.entity';
 import { ActivitySummaryResponseDto } from './dto/responses/activity-summary-response.dto';
 import { ActivityAttemptStatus } from './enums/activity-attempt-status.enum';
+import { TaskTypeScope } from '../task-types/enums/task-type-scope.enum';
 
 @Injectable()
 export class ActivityService {
@@ -66,6 +67,9 @@ export class ActivityService {
         'COUNT(DISTINCT taskQuestions.task_question_id)',
         'questionCount',
       )
+      .where('taskType.scope IN (:...scopes)', {
+        scopes: [TaskTypeScope.ACTIVITY, TaskTypeScope.GLOBAL],
+      })
       .groupBy('task.task_id')
       .addGroupBy('taskType.name')
       .addGroupBy('subject.name');
@@ -204,17 +208,18 @@ export class ActivityService {
     qb: SelectQueryBuilder<Task>,
     userId: string,
   ) {
-    const favSubject = await this.getUserMostAttemptedSubject(userId);
+    const favSubjects = await this.getUserMostAttemptedSubjects(userId);
 
-    if (favSubject)
-      qb.andWhere('subject.name = :subjectName', { subjectName: favSubject });
+    if (favSubjects.length > 0) {
+      qb.andWhere('subject.name IN (:...favSubjects)', { favSubjects });
+    }
 
     // exclude tasks that are in "continue" section
     const continueSub = this.buildUserAttemptSubQuery(userId, false);
     qb.andWhere(
       `task.task_id NOT IN (
-    SELECT task_id FROM (${continueSub.getQuery()}) AS sub
-  )`,
+      SELECT task_id FROM (${continueSub.getQuery()}) AS sub
+    )`,
     ).setParameters(continueSub.getParameters());
 
     qb.orderBy('task.created_at', 'DESC').limit(10);
@@ -223,7 +228,9 @@ export class ActivityService {
   // ==========================
   // 📘 HELPER
   // ==========================
-  private async getUserMostAttemptedSubject(userId: string) {
+  private async getUserMostAttemptedSubjects(
+    userId: string,
+  ): Promise<string[]> {
     const res = await this.taskAttemptRepository
       .createQueryBuilder('ta')
       .leftJoin('ta.task', 'task')
@@ -231,12 +238,19 @@ export class ActivityService {
       .select('subject.name', 'subjectName')
       .addSelect('COUNT(*)', 'attemptCount')
       .where('ta.student_id = :userId', { userId })
+      .andWhere('ta.status = :status', { status: 'completed' })
       .groupBy('subject.name')
       .orderBy('COUNT(*)', 'DESC')
-      .limit(1)
-      .getRawOne();
+      .getRawMany();
 
-    return res?.subjectName ?? null;
+    if (res.length === 0) return [];
+
+    const maxCount = Number(res[0].attemptCount);
+
+    // Ambil semua subject yang punya count sama dengan maxCount
+    return res
+      .filter((r) => Number(r.attemptCount) === maxCount)
+      .map((r) => r.subjectName);
   }
 
   // ==========================

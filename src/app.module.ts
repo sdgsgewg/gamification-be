@@ -19,6 +19,7 @@ import { TaskQuestionOptionModule } from './modules/task-question-options/task-q
 import { ActivityModule } from './modules/activities/activities.module';
 import { TaskAnswerLogModule } from './modules/task-answer-logs/task-answer-logs.module';
 import { TaskAttemptModule } from './modules/task-attempts/task-attempts.module';
+import { LeaderboardModule } from './modules/leaderboards/leaderboards.module';
 
 @Module({
   imports: [
@@ -53,7 +54,8 @@ import { TaskAttemptModule } from './modules/task-attempts/task-attempts.module'
     TaskQuestionOptionModule,
     ActivityModule,
     TaskAttemptModule,
-    TaskAnswerLogModule
+    TaskAnswerLogModule,
+    LeaderboardModule,
     // tambah module baru di sini
   ],
   controllers: [AppController],

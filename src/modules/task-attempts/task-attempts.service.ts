@@ -136,7 +136,7 @@ export class TaskAttemptService {
         acc[dateKey].attempts.push({
           id: task_attempt_id,
           title,
-          image,
+          image: image !== '' ? image : null,
           status,
           lastAccessedTime: getTime(last_accessed_at),
           completedTime: completed_at ? getTime(completed_at) : null,

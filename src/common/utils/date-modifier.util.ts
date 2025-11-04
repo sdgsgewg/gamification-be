@@ -80,9 +80,19 @@ export function getDateTimeWithName(date: Date, name?: string): string {
 
 export function getTime(date: Date): string {
   if (!date) return '';
-  return date.toLocaleTimeString('en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
-  });
+
+  const hours = date.getHours();
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+
+  // ubah jam ke format 12 jam, tapi biarkan 00 untuk jam 0
+  let displayHours = hours % 12;
+  if (hours === 0)
+    displayHours = 0; // jam 0 (tengah malam)
+  else if (hours > 12) displayHours = hours - 12;
+  else if (hours === 12) displayHours = 12; // jam 12 siang
+
+  const hoursStr = displayHours.toString().padStart(2, '0');
+
+  return `${hoursStr}:${minutes} ${ampm}`;
 }
