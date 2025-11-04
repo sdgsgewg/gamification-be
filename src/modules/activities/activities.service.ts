@@ -1,12 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, SelectQueryBuilder } from 'typeorm';
+import { Not, Repository, SelectQueryBuilder } from 'typeorm';
 import { FilterActivityDto } from './dto/requests/filter-activity.dto';
 import { Task } from '../tasks/entities/task.entity';
 import { TaskAttempt } from '../task-attempts/entities/task-attempt.entity';
 import { ActivityOverviewResponseDto } from './dto/responses/activity-overview-response.dto';
 import {
-  ActivityAttempt,
+  CurrentAttempt,
+  RecentAttempt,
   ActivityDetailResponseDto,
 } from './dto/responses/activity-detail-response.dto';
 import {
@@ -274,71 +275,131 @@ export class ActivityService {
       throw new NotFoundException(`Activity with slug ${slug} not found`);
 
     // Default metadata
-    let meta: ActivityAttempt = {
+    let currAttemptMeta: CurrentAttempt = {
       answeredCount: 0,
       startedAt: null,
       lastAccessedAt: null,
       status: ActivityAttemptStatus.NOT_STARTED,
     };
 
-    // Kalau userId ada → cari attempt user terbaru
+    let recentAttemptMeta: RecentAttempt = {
+      startedAt: null,
+      lastAccessedAt: null,
+      completedAt: null,
+      status: ActivityAttemptStatus.NOT_STARTED,
+    };
+
+    // Kalau userId ada → cari attempt user
     if (userId) {
-      const latestAttempt = await this.taskAttemptRepository.findOne({
+      // Attempt terkini yang sedang dikerjakan user
+      const currAttempt = await this.taskAttemptRepository.findOne({
         where: { student_id: userId, task: { slug } },
         order: { last_accessed_at: 'DESC' },
       });
 
-      if (latestAttempt) {
-        meta = {
-          answeredCount: latestAttempt.answered_question_count ?? 0,
-          startedAt: getDateTime(latestAttempt.started_at) ?? null,
-          lastAccessedAt: getDateTime(latestAttempt.last_accessed_at) ?? null,
+      if (currAttempt) {
+        currAttemptMeta = {
+          answeredCount: currAttempt.answered_question_count ?? 0,
+          startedAt: getDateTime(currAttempt.started_at) ?? null,
+          lastAccessedAt: getDateTime(currAttempt.last_accessed_at) ?? null,
           status:
-            (latestAttempt.status as ActivityAttemptStatus) ??
+            (currAttempt.status as ActivityAttemptStatus) ??
+            ActivityAttemptStatus.NOT_STARTED,
+        };
+      } else {
+        // Attempt terbaru yang sudah completed
+        const recentAttempt = await this.taskAttemptRepository.findOne({
+          where: {
+            student_id: userId,
+            task: { slug },
+            status: ActivityAttemptStatus.COMPLETED,
+          },
+          order: { completed_at: 'DESC' },
+        });
+
+        recentAttemptMeta = {
+          startedAt: getDateTime(recentAttempt.started_at) ?? null,
+          lastAccessedAt: getDateTime(recentAttempt.last_accessed_at) ?? null,
+          completedAt: getDateTime(recentAttempt.completed_at),
+          status:
+            (recentAttempt.status as ActivityAttemptStatus) ??
             ActivityAttemptStatus.NOT_STARTED,
         };
       }
     }
 
     // Mapping ke DTO final
-    return this.mapActivityBySlugResponse(task, meta);
+    return this.mapActivityBySlugResponse(
+      task,
+      currAttemptMeta,
+      recentAttemptMeta,
+    );
   }
 
   private mapActivityBySlugResponse(
     task: Task,
-    meta: ActivityAttempt,
+    currAttemptMeta: CurrentAttempt,
+    recentAttemptMeta: RecentAttempt,
   ): ActivityDetailResponseDto {
+    const {
+      task_id,
+      title,
+      slug,
+      description,
+      image,
+      subject,
+      material,
+      taskGrades,
+      taskQuestions,
+      taskType,
+      start_time,
+      end_time,
+    } = task;
+
     return {
-      id: task.task_id,
-      title: task.title,
-      slug: task.slug,
-      description: task.description ?? null,
-      image: task.image ?? null,
-      subject: task.subject
-        ? { subjectId: task.subject.subject_id, name: task.subject.name }
-        : null,
-      material: task.material
-        ? { materialId: task.material.material_id, name: task.material.name }
-        : null,
-      type: task.taskType
-        ? { taskTypeId: task.taskType.task_type_id, name: task.taskType.name }
+      id: task_id,
+      title: title,
+      slug: slug,
+      description: description ?? null,
+      image: image ?? null,
+      subject: subject ? { id: subject.subject_id, name: subject.name } : null,
+      material: material
+        ? { id: material.material_id, name: material.name }
         : null,
       grade:
-        task.taskGrades?.length > 0
-          ? task.taskGrades
+        taskGrades.length > 0
+          ? taskGrades
               .map((tg) => tg.grade?.name.replace('Kelas ', ''))
               .join(', ')
           : null,
-      questionCount: task.taskQuestions?.length || 0,
-      startTime: task.start_time ?? null,
-      endTime: task.end_time ?? null,
-      duration: getTimePeriod(task.start_time, task.end_time),
+      questionCount: taskQuestions.length || 0,
       createdBy: task.created_by || 'Unknown',
-      attempt: {
-        answeredCount: Number(meta.answeredCount) || 0,
-        startedAt: meta.startedAt,
-        lastAccessedAt: meta.lastAccessedAt,
-        status: meta.status,
+      type: {
+        id: taskType.task_type_id,
+        name: taskType.name,
+        isRepeatable: taskType.is_repeatable,
+      },
+      currAttempt:
+        currAttemptMeta.status === ActivityAttemptStatus.ON_PROGRESS
+          ? {
+              answeredCount: Number(currAttemptMeta.answeredCount) || 0,
+              startedAt: currAttemptMeta.startedAt,
+              lastAccessedAt: currAttemptMeta.lastAccessedAt,
+              status: currAttemptMeta.status,
+            }
+          : null,
+      recentAttempt: recentAttemptMeta.completedAt
+        ? {
+            startedAt: recentAttemptMeta.startedAt,
+            lastAccessedAt: recentAttemptMeta.lastAccessedAt,
+            completedAt: recentAttemptMeta.completedAt,
+            status: recentAttemptMeta.status,
+          }
+        : null,
+      duration: {
+        startTime: start_time ?? null,
+        endTime: end_time ?? null,
+        duration: getTimePeriod(start_time, end_time),
       },
     };
   }
@@ -368,7 +429,11 @@ export class ActivityService {
     // Kalau userId ada → ambil attempt dan jawaban user (kalau ada)
     if (userId) {
       const latestAttempt = await this.taskAttemptRepository.findOne({
-        where: { student_id: userId, task: { slug } },
+        where: {
+          student_id: userId,
+          task: { slug },
+          status: Not(ActivityAttemptStatus.COMPLETED),
+        },
         order: { last_accessed_at: 'DESC' },
       });
 

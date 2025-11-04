@@ -1,10 +1,29 @@
 import { ActivityAttemptStatus } from '../../enums/activity-attempt-status.enum';
 
-export class ActivityAttempt {
+export class ActivityType {
+  id: string;
+  name: string;
+  isRepeatable: boolean;
+}
+
+export class CurrentAttempt {
   answeredCount?: number;
-  startedAt?: string | null;
-  lastAccessedAt?: string | null;
+  startedAt?: string;
+  lastAccessedAt?: string;
   status?: ActivityAttemptStatus;
+}
+
+export class RecentAttempt {
+  startedAt?: string;
+  lastAccessedAt?: string;
+  completedAt?: string;
+  status?: ActivityAttemptStatus;
+}
+
+export class ActivityDuration {
+  startTime?: Date;
+  endTime?: Date;
+  duration?: string;
 }
 
 export class ActivityDetailResponseDto {
@@ -13,14 +32,13 @@ export class ActivityDetailResponseDto {
   slug: string;
   description?: string;
   image?: string;
-  subject: { subjectId: string; name: string };
-  material?: { materialId: string; name: string };
-  type: { taskTypeId: string; name: string };
+  subject: { id: string; name: string };
+  material?: { id: string; name: string };
   grade: string;
   questionCount: number;
-  startTime?: Date;
-  endTime?: Date;
-  duration?: string;
   createdBy: string;
-  attempt?: ActivityAttempt;
+  type: ActivityType;
+  currAttempt?: CurrentAttempt;
+  recentAttempt?: RecentAttempt;
+  duration?: ActivityDuration;
 }

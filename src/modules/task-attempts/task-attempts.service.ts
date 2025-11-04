@@ -196,6 +196,7 @@ export class TaskAttemptService {
   ): TaskAttemptDetailResponseDto {
     const {
       title,
+      slug,
       image,
       description,
       subject,
@@ -208,6 +209,7 @@ export class TaskAttemptService {
       created_by,
     } = attempt.task;
     const {
+      answered_question_count,
       points,
       xp_gained,
       started_at,
@@ -280,11 +282,11 @@ export class TaskAttemptService {
 
     return {
       title,
+      slug,
       image,
       description,
       subject: subject.name,
       material: material ? material.name : null,
-      type: taskType.name,
       grade:
         taskGrades.length > 0
           ? taskGrades
@@ -292,11 +294,20 @@ export class TaskAttemptService {
               .join(', ')
           : null,
       questionCount: taskQuestions.length,
-      startTime: start_time ?? null,
-      endTime: end_time ?? null,
-      duration: getTimePeriod(start_time, end_time),
       createdBy: created_by || 'Unknown',
+      type: {
+        name: taskType.name,
+        isRepeatable: taskType.is_repeatable,
+      },
+      attempt: {
+        answeredCount: answered_question_count ?? 0,
+      },
       stats,
+      duration: {
+        startTime: start_time ?? null,
+        endTime: end_time ?? null,
+        duration: getTimePeriod(start_time, end_time),
+      },
       progress,
       questions,
     };

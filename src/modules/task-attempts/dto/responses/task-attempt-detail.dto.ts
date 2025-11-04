@@ -1,10 +1,25 @@
 import { ActivityAttemptStatus } from 'src/modules/activities/enums/activity-attempt-status.enum';
 
+export class TaskType {
+  name: string;
+  isRepeatable: boolean;
+}
+
+export class Attempt {
+  answeredCount?: number;
+}
+
 export class TaskAttemptStats {
   pointGained: number;
   totalPoints: number;
   xpGained: number;
   score: number;
+}
+
+export class TaskDuration {
+  startTime?: Date;
+  endTime?: Date;
+  duration?: string;
 }
 
 export class TaskAttemptProgress {
@@ -42,18 +57,18 @@ export class Question {
 
 export class TaskAttemptDetailResponseDto {
   title: string;
+  slug: string;
   image: string;
   description: string;
   subject: string;
   material: string;
-  type: string;
   grade: string;
   questionCount: number;
-  startTime?: Date;
-  endTime?: Date;
-  duration?: string;
   createdBy: string;
+  type: TaskType;
+  attempt?: Attempt;
   stats: TaskAttemptStats;
+  duration?: TaskDuration;
   progress: TaskAttemptProgress;
   questions: Question[];
 }

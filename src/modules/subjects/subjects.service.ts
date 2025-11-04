@@ -14,6 +14,7 @@ import { BaseResponseDto } from 'src/common/responses/base-response.dto';
 import { getDbColumn } from 'src/common/database/get-db-column.util';
 import { slugify } from 'src/common/utils/slug.util';
 import { SlugHelper } from 'src/common/helpers/slug.helper';
+import { TaskTypeScope } from '../task-types/enums/task-type-scope.enum';
 
 @Injectable()
 export class SubjectService {
@@ -29,13 +30,25 @@ export class SubjectService {
     const qb = this.subjectRepository
       .createQueryBuilder('subject')
       .leftJoin('subject.tasks', 'tasks')
+      .leftJoin('tasks.taskType', 'taskType')
       .select([
         'subject.subject_id AS "subjectId"',
         'subject.name AS "name"',
         'subject.slug AS "slug"',
         'subject.image AS "image"',
       ])
-      .addSelect('COUNT(DISTINCT tasks.task_id)', 'activityCount')
+      .addSelect(
+        `
+      COUNT(
+        DISTINCT CASE
+          WHEN taskType.scope IN (:...scopes)
+          THEN tasks.task_id
+        END
+      )
+    `,
+        'activityCount',
+      )
+      .setParameter('scopes', [TaskTypeScope.ACTIVITY, TaskTypeScope.GLOBAL])
       .groupBy('subject.subject_id')
       .addGroupBy('subject.name')
       .addGroupBy('subject.slug');
@@ -63,7 +76,7 @@ export class SubjectService {
         subjectId: s.subjectId,
         name: s.name,
         slug: s.slug,
-        image: s.image,
+        image: s.image !== '' ? s.image : null,
         activityCount: Number(s.activityCount) || 0,
       }),
     );
