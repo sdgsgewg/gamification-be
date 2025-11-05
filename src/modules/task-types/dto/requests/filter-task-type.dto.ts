@@ -18,9 +18,6 @@ export class FilterTaskTypeDto {
   isRepeatable?: string;
 
   @IsOptional()
-  pointMultiplier?: number;
-
-  @IsOptional()
   @IsIn(['createdAt', 'updatedAt', 'name'])
   orderBy?: 'createdAt' | 'updatedAt' | 'name';
 

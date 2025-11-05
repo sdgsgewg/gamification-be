@@ -58,12 +58,6 @@ export class TaskTypeService {
       });
     }
 
-    if (filterDto.pointMultiplier) {
-      qb.andWhere('taskType.point_multiplier = :pointMultiplier', {
-        pointMultiplier: filterDto.pointMultiplier,
-      });
-    }
-
     // order by
     const orderBy = filterDto.orderBy ?? 'createdAt';
     const orderState = filterDto.orderState ?? 'DESC';
@@ -82,9 +76,7 @@ export class TaskTypeService {
         slug: tt.slug,
         scope: capitalizeFirstLowerRest(tt.scope),
         hasDeadline: tt.has_deadline,
-        isCompetitive: tt.is_competitive,
         isRepeatable: tt.is_repeatable,
-        pointMultiplier: tt.point_multiplier,
       }),
     );
 
@@ -99,9 +91,7 @@ export class TaskTypeService {
       description: taskType.description,
       scope: capitalizeFirstLowerRest(taskType.scope),
       hasDeadline: taskType.has_deadline,
-      isCompetitive: taskType.is_competitive,
       isRepeatable: taskType.is_repeatable,
-      pointMultiplier: taskType.point_multiplier,
       createdBy: `${getDateTimeWithName(taskType.created_at, taskType.created_by)}`,
       updatedBy: taskType.updated_by
         ? `${getDateTimeWithName(taskType.updated_at, taskType.updated_by)}`
@@ -153,9 +143,7 @@ export class TaskTypeService {
       description: dto.description,
       scope: dto.scope,
       has_deadline: dto.hasDeadline === 'true' ? true : false,
-      is_competitive: dto.isCompetitive === 'true' ? true : false,
       is_repeatable: dto.isRepeatable === 'true' ? true : false,
-      point_multiplier: dto.pointMultiplier,
       created_at: new Date(),
       created_by: dto.createdBy ?? null,
     });
@@ -219,10 +207,7 @@ export class TaskTypeService {
     existingTaskType.description = dto.description ?? null;
     existingTaskType.scope = dto.scope;
     existingTaskType.has_deadline = dto.hasDeadline === 'true' ? true : false;
-    existingTaskType.is_competitive =
-      dto.isCompetitive === 'true' ? true : false;
     existingTaskType.is_repeatable = dto.isRepeatable === 'true' ? true : false;
-    existingTaskType.point_multiplier = dto.pointMultiplier;
     existingTaskType.updated_at = new Date();
     existingTaskType.updated_by = dto.updatedBy;
 

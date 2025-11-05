@@ -1,19 +1,25 @@
-import { Class } from 'src/modules/class/entities/class.entity';
+import { Class } from 'src/modules/classes/entities/class.entity';
 import { Task } from 'src/modules/tasks/entities/task.entity';
-import { Entity, Column, PrimaryColumn, JoinColumn, ManyToOne } from 'typeorm';
+import {
+  Entity,
+  Column,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 
 @Entity('class_tasks')
 export class ClassTask {
-  @PrimaryColumn()
+  @PrimaryGeneratedColumn('uuid')
   class_task_id: string;
 
-  @Column()
-  created_at: Date;
+  @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
+  created_at: string;
 
-  @Column()
+  @Column({ type: 'uuid' })
   class_id: string;
 
-  @Column()
+  @Column({ type: 'uuid' })
   task_id: string;
 
   @ManyToOne(() => Class)

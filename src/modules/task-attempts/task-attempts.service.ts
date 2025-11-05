@@ -346,7 +346,15 @@ export class TaskAttemptService {
     return task;
   }
 
-  // Helper: Hitung poin dan XP
+  /**
+   * Hitung total poin dan XP yang didapatkan dari pengerjaan tugas.
+   * Rumus:
+   * xpBaseRate:
+   * - HARD = 3
+   * - MEDIUM = 2
+   * - EASY = 1.5
+   * total points: points (jumlah poin benar dari seluruh soal)  * xpBaseRate
+   */
   private async calculatePointsAndXp(
     task: Task,
     answerLogs: any[],
@@ -358,13 +366,17 @@ export class TaskAttemptService {
       .map((a) => a.optionId)
       .filter((id): id is string => !!id);
 
+    if (optionIds.length === 0) {
+      return { points: 0, xpGained: 0 };
+    }
+
     // Ambil semua option terkait sekaligus (hindari N+1 query)
     const options = await this.taskQuestionOptionRepository.find({
       where: { task_question_option_id: In(optionIds) },
       relations: ['question'],
     });
 
-    // Buat map biar akses cepat
+    // Buat map biar lookup cepat
     const optionMap = new Map(
       options.map((opt) => [opt.task_question_option_id, opt]),
     );
@@ -378,15 +390,11 @@ export class TaskAttemptService {
       }
     }
 
-    // Kalikan dengan multiplier taskType (misal ujian final > latihan)
-    const taskMultiplier = task.taskType.point_multiplier ?? 1;
-    points *= taskMultiplier;
+    // Perhitungan XP berdasarkan tingkat kesulitan
+    const difficultyRate =
+      task.difficulty === 'HARD' ? 3 : task.difficulty === 'MEDIUM' ? 2 : 1.5;
 
-    // Revisi perhitungan XP
-    // XP diambil proporsional terhadap poin, bukan akurasi
-    // 1 poin = 3 XP (bisa diatur kalau mau lebih rewarding)
-    const xpBaseRate = 3;
-    const xpGained = Math.round(points * xpBaseRate);
+    const xpGained = Math.round(points * difficultyRate);
 
     return { points, xpGained };
   }

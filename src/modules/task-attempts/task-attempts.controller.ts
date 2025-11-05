@@ -8,17 +8,20 @@ import {
   Query,
   Req,
   BadRequestException,
+  UseGuards,
 } from '@nestjs/common';
 import { TaskAttemptService } from './task-attempts.service';
 import { CreateTaskAttemptDto } from './dto/requests/create-task-attempt.dto';
 import { UpdateTaskAttemptDto } from './dto/requests/update-task-attempt.dto';
 import { FilterTaskAttemptDto } from './dto/requests/filter-task-attempt.dto';
+import { OptionalJwtAuthGuard } from 'src/auth/optional-jwt-auth.guard';
 
 @Controller('/task-attempts')
 export class TaskAttemptController {
   constructor(private readonly taskAttemptService: TaskAttemptService) {}
 
   @Get('')
+  @UseGuards(OptionalJwtAuthGuard)
   async getAllTaskAttemptsByUser(
     @Query() filterDto: FilterTaskAttemptDto,
     @Req() req: any,

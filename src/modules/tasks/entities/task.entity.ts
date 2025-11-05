@@ -14,6 +14,7 @@ import {
   JoinColumn,
   OneToMany,
 } from 'typeorm';
+import { TaskDifficulty } from '../enums/task-difficulty.enum';
 
 @Entity('tasks')
 export class Task {
@@ -38,7 +39,10 @@ export class Task {
   @Column({ type: 'timestamptz', nullable: true })
   end_time: Date;
 
-  @Column({ default: false })
+  @Column({ type: 'varchar', default: TaskDifficulty.MEDIUM })
+  difficulty: TaskDifficulty;
+
+  @Column({ type: 'boolean', default: false })
   is_globally_assigned: boolean;
 
   @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })

@@ -14,13 +14,7 @@ export class UpdateTaskTypeDto {
   hasDeadline: string;
 
   @IsNotEmpty()
-  isCompetitive: string;
-
-  @IsNotEmpty()
   isRepeatable: string;
-
-  @IsNotEmpty()
-  pointMultiplier: number;
 
   @IsNotEmpty()
   updatedBy: string;

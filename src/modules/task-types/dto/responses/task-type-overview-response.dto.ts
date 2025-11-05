@@ -4,7 +4,5 @@ export class TaskTypeOverviewResponseDto {
   slug: string;
   scope: string;
   hasDeadline: boolean;
-  isCompetitive: boolean;
   isRepeatable: boolean;
-  pointMultiplier: number;
 }

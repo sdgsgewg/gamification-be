@@ -75,6 +75,16 @@ export class AuthController {
       : this.convertExpiryToMs('1d'); // 30 hari / 1 hari
 
     // Set refresh token as HTTP-only cookie
+    // Production
+    // res.cookie('refresh_token', refreshToken, {
+    //   httpOnly: true,
+    //   secure: true,
+    //   sameSite: 'none',
+    //   path: '/',
+    //   domain: '.inspiraumkm.com',
+    // });
+
+    // Development
     res.cookie('refresh_token', refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -202,7 +212,23 @@ export class AuthController {
       await this.userSessionService.deleteSession(token);
     }
 
-    res.clearCookie('refresh_token', { path: '/' });
+    // Production
+    // res.clearCookie('refresh_token', {
+    //   httpOnly: true,
+    //   secure: true,
+    //   sameSite: 'none',
+    //   path: '/',
+    //   domain: '.gamification.com',
+    // });
+
+    // Development
+
+    res.clearCookie('refresh_token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/',
+    });
 
     const response: BaseResponseDto = {
       status: 200,

@@ -5,9 +5,7 @@ export class TaskTypeDetailResponseDto {
   description?: string;
   scope: string;
   hasDeadline: boolean;
-  isCompetitive: boolean;
   isRepeatable: boolean;
-  pointMultiplier: number;
   createdBy: string;
   updatedBy?: string;
 }

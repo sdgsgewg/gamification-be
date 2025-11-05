@@ -14,13 +14,7 @@ export class CreateTaskTypeDto {
   hasDeadline: string;
 
   @IsNotEmpty()
-  isCompetitive: string;
-
-  @IsNotEmpty()
   isRepeatable: string;
-
-  @IsNotEmpty()
-  pointMultiplier: number;
 
   @IsNotEmpty()
   createdBy: string;

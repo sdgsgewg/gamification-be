@@ -21,14 +21,14 @@ export class TaskType {
   @Column({ type: 'boolean' })
   has_deadline: boolean;
 
-  @Column({ type: 'boolean' })
-  is_competitive: boolean;
+  // @Column({ type: 'boolean' })
+  // is_competitive: boolean;
 
   @Column({ type: 'boolean' })
   is_repeatable: boolean;
 
-  @Column({ type: 'float', default: 1 })
-  point_multiplier: number;
+  // @Column({ type: 'float', default: 1 })
+  // point_multiplier: number;
 
   @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;

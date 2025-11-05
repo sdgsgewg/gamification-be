@@ -4,8 +4,15 @@ export class LevelHelper {
    */
   static getTotalXpForLevel(level: number): number {
     if (level <= 1) return 0;
-    const total = (2 / 5) * Math.pow(level, 1.8) - 2 / 5;
-    return Math.floor(100 * total);
+
+    const baseXp = 100;
+    const increment = 30;
+
+    // Rumus deret aritmetika: total = n/2 * (2a + (n-1)d)
+    const n = level - 1;
+    const totalXp = (n / 2) * (2 * baseXp + (n - 1) * increment);
+
+    return Math.round(totalXp);
   }
 
   /**

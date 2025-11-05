@@ -4,14 +4,25 @@ import { Repository } from 'typeorm';
 import { User } from '../users/entities/user.entity';
 import { GlobalLeaderboardResponseDto } from './dto/responses/global-leaderboard-responses.dto';
 import { UserRole } from '../roles/enums/user-role.enum';
+import { ClassStudentsLeaderboardResponseDto } from './dto/responses/class-students-leaderboard.-response.dto';
+import { ClassLeaderboardResponseDto } from './dto/responses/class-leaderboard-response.dto';
+import { Class } from '../classes/entities/class.entity';
+import { TaskAttempt } from '../task-attempts/entities/task-attempt.entity';
 
 @Injectable()
 export class LeaderboardService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(Class)
+    private readonly classRepository: Repository<Class>,
+    @InjectRepository(TaskAttempt)
+    private readonly taskAttemptRepository: Repository<TaskAttempt>,
   ) {}
 
+  /**
+   * Find leaderboard for all users based on their performance in the activity page
+   */
   async findGlobalLeaderboard(): Promise<GlobalLeaderboardResponseDto[]> {
     // Ambil semua user dengan role "student" + relasi taskAttempts
     const users = await this.userRepository.find({
@@ -58,5 +69,61 @@ export class LeaderboardService {
       }));
 
     return rankedLeaderboard;
+  }
+
+  /**
+   * Find leaderboard for all students in one class
+   */
+  async findClassStudentsLeaderboard(
+    classId: string,
+  ): Promise<ClassStudentsLeaderboardResponseDto[]> {
+    const results = await this.taskAttemptRepository
+      .createQueryBuilder('attempt')
+      .leftJoin('attempt.student', 'student')
+      .leftJoin('student.role', 'role')
+      .select('student.user_id', 'id')
+      .addSelect('student.name', 'name')
+      .addSelect('student.username', 'username')
+      .addSelect('student.image', 'image')
+      .addSelect('student.level', 'level')
+      .addSelect('student.xp', 'xp')
+      .addSelect('COALESCE(SUM(attempt.points), 0)', 'point')
+      .where('attempt.class_id = :classId', { classId })
+      .andWhere('role.name = :role', { role: UserRole.STUDENT })
+      .groupBy('student.user_id')
+      .addGroupBy('student.name')
+      .addGroupBy('student.username')
+      .addGroupBy('student.image')
+      .addGroupBy('student.level')
+      .addGroupBy('student.xp')
+      .orderBy('point', 'DESC')
+      .addOrderBy('xp', 'DESC')
+      .limit(50)
+      .getRawMany();
+
+    // Tambahkan rank (peringkat)
+    return results.map((student, index) => ({
+      ...student,
+      rank: index + 1,
+    }));
+  }
+
+  /**
+   * Find leaderboard for all classes registered into the system
+   */
+  async findClassLeaderboard(): Promise<ClassLeaderboardResponseDto[]> {
+    const results = await this.classRepository
+      .createQueryBuilder('class')
+      .leftJoin('class.taskAttempts', 'attempt')
+      .select('class.class_id', 'id')
+      .addSelect('class.name', 'name')
+      .addSelect('class.image', 'image')
+      .addSelect('COALESCE(SUM(attempt.points), 0)', 'point')
+      .groupBy('class.class_id')
+      .orderBy('point', 'DESC')
+      .limit(50)
+      .getRawMany();
+
+    return results;
   }
 }

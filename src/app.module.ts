@@ -20,6 +20,8 @@ import { ActivityModule } from './modules/activities/activities.module';
 import { TaskAnswerLogModule } from './modules/task-answer-logs/task-answer-logs.module';
 import { TaskAttemptModule } from './modules/task-attempts/task-attempts.module';
 import { LeaderboardModule } from './modules/leaderboards/leaderboards.module';
+import { ClassModule } from './modules/classes/classes.module';
+import { ClassTaskModule } from './modules/class-tasks/class-tasks.module';
 
 @Module({
   imports: [
@@ -56,6 +58,8 @@ import { LeaderboardModule } from './modules/leaderboards/leaderboards.module';
     TaskAttemptModule,
     TaskAnswerLogModule,
     LeaderboardModule,
+    ClassModule,
+    ClassTaskModule,
     // tambah module baru di sini
   ],
   controllers: [AppController],
