@@ -64,6 +64,7 @@ export class TaskAttemptDetailResponseDto {
   material: string;
   grade: string;
   questionCount: number;
+  difficulty: string;
   createdBy: string;
   type: TaskType;
   attempt?: Attempt;

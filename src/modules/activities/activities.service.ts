@@ -19,6 +19,7 @@ import { TaskAnswerLog } from '../task-answer-logs/entities/task-answer-log.enti
 import { ActivitySummaryResponseDto } from './dto/responses/activity-summary-response.dto';
 import { TaskTypeScope } from '../task-types/enums/task-type-scope.enum';
 import { TaskAttemptStatus } from '../task-attempts/enums/task-attempt-status.enum';
+import { TaskDifficultyLabels } from '../tasks/enums/task-difficulty.enum';
 
 @Injectable()
 export class ActivityService {
@@ -291,7 +292,6 @@ export class ActivityService {
 
     // Kalau userId ada → cari attempt user
     if (userId) {
-      // Attempt terkini yang sedang dikerjakan user
       const currAttempt = await this.taskAttemptRepository.findOne({
         where: { student_id: userId, task: { slug } },
         order: { last_accessed_at: 'DESC' },
@@ -306,17 +306,18 @@ export class ActivityService {
             (currAttempt.status as TaskAttemptStatus) ??
             TaskAttemptStatus.NOT_STARTED,
         };
-      } else {
-        // Attempt terbaru yang sudah completed
-        const recentAttempt = await this.taskAttemptRepository.findOne({
-          where: {
-            student_id: userId,
-            task: { slug },
-            status: TaskAttemptStatus.COMPLETED,
-          },
-          order: { completed_at: 'DESC' },
-        });
+      }
 
+      const recentAttempt = await this.taskAttemptRepository.findOne({
+        where: {
+          student_id: userId,
+          task: { slug },
+          status: TaskAttemptStatus.COMPLETED,
+        },
+        order: { completed_at: 'DESC' },
+      });
+
+      if (recentAttempt) {
         recentAttemptMeta = {
           startedAt: getDateTime(recentAttempt.started_at) ?? null,
           lastAccessedAt: getDateTime(recentAttempt.last_accessed_at) ?? null,
@@ -347,6 +348,7 @@ export class ActivityService {
       slug,
       description,
       image,
+      difficulty,
       subject,
       material,
       taskGrades,
@@ -373,6 +375,7 @@ export class ActivityService {
               .join(', ')
           : null,
       questionCount: taskQuestions.length || 0,
+      difficulty: TaskDifficultyLabels[difficulty],
       createdBy: task.created_by || 'Unknown',
       type: {
         id: taskType.task_type_id,

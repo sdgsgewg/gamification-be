@@ -36,6 +36,7 @@ export class ActivityDetailResponseDto {
   material?: { id: string; name: string };
   grade: string;
   questionCount: number;
+  difficulty: string;
   createdBy: string;
   type: ActivityType;
   currAttempt?: CurrentAttempt;

@@ -7,4 +7,5 @@ export class TaskOverviewResponseDto {
   material?: string;
   taskGrade: string;
   questionCount: number;
+  difficulty: string;
 }

@@ -1,4 +1,5 @@
 import { IsNotEmpty, IsOptional, ValidateIf } from 'class-validator';
+import { TaskDifficulty } from '../../enums/task-difficulty.enum';
 
 export class CreateTaskQuestionOptionDto {
   @IsNotEmpty()
@@ -46,6 +47,9 @@ export class CreateTaskDto {
 
   @IsNotEmpty()
   createdBy: string;
+
+  @IsNotEmpty()
+  difficulty: TaskDifficulty;
 
   @IsOptional()
   description?: string;

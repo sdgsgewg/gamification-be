@@ -34,6 +34,7 @@ import { GroupedTaskAttemptResponseDto } from './dto/responses/grouped-task-atte
 import { TaskAttemptStatus } from './enums/task-attempt-status.enum';
 import { TaskSubmissionService } from '../task-submissions/task-submissions.service';
 import { TaskXpHelper } from 'src/common/helpers/task-xp.helper';
+import { TaskDifficultyLabels } from '../tasks/enums/task-difficulty.enum';
 
 @Injectable()
 export class TaskAttemptService {
@@ -205,6 +206,7 @@ export class TaskAttemptService {
       material,
       taskType,
       taskGrades,
+      difficulty,
       taskQuestions,
       start_time,
       end_time,
@@ -296,6 +298,7 @@ export class TaskAttemptService {
               .join(', ')
           : null,
       questionCount: taskQuestions.length,
+      difficulty: TaskDifficultyLabels[difficulty],
       createdBy: created_by || 'Unknown',
       type: {
         name: taskType.name,

@@ -19,6 +19,7 @@ import { FileUploadService } from 'src/common/services/file-upload.service';
 import { SlugHelper } from 'src/common/helpers/slug.helper';
 import { TaskQuestionService } from '../task-questions/task-questions.service';
 import { getDbColumn } from 'src/common/database/get-db-column.util';
+import { TaskDifficultyLabels } from './enums/task-difficulty.enum';
 
 @Injectable()
 export class TaskService {
@@ -46,6 +47,7 @@ export class TaskService {
         'task.task_id AS "taskId"',
         'task.title AS "title"',
         'task.slug AS "slug"',
+        'task.difficulty AS "difficulty"',
         'taskType.name AS "taskType"',
         'subject.name AS "subject"',
         'material.name AS "material"',
@@ -112,6 +114,7 @@ export class TaskService {
       material: t.material,
       taskGrade: t.taskGrade || null,
       questionCount: Number(t.questionCount) || 0,
+      difficulty: TaskDifficultyLabels[t.difficulty],
     }));
 
     return taskOverviews;
@@ -152,6 +155,7 @@ export class TaskService {
               .join(', ')
           : null,
       questionCount: taskWithRelations.taskQuestions.length,
+      difficulty: TaskDifficultyLabels[taskWithRelations.difficulty],
       startTime: taskWithRelations.start_time ?? null,
       endTime: taskWithRelations.end_time ?? null,
       duration: getTimePeriod(
@@ -225,6 +229,7 @@ export class TaskService {
       slug,
       description: dto.description ?? '',
       image: imageUrl,
+      difficulty: dto.difficulty,
       start_time: dto.startTime ?? null,
       end_time: dto.endTime ?? null,
       created_at: new Date(),
@@ -383,6 +388,7 @@ export class TaskService {
     existingTask.slug = slug;
     existingTask.description = dto.description;
     existingTask.image = imageUrl;
+    existingTask.difficulty = dto.difficulty;
     existingTask.start_time = dto.startTime ?? null;
     existingTask.end_time = dto.endTime ?? null;
     existingTask.updated_at = new Date();

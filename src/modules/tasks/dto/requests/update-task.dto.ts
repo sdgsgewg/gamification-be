@@ -1,4 +1,5 @@
 import { IsNotEmpty, IsOptional, IsString, ValidateIf } from 'class-validator';
+import { TaskDifficulty } from '../../enums/task-difficulty.enum';
 
 export class UpdateTaskQuestionOptionDto {
   @IsNotEmpty()
@@ -54,6 +55,10 @@ export class UpdateTaskDto {
   @IsNotEmpty()
   @IsString()
   updatedBy: string;
+
+  @IsNotEmpty()
+  @IsString()
+  difficulty?: TaskDifficulty;
 
   @IsOptional()
   @IsString()

@@ -26,6 +26,7 @@ export class TaskDetailResponseDto {
   taskGradeIds: string[];
   taskGrade: string;
   questionCount: number;
+  difficulty: string;
   startTime?: Date;
   endTime?: Date;
   duration?: string;
