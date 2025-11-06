@@ -1,7 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
-  In,
   Repository,
   Between,
   MoreThanOrEqual,
@@ -28,11 +27,13 @@ import {
   getTime,
   getTimePeriod,
 } from 'src/common/utils/date-modifier.util';
-import { ActivityAttemptStatus } from '../activities/enums/activity-attempt-status.enum';
 import { FilterTaskAttemptDto } from './dto/requests/filter-task-attempt.dto';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { GroupedTaskAttemptResponseDto } from './dto/responses/grouped-task-attempt.dto';
+import { TaskAttemptStatus } from './enums/task-attempt-status.enum';
+import { TaskSubmissionService } from '../task-submissions/task-submissions.service';
+import { TaskXpHelper } from 'src/common/helpers/task-xp.helper';
 
 @Injectable()
 export class TaskAttemptService {
@@ -45,6 +46,7 @@ export class TaskAttemptService {
     private readonly taskQuestionOptionRepository: Repository<TaskQuestionOption>,
     private readonly taskAnswerLogService: TaskAnswerLogService,
     private readonly userService: UserService,
+    private readonly taskSubmissionService: TaskSubmissionService,
   ) {}
 
   async findAllTaskAttemptsbyUser(
@@ -236,11 +238,11 @@ export class TaskAttemptService {
 
     const rawStatus = status as string | null;
 
-    const normalizedStatus = Object.values(ActivityAttemptStatus).includes(
-      rawStatus as ActivityAttemptStatus,
+    const normalizedStatus = Object.values(TaskAttemptStatus).includes(
+      rawStatus as TaskAttemptStatus,
     )
-      ? (rawStatus as ActivityAttemptStatus)
-      : ActivityAttemptStatus.NOT_STARTED;
+      ? (rawStatus as TaskAttemptStatus)
+      : TaskAttemptStatus.NOT_STARTED;
 
     const progress: TaskAttemptProgress = {
       startedAt: getDateTime(started_at),
@@ -326,10 +328,16 @@ export class TaskAttemptService {
   private getStatus(
     answeredQuestionCount: number,
     completedAt: Date | null,
-  ): string {
-    if (answeredQuestionCount === 0) return 'not_started';
-    if (completedAt) return 'completed';
-    return 'on_progress';
+    isClassTask = false,
+  ): TaskAttemptStatus {
+    if (answeredQuestionCount === 0) return TaskAttemptStatus.NOT_STARTED;
+    if (completedAt) {
+      // kalau task dari class → SUBMITTED dulu, bukan langsung COMPLETED
+      return isClassTask
+        ? TaskAttemptStatus.SUBMITTED
+        : TaskAttemptStatus.COMPLETED;
+    }
+    return TaskAttemptStatus.ON_PROGRESS;
   }
 
   // Helper: Ambil task + validasi
@@ -344,59 +352,6 @@ export class TaskAttemptService {
     }
 
     return task;
-  }
-
-  /**
-   * Hitung total poin dan XP yang didapatkan dari pengerjaan tugas.
-   * Rumus:
-   * xpBaseRate:
-   * - HARD = 3
-   * - MEDIUM = 2
-   * - EASY = 1.5
-   * total points: points (jumlah poin benar dari seluruh soal)  * xpBaseRate
-   */
-  private async calculatePointsAndXp(
-    task: Task,
-    answerLogs: any[],
-  ): Promise<{ points: number; xpGained: number }> {
-    let points = 0;
-
-    // Ambil semua optionId valid dari jawaban
-    const optionIds = answerLogs
-      .map((a) => a.optionId)
-      .filter((id): id is string => !!id);
-
-    if (optionIds.length === 0) {
-      return { points: 0, xpGained: 0 };
-    }
-
-    // Ambil semua option terkait sekaligus (hindari N+1 query)
-    const options = await this.taskQuestionOptionRepository.find({
-      where: { task_question_option_id: In(optionIds) },
-      relations: ['question'],
-    });
-
-    // Buat map biar lookup cepat
-    const optionMap = new Map(
-      options.map((opt) => [opt.task_question_option_id, opt]),
-    );
-
-    // Hitung total poin dari jawaban benar
-    for (const ans of answerLogs) {
-      if (!ans.optionId) continue;
-      const option = optionMap.get(ans.optionId);
-      if (option?.is_correct && option.question) {
-        points += option.question.point;
-      }
-    }
-
-    // Perhitungan XP berdasarkan tingkat kesulitan
-    const difficultyRate =
-      task.difficulty === 'HARD' ? 3 : task.difficulty === 'MEDIUM' ? 2 : 1.5;
-
-    const xpGained = Math.round(points * difficultyRate);
-
-    return { points, xpGained };
   }
 
   private async getLevelChangeData(
@@ -453,6 +408,7 @@ export class TaskAttemptService {
     existing: TaskAttempt | null,
     task: Task,
     dto: CreateTaskAttemptDto | UpdateTaskAttemptDto,
+    isClassTask = false, // ✅ tambahkan
   ): Promise<TaskAttempt> {
     const questionCount = task.taskQuestions.length;
     const { answeredQuestionCount, answerLogs } = dto;
@@ -460,7 +416,11 @@ export class TaskAttemptService {
       questionCount,
       answeredQuestionCount,
     );
-    const status = this.getStatus(answeredQuestionCount, completedAt);
+    const status = this.getStatus(
+      answeredQuestionCount,
+      completedAt,
+      isClassTask,
+    );
 
     const attempt =
       existing ??
@@ -476,9 +436,13 @@ export class TaskAttemptService {
     attempt.completed_at = completedAt;
 
     // Update points dan xpGained saat semua soal sudah terisi
-    if (answeredQuestionCount >= questionCount) {
+    if (answeredQuestionCount >= questionCount && !isClassTask) {
       const { points, xpGained } = answerLogs?.length
-        ? await this.calculatePointsAndXp(task, answerLogs)
+        ? await TaskXpHelper.calculatePointsAndXp(
+            task,
+            answerLogs,
+            this.taskQuestionOptionRepository,
+          )
         : { points: 0, xpGained: 0 };
 
       attempt.points = points;
@@ -525,7 +489,7 @@ export class TaskAttemptService {
     return {
       status: 200,
       isSuccess: true,
-      message: 'Percobaan tugas berhasil dibuat!',
+      message: 'Task attempt has been created!',
       data,
     };
   }
@@ -565,7 +529,106 @@ export class TaskAttemptService {
     return {
       status: 200,
       isSuccess: true,
-      message: 'Percobaan tugas berhasil diperbarui!',
+      message: 'Task attempt has been updated!',
+      data,
+    };
+  }
+
+  /**
+   * Create task attempt that is initiated in the dahsboard class page
+   */
+  async createClassTaskAttempt(
+    dto: CreateTaskAttemptDto,
+  ): Promise<DetailResponseDto<UpsertTaskAttemptResponseDto>> {
+    const { taskId, answerLogs, studentId } = dto;
+
+    const task = await this.getTaskWithQuestions(taskId);
+
+    // create task attempt
+    const taskAttempt = await this.buildTaskAttempt(null, task, dto, true);
+    const savedTaskAttempt = await this.taskAttemptRepository.save(taskAttempt);
+
+    const { task_attempt_id } = savedTaskAttempt;
+
+    // create answer log
+    await this.saveAnswerLogs(task_attempt_id, answerLogs, false);
+
+    // create task submission if user han answered all questions
+    if (
+      savedTaskAttempt.answered_question_count === task.taskQuestions.length
+    ) {
+      await this.taskSubmissionService.createTaskSubmission({
+        taskAttemptId: task_attempt_id,
+      });
+    }
+
+    const data: UpsertTaskAttemptResponseDto = await this.getLevelChangeData(
+      studentId,
+      savedTaskAttempt,
+    );
+
+    return {
+      status: 200,
+      isSuccess: true,
+      message: 'Task attempt has been created!',
+      data,
+    };
+  }
+
+  /**
+   * Update task attempt that is initiated in the dahsboard class page
+   */
+  async updateClassTaskAttempt(
+    id: string,
+    dto: UpdateTaskAttemptDto,
+  ): Promise<DetailResponseDto<UpsertTaskAttemptResponseDto>> {
+    // get existing task attempt
+    const existing = await this.taskAttemptRepository.findOne({
+      where: { task_attempt_id: id },
+    });
+
+    if (!existing) {
+      throw new NotFoundException(`Task attempt with id ${id} not found`);
+    }
+
+    // get task informations
+    const { task_id } = existing;
+    const task = await this.getTaskWithQuestions(task_id);
+
+    // update task attempt
+    const updatedAttempt = await this.buildTaskAttempt(
+      existing,
+      task,
+      dto,
+      true,
+    );
+    const savedTaskAttempt =
+      await this.taskAttemptRepository.save(updatedAttempt);
+
+    const { task_attempt_id, student_id: studentId } = savedTaskAttempt;
+    const { answerLogs } = dto;
+
+    // update answer log
+    await this.saveAnswerLogs(task_attempt_id, answerLogs, true);
+
+    // create task submission if user han answered all questions
+    if (
+      savedTaskAttempt.answered_question_count === task.taskQuestions.length
+    ) {
+      await this.taskSubmissionService.createTaskSubmission({
+        taskAttemptId: task_attempt_id,
+      });
+    }
+
+    const data: UpsertTaskAttemptResponseDto = await this.getLevelChangeData(
+      studentId,
+      savedTaskAttempt,
+    );
+
+    return {
+      status: 200,
+      isSuccess: true,
+      message: 'Task attempt has been updated!',
       data,
     };
   }

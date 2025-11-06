@@ -1,4 +1,4 @@
-import { ActivityAttemptStatus } from '../../enums/activity-attempt-status.enum';
+import { TaskAttemptStatus } from 'src/modules/task-attempts/enums/task-attempt-status.enum';
 
 export class ActivityType {
   id: string;
@@ -10,14 +10,14 @@ export class CurrentAttempt {
   answeredCount?: number;
   startedAt?: string;
   lastAccessedAt?: string;
-  status?: ActivityAttemptStatus;
+  status?: TaskAttemptStatus;
 }
 
 export class RecentAttempt {
   startedAt?: string;
   lastAccessedAt?: string;
   completedAt?: string;
-  status?: ActivityAttemptStatus;
+  status?: TaskAttemptStatus;
 }
 
 export class ActivityDuration {

@@ -3,6 +3,7 @@ import { Grade } from 'src/modules/grades/entities/grade.entity';
 import { PasswordReset } from 'src/modules/password_resets/entities/password-reset.entity';
 import { Role } from 'src/modules/roles/entities/role.entity';
 import { TaskAttempt } from 'src/modules/task-attempts/entities/task-attempt.entity';
+import { TaskSubmission } from 'src/modules/task-submissions/entities/task-submission.entity';
 import { UserSession } from 'src/modules/user-sessions/entities/user-sessions.entity';
 import {
   Entity,
@@ -82,4 +83,7 @@ export class User {
 
   @OneToMany(() => TaskAttempt, (ta) => ta.student)
   taskAttempts: TaskAttempt[];
+
+  @OneToMany(() => TaskSubmission, (ts) => ts.grader)
+  taskSubmissions: TaskSubmission[];
 }

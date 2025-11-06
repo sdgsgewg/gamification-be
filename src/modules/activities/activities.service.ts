@@ -17,8 +17,8 @@ import {
 import { ActivityWithQuestionsResponseDto } from './dto/responses/activity-with-questions-response.dto';
 import { TaskAnswerLog } from '../task-answer-logs/entities/task-answer-log.entity';
 import { ActivitySummaryResponseDto } from './dto/responses/activity-summary-response.dto';
-import { ActivityAttemptStatus } from './enums/activity-attempt-status.enum';
 import { TaskTypeScope } from '../task-types/enums/task-type-scope.enum';
+import { TaskAttemptStatus } from '../task-attempts/enums/task-attempt-status.enum';
 
 @Injectable()
 export class ActivityService {
@@ -279,14 +279,14 @@ export class ActivityService {
       answeredCount: 0,
       startedAt: null,
       lastAccessedAt: null,
-      status: ActivityAttemptStatus.NOT_STARTED,
+      status: TaskAttemptStatus.NOT_STARTED,
     };
 
     let recentAttemptMeta: RecentAttempt = {
       startedAt: null,
       lastAccessedAt: null,
       completedAt: null,
-      status: ActivityAttemptStatus.NOT_STARTED,
+      status: TaskAttemptStatus.NOT_STARTED,
     };
 
     // Kalau userId ada → cari attempt user
@@ -303,8 +303,8 @@ export class ActivityService {
           startedAt: getDateTime(currAttempt.started_at) ?? null,
           lastAccessedAt: getDateTime(currAttempt.last_accessed_at) ?? null,
           status:
-            (currAttempt.status as ActivityAttemptStatus) ??
-            ActivityAttemptStatus.NOT_STARTED,
+            (currAttempt.status as TaskAttemptStatus) ??
+            TaskAttemptStatus.NOT_STARTED,
         };
       } else {
         // Attempt terbaru yang sudah completed
@@ -312,7 +312,7 @@ export class ActivityService {
           where: {
             student_id: userId,
             task: { slug },
-            status: ActivityAttemptStatus.COMPLETED,
+            status: TaskAttemptStatus.COMPLETED,
           },
           order: { completed_at: 'DESC' },
         });
@@ -322,8 +322,8 @@ export class ActivityService {
           lastAccessedAt: getDateTime(recentAttempt.last_accessed_at) ?? null,
           completedAt: getDateTime(recentAttempt.completed_at),
           status:
-            (recentAttempt.status as ActivityAttemptStatus) ??
-            ActivityAttemptStatus.NOT_STARTED,
+            (recentAttempt.status as TaskAttemptStatus) ??
+            TaskAttemptStatus.NOT_STARTED,
         };
       }
     }
@@ -380,7 +380,7 @@ export class ActivityService {
         isRepeatable: taskType.is_repeatable,
       },
       currAttempt:
-        currAttemptMeta.status === ActivityAttemptStatus.ON_PROGRESS
+        currAttemptMeta.status === TaskAttemptStatus.ON_PROGRESS
           ? {
               answeredCount: Number(currAttemptMeta.answeredCount) || 0,
               startedAt: currAttemptMeta.startedAt,
@@ -432,7 +432,7 @@ export class ActivityService {
         where: {
           student_id: userId,
           task: { slug },
-          status: Not(ActivityAttemptStatus.COMPLETED),
+          status: Not(TaskAttemptStatus.COMPLETED),
         },
         order: { last_accessed_at: 'DESC' },
       });

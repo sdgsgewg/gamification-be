@@ -1,6 +1,6 @@
 import { TaskAttemptStatus } from 'src/modules/task-attempts/enums/task-attempt-status.enum';
 
-export class ActivityType {
+export class TaskType {
   id: string;
   name: string;
   isRepeatable: boolean;
@@ -37,7 +37,7 @@ export class ClassTaskDetailResponseDto {
   grade: string;
   questionCount: number;
   createdBy: string;
-  type: ActivityType;
+  type: TaskType;
   currAttempt?: CurrentAttempt;
   recentAttempt?: RecentAttempt;
   duration?: TaskDuration;

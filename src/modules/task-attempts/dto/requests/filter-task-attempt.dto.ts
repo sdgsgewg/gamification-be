@@ -1,5 +1,5 @@
 import { IsOptional, IsString, IsIn, IsDate } from 'class-validator';
-import { ActivityAttemptStatus } from 'src/modules/activities/enums/activity-attempt-status.enum';
+import { TaskAttemptStatus } from '../../enums/task-attempt-status.enum';
 
 export class FilterTaskAttemptDto {
   @IsOptional()
@@ -8,7 +8,7 @@ export class FilterTaskAttemptDto {
 
   @IsOptional()
   @IsString()
-  status?: ActivityAttemptStatus;
+  status?: TaskAttemptStatus;
 
   @IsOptional()
   @IsDate()

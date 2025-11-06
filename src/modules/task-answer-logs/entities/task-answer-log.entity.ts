@@ -1,7 +1,13 @@
 import { TaskAttempt } from 'src/modules/task-attempts/entities/task-attempt.entity';
 import { TaskQuestion } from 'src/modules/task-questions/entities/task-question.entity';
 import { TaskQuestionOption } from 'src/modules/task-question-options/entities/task-question-option.entity';
-import { Entity, Column, PrimaryGeneratedColumn, JoinColumn, ManyToOne } from 'typeorm';
+import {
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  JoinColumn,
+  ManyToOne,
+} from 'typeorm';
 
 @Entity('task_answer_logs')
 export class TaskAnswerLog {
@@ -16,6 +22,12 @@ export class TaskAnswerLog {
 
   @Column({ type: 'boolean' })
   is_correct: boolean;
+
+  @Column({ type: 'int4', nullable: true })
+  point_awarded: number;
+
+  @Column({ type: 'text', nullable: true })
+  teacher_notes: string;
 
   @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;

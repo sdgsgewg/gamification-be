@@ -16,7 +16,7 @@ export class ClassTaskController {
   constructor(private readonly classTaskService: ClassTaskService) {}
 
   /**
-   * ✅ [GET] /classes/:classSlug/tasks
+   * [GET] /classes/:classSlug/tasks
    * Mendapatkan daftar tugas (task) dalam satu kelas
    */
   @Get()
@@ -32,7 +32,7 @@ export class ClassTaskController {
   }
 
   /**
-   * ✅ [GET] /classes/:classSlug/tasks/:taskSlug
+   * [GET] /classes/:classSlug/tasks/:taskSlug
    * Mendapatkan detail satu task (tanpa pertanyaan)
    */
   @Get(':taskSlug')
@@ -55,7 +55,7 @@ export class ClassTaskController {
   }
 
   /**
-   * ✅ [GET] /classes/:classSlug/tasks/:taskSlug/attempt
+   * [GET] /classes/:classSlug/tasks/:taskSlug/attempt
    * Mendapatkan detail task + pertanyaan (jika user login, sertakan jawaban terakhir)
    */
   @Get(':taskSlug/attempt')
@@ -78,7 +78,7 @@ export class ClassTaskController {
   }
 
   /**
-   * ✅ [GET] /classes/:classSlug/tasks/:taskSlug/summary
+   * [GET] /classes/:classSlug/tasks/:taskSlug/summary
    * Mendapatkan ringkasan attempt terakhir yang sudah completed
    */
   @Get(':taskSlug/summary')

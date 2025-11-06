@@ -5,5 +5,5 @@ class Member {
 
 export class ClassMemberResponseDto {
   students: Member[];
-  teacher: Member;
+  teacher: Member[];
 }

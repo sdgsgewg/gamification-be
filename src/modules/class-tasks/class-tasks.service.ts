@@ -53,7 +53,7 @@ export class ClassTaskService {
     // Ambil class berdasarkan slug
     const qb = this.classRepository
       .createQueryBuilder('class')
-      .where('class.slug = :slug', { classSlug });
+      .where('class.slug = :slug', { slug: classSlug });
 
     const classData = await qb.getOne();
 

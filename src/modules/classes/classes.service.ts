@@ -197,11 +197,15 @@ export class ClassService {
     });
 
     const member: ClassMemberResponseDto = {
-      teacher: {
-        name: classData.teacher?.name ?? '-',
-        image:
-          classData.teacher?.image !== '' ? classData.teacher?.image : null,
-      },
+      teacher: [
+        {
+          name: classData.teacher?.name ?? '-',
+          image:
+            classData.teacher?.image && classData.teacher?.image !== ''
+              ? classData.teacher.image
+              : null,
+        },
+      ],
       students: classStudents.map((cs) => ({
         name: cs.student.name,
         image: cs.student.image !== '' ? cs.student.image : null,

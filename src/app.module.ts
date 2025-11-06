@@ -22,6 +22,7 @@ import { TaskAttemptModule } from './modules/task-attempts/task-attempts.module'
 import { LeaderboardModule } from './modules/leaderboards/leaderboards.module';
 import { ClassModule } from './modules/classes/classes.module';
 import { ClassTaskModule } from './modules/class-tasks/class-tasks.module';
+import { TaskSubmissionModule } from './modules/task-submissions/task-submissions.module';
 
 @Module({
   imports: [
@@ -60,6 +61,7 @@ import { ClassTaskModule } from './modules/class-tasks/class-tasks.module';
     LeaderboardModule,
     ClassModule,
     ClassTaskModule,
+    TaskSubmissionModule
     // tambah module baru di sini
   ],
   controllers: [AppController],
