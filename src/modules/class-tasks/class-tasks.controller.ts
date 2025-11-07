@@ -93,6 +93,7 @@ export class ClassTaskController {
     }
 
     const userId = req.user?.id || null;
+
     return this.classTaskService.findClassTaskSummaryFromAttempt(
       classSlug,
       taskSlug,

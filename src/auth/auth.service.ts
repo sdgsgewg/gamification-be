@@ -152,6 +152,7 @@ export class AuthService {
         accessToken,
         refreshToken,
         user: safeUser,
+        remember,
       };
 
       return {

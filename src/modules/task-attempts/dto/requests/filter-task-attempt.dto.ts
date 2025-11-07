@@ -1,5 +1,6 @@
-import { IsOptional, IsString, IsIn, IsDate } from 'class-validator';
+import { IsOptional, IsString, IsIn, IsDate, IsBoolean } from 'class-validator';
 import { TaskAttemptStatus } from '../../enums/task-attempt-status.enum';
+import { Transform } from 'class-transformer';
 
 export class FilterTaskAttemptDto {
   @IsOptional()
@@ -9,6 +10,11 @@ export class FilterTaskAttemptDto {
   @IsOptional()
   @IsString()
   status?: TaskAttemptStatus;
+
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  isClassTask?: boolean;
 
   @IsOptional()
   @IsDate()

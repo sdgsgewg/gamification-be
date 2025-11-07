@@ -6,6 +6,8 @@ import {
   MoreThanOrEqual,
   LessThanOrEqual,
   Raw,
+  Not,
+  IsNull,
 } from 'typeorm';
 import { TaskAttempt } from './entities/task-attempt.entity';
 import { CreateTaskAttemptDto } from './dto/requests/create-task-attempt.dto';
@@ -50,7 +52,7 @@ export class TaskAttemptService {
     private readonly taskSubmissionService: TaskSubmissionService,
   ) {}
 
-  async findAllTaskAttemptsbyUser(
+  async findAllTaskAttemptsByUser(
     userId: string,
     filterDto: FilterTaskAttemptDto,
   ): Promise<GroupedTaskAttemptResponseDto[]> {
@@ -62,6 +64,12 @@ export class TaskAttemptService {
     // Tambahkan filter dinamis
     if (filterDto.status) {
       where.status = filterDto.status;
+    }
+
+    if (filterDto.isClassTask) {
+      where.class_id = Not(IsNull());
+    } else {
+      where.class_id = IsNull();
     }
 
     if (filterDto.dateFrom && filterDto.dateTo) {
@@ -91,6 +99,7 @@ export class TaskAttemptService {
       where,
       relations: {
         task: true,
+        class: true,
       },
       order: {
         [orderBy]: orderState,
@@ -105,7 +114,8 @@ export class TaskAttemptService {
     }
 
     // Mapping
-    const groupByCompleted = filterDto.status?.toLowerCase() === 'completed';
+    const groupByCompleted = filterDto.status === TaskAttemptStatus.COMPLETED;
+
     return this.mapAndGroupTaskAttempts(attempts, groupByCompleted);
   }
 
@@ -141,6 +151,8 @@ export class TaskAttemptService {
           title,
           image: image !== '' ? image : null,
           status,
+          classSlug: attempt.class.slug,
+          taskSlug: attempt.task.slug,
           lastAccessedTime: getTime(last_accessed_at),
           completedTime: completed_at ? getTime(completed_at) : null,
         });
@@ -322,9 +334,12 @@ export class TaskAttemptService {
   private getCompletedAt(
     questionCount: number,
     answeredQuestionCount: number,
+    isClassTask = false,
   ): Date | null {
     // Jika semua atau lebih banyak soal sudah dijawab, anggap sudah selesai
-    return answeredQuestionCount >= questionCount ? new Date() : null;
+    return answeredQuestionCount >= questionCount && !isClassTask
+      ? new Date()
+      : null;
   }
 
   // Helper: Tentukan status
@@ -411,7 +426,7 @@ export class TaskAttemptService {
     existing: TaskAttempt | null,
     task: Task,
     dto: CreateTaskAttemptDto | UpdateTaskAttemptDto,
-    isClassTask = false, // ✅ tambahkan
+    isClassTask = false,
   ): Promise<TaskAttempt> {
     const questionCount = task.taskQuestions.length;
     const { answeredQuestionCount, answerLogs } = dto;
@@ -430,6 +445,7 @@ export class TaskAttemptService {
       this.taskAttemptRepository.create({
         ...(this.isCreateDto(dto) && { task_id: dto.taskId }),
         ...(this.isCreateDto(dto) && { student_id: dto.studentId }),
+        ...(this.isCreateDto(dto) && isClassTask && { class_id: dto.classId }),
         started_at: existing ? existing.started_at : new Date(),
       });
 
@@ -438,8 +454,12 @@ export class TaskAttemptService {
     attempt.last_accessed_at = new Date();
     attempt.completed_at = completedAt;
 
-    // Update points dan xpGained saat semua soal sudah terisi
-    if (answeredQuestionCount >= questionCount && !isClassTask) {
+    // Update points dan xpGained saat status = "COMPLETED" dan semua soal sudah terisi
+    if (
+      dto.status === TaskAttemptStatus.COMPLETED &&
+      answeredQuestionCount >= questionCount &&
+      !isClassTask
+    ) {
       const { points, xpGained } = answerLogs?.length
         ? await TaskXpHelper.calculatePointsAndXp(
             task,
@@ -556,8 +576,9 @@ export class TaskAttemptService {
     // create answer log
     await this.saveAnswerLogs(task_attempt_id, answerLogs, false);
 
-    // create task submission if user han answered all questions
+    // create task submission if status === "COMPLETED" and  user has answered all questions
     if (
+      dto.status === TaskAttemptStatus.COMPLETED &&
       savedTaskAttempt.answered_question_count === task.taskQuestions.length
     ) {
       await this.taskSubmissionService.createTaskSubmission({
@@ -614,8 +635,9 @@ export class TaskAttemptService {
     // update answer log
     await this.saveAnswerLogs(task_attempt_id, answerLogs, true);
 
-    // create task submission if user han answered all questions
+    // create task submission if status === "COMPLETED" and user han answered all questions
     if (
+      dto.status === TaskAttemptStatus.COMPLETED &&
       savedTaskAttempt.answered_question_count === task.taskQuestions.length
     ) {
       await this.taskSubmissionService.createTaskSubmission({

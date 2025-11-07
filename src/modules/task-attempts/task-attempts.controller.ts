@@ -29,7 +29,7 @@ export class TaskAttemptController {
     // Ambil userId dari request (kalau user login)
     const userId = req.user?.id || null;
 
-    return this.taskAttemptService.findAllTaskAttemptsbyUser(userId, filterDto);
+    return this.taskAttemptService.findAllTaskAttemptsByUser(userId, filterDto);
   }
 
   @Get(':id')
@@ -40,13 +40,29 @@ export class TaskAttemptController {
     return this.taskAttemptService.findTaskAttemptById(id);
   }
 
-  @Post()
-  async create(@Body() dto: CreateTaskAttemptDto) {
+  @Post('activity')
+  async createActivityAttempt(@Body() dto: CreateTaskAttemptDto) {
     return this.taskAttemptService.createTaskAttempt(dto);
   }
 
-  @Put(':id')
-  async update(@Param('id') id: string, @Body() dto: UpdateTaskAttemptDto) {
+  @Post('class')
+  async createClassTaskAttempt(@Body() dto: CreateTaskAttemptDto) {
+    return this.taskAttemptService.createClassTaskAttempt(dto);
+  }
+
+  @Put('activity/:id')
+  async updateActivityAttempt(
+    @Param('id') id: string,
+    @Body() dto: UpdateTaskAttemptDto,
+  ) {
     return this.taskAttemptService.updateTaskAttempt(id, dto);
+  }
+
+  @Put('class/:id')
+  async updateClassTaskAttempt(
+    @Param('id') id: string,
+    @Body() dto: UpdateTaskAttemptDto,
+  ) {
+    return this.taskAttemptService.updateClassTaskAttempt(id, dto);
   }
 }

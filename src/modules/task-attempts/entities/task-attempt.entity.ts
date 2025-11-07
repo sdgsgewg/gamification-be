@@ -61,7 +61,7 @@ export class TaskAttempt {
   class: Class;
 
   @OneToOne(() => TaskSubmission, (ts) => ts.taskAttempt)
-  taskAttempt: TaskSubmission;
+  taskSubmission: TaskSubmission;
 
   @OneToMany(() => TaskAnswerLog, (tal) => tal.taskAttempt)
   taskAnswerLogs: TaskAnswerLog[];

@@ -3,6 +3,8 @@ export class TaskAttemptOverviewResponseDto {
   title: string;
   image: string;
   status: string;
+  classSlug?: string;
+  taskSlug?: string;
   lastAccessedTime: string;
   completedTime?: string;
 }

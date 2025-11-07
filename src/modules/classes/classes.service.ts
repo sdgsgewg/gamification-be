@@ -107,7 +107,7 @@ export class ClassService {
     }
 
     // Hanya student yang relevan untuk query ini
-    if (user.role.name !== 'student') {
+    if (user.role.name !== UserRole.STUDENT) {
       throw new ForbiddenException(
         `Role ${user.role.name} tidak memiliki akses ke daftar kelas yang belum diikuti`,
       );

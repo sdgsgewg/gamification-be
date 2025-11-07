@@ -173,7 +173,9 @@ export class ActivityService {
       .addOrderBy('ta.last_accessed_at', 'DESC');
 
     if (!includeCompleted)
-      sub.andWhere('ta.status != :completed', { completed: 'completed' });
+      sub.andWhere('ta.status != :completed', {
+        completed: TaskAttemptStatus.COMPLETED,
+      });
 
     return sub;
   }
@@ -240,7 +242,7 @@ export class ActivityService {
       .select('subject.name', 'subjectName')
       .addSelect('COUNT(*)', 'attemptCount')
       .where('ta.student_id = :userId', { userId })
-      .andWhere('ta.status = :status', { status: 'completed' })
+      .andWhere('ta.status = :status', { status: TaskAttemptStatus.COMPLETED })
       .groupBy('subject.name')
       .orderBy('COUNT(*)', 'DESC')
       .getRawMany();
@@ -513,7 +515,7 @@ export class ActivityService {
     const attempt = await this.taskAttemptRepository.findOne({
       where: {
         student_id: userId,
-        status: 'completed',
+        status: TaskAttemptStatus.COMPLETED,
         task: { slug: taskSlug },
       },
       relations: {

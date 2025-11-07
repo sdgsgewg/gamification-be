@@ -12,7 +12,8 @@ import {
 import {
   ClassTaskDetailResponseDto,
   CurrentAttempt,
-  RecentAttempt,
+  TaskDuration,
+  TaskType,
 } from './dto/responses/class-task-detail-response.dto';
 import {
   ClassTaskWithQuestionsResponseDto,
@@ -27,6 +28,7 @@ import {
   AnswerLog,
   ClassTaskSummaryResponseDto,
 } from './dto/responses/class-task-summary-response.dto';
+import { TaskDifficultyLabels } from '../tasks/enums/task-difficulty.enum';
 
 @Injectable()
 export class ClassTaskService {
@@ -129,11 +131,6 @@ export class ClassTaskService {
           taskQuestions: true,
         },
       },
-      order: {
-        task: {
-          taskQuestions: { order: 'ASC' },
-        },
-      },
     });
 
     if (!classTask)
@@ -151,12 +148,8 @@ export class ClassTaskService {
       status: TaskAttemptStatus.NOT_STARTED,
     };
 
-    let recentAttemptMeta: RecentAttempt = {
-      startedAt: null,
-      lastAccessedAt: null,
-      completedAt: null,
-      status: TaskAttemptStatus.NOT_STARTED,
-    };
+    // let recentAttemptMeta: TaskAttempt | null = null;
+    let recentAttempt: TaskAttempt | null = null;
 
     // Jika userId ada → ambil attempt
     if (userId) {
@@ -181,76 +174,187 @@ export class ClassTaskService {
       }
 
       // Attempt terakhir yang sudah selesai
-      const recentAttempt = await this.taskAttemptRepository.findOne({
+      recentAttempt = await this.taskAttemptRepository.findOne({
         where: {
           student_id: userId,
           task_id: task.task_id,
           class_id: classEntity.class_id,
-          status: TaskAttemptStatus.COMPLETED,
+          status: TaskAttemptStatus.SUBMITTED || TaskAttemptStatus.COMPLETED,
         },
-        order: { completed_at: 'DESC' },
+        relations: {
+          task: {
+            taskQuestions: {
+              taskQuestionOptions: true,
+            },
+          },
+          taskAnswerLogs: {
+            // include question relation if your TaskAnswerLog has it (ref in example)
+            question: true,
+          },
+          taskSubmission: {
+            grader: true,
+          },
+        },
+        order: {
+          completed_at: 'DESC',
+          task: {
+            taskQuestions: {
+              order: 'ASC',
+              taskQuestionOptions: {
+                order: 'ASC',
+              },
+            },
+          },
+          taskAnswerLogs: {
+            created_at: 'ASC',
+          },
+        },
       });
 
-      if (recentAttempt) {
-        recentAttemptMeta = {
-          startedAt: getDateTime(recentAttempt.started_at),
-          lastAccessedAt: getDateTime(recentAttempt.last_accessed_at),
-          completedAt: getDateTime(recentAttempt.completed_at),
-          status: recentAttempt.status as TaskAttemptStatus,
-        };
-      }
+      // if (recentAttempt) {
+      //   recentAttemptMeta = recentAttempt;
+      // }
     }
 
     // Mapping ke DTO final
     return this.mapClassTaskDetailResponse(
       classTask,
       currAttemptMeta,
-      recentAttemptMeta,
+      // recentAttemptMeta,
+      recentAttempt,
     );
   }
 
   private mapClassTaskDetailResponse(
     classTask: ClassTask,
     currAttemptMeta: CurrentAttempt,
-    recentAttemptMeta: RecentAttempt,
+    recentAttempt: TaskAttempt | null,
   ): ClassTaskDetailResponseDto {
-    const { task } = classTask;
+    const {
+      task_id,
+      title,
+      slug,
+      image,
+      description,
+      subject,
+      material,
+      taskType,
+      taskGrades,
+      difficulty,
+      taskQuestions,
+      start_time,
+      end_time,
+      created_by,
+    } = classTask.task;
+
+    // const score = Math.round((points / totalPoints) * 100);
+
+    const type: TaskType = {
+      id: taskType.task_type_id,
+      name: taskType.name,
+      isRepeatable: taskType.is_repeatable,
+    };
+
+    const currAttempt: CurrentAttempt | null =
+      currAttemptMeta?.status === TaskAttemptStatus.ON_PROGRESS
+        ? currAttemptMeta
+        : null;
+
+    const duration: TaskDuration = {
+      startTime: start_time ?? null,
+      endTime: end_time ?? null,
+      duration: getTimePeriod(start_time, end_time),
+    };
 
     return {
-      id: task.task_id,
-      title: task.title,
-      slug: task.slug,
-      description: task.description ?? null,
-      image: task.image ?? null,
-      subject: task.subject
-        ? { id: task.subject.subject_id, name: task.subject.name }
-        : null,
-      material: task.material
-        ? { id: task.material.material_id, name: task.material.name }
+      id: task_id,
+      title,
+      slug,
+      description: description ?? null,
+      image: image ?? null,
+      subject: subject ? { id: subject.subject_id, name: subject.name } : null,
+      material: material
+        ? { id: material.material_id, name: material.name }
         : null,
       grade:
-        task.taskGrades?.length > 0
-          ? task.taskGrades
+        taskGrades?.length > 0
+          ? taskGrades
               .map((tg) => tg.grade?.name.replace('Kelas ', ''))
               .join(', ')
           : null,
-      questionCount: task.taskQuestions?.length || 0,
-      createdBy: task.created_by || 'Unknown',
-      type: {
-        id: task.taskType.task_type_id,
-        name: task.taskType.name,
-        isRepeatable: task.taskType.is_repeatable,
-      },
-      currAttempt:
-        currAttemptMeta?.status === TaskAttemptStatus.ON_PROGRESS
-          ? currAttemptMeta
+      difficulty: TaskDifficultyLabels[difficulty] ?? 'Unknown',
+      questionCount: taskQuestions?.length || 0,
+      createdBy: created_by || 'Unknown',
+      type,
+      currAttempt,
+      recentAttempt: recentAttempt
+        ? {
+            startedAt: getDateTime(recentAttempt.started_at),
+            lastAccessedAt: getDateTime(recentAttempt.last_accessed_at),
+            submittedAt: getDateTime(recentAttempt.taskSubmission.created_at),
+            completedAt: getDateTime(recentAttempt.completed_at),
+            status: recentAttempt.status as TaskAttemptStatus,
+          }
+        : null,
+      stats:
+        recentAttempt && recentAttempt.taskSubmission
+          ? {
+              pointGained: recentAttempt.points,
+              xpGained: recentAttempt.xp_gained,
+              totalPoints: taskQuestions.reduce(
+                (acc, question) => acc + (question.point ?? 0),
+                0,
+              ),
+              score: recentAttempt.taskSubmission.score,
+            }
           : null,
-      recentAttempt: recentAttemptMeta?.completedAt ? recentAttemptMeta : null,
-      duration: {
-        startTime: task.start_time ?? null,
-        endTime: task.end_time ?? null,
-        duration: getTimePeriod(task.start_time, task.end_time),
-      },
+      duration,
+      questions:
+        recentAttempt && recentAttempt.taskSubmission
+          ? recentAttempt.task.taskQuestions.map((q) => {
+              const userAnswer = recentAttempt.taskAnswerLogs.find(
+                (log) => log.question_id === q.task_question_id,
+              );
+
+              return {
+                questionId: q.task_question_id,
+                text: q.text,
+                point: q.point,
+                type: q.type,
+                timeLimit: q.time_limit ?? null,
+                image: q.image ?? null,
+                options: q.taskQuestionOptions?.map((o) => ({
+                  optionId: o.task_question_option_id,
+                  text: o.text,
+                  isCorrect: o.is_correct,
+                  isSelected:
+                    userAnswer?.option_id === o.task_question_option_id,
+                })),
+                userAnswer: userAnswer
+                  ? {
+                      answerLogId: userAnswer.task_answer_log_id,
+                      text: userAnswer.answer_text,
+                      image: userAnswer.image,
+                      optionId: userAnswer.option_id,
+                      isCorrect: userAnswer.is_correct,
+                    }
+                  : null,
+              };
+            })
+          : [],
+      submission: recentAttempt.taskSubmission
+        ? {
+            score: recentAttempt.taskSubmission.score,
+            feedback: recentAttempt.taskSubmission.feedback,
+            status: recentAttempt.taskSubmission.status,
+            gradedBy: recentAttempt.taskSubmission.graded_by
+              ? recentAttempt.taskSubmission.grader.name
+              : null,
+            gradedAt: recentAttempt.taskSubmission.graded_at
+              ? getDateTime(recentAttempt.taskSubmission.graded_at)
+              : null,
+          }
+        : null,
     };
   }
 
@@ -402,7 +506,7 @@ export class ClassTaskService {
     const attempt = await this.taskAttemptRepository.findOne({
       where: {
         student_id: userId,
-        status: 'completed',
+        status: TaskAttemptStatus.SUBMITTED,
         task: { slug: taskSlug },
         class_id: classEntity.class_id,
       },

@@ -100,6 +100,8 @@ export class AuthController {
       data: {
         accessToken,
         user,
+        remember,
+        cookieMaxAge,
       },
     };
 
