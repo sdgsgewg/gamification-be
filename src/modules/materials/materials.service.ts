@@ -15,6 +15,9 @@ import { BaseResponseDto } from 'src/common/responses/base-response.dto';
 import { getDateTimeWithName } from 'src/common/utils/date-modifier.util';
 import { SlugHelper } from 'src/common/helpers/slug.helper';
 import { getDbColumn } from 'src/common/database/get-db-column.util';
+import { MasterHistoryService } from '../master-history/master-history.service';
+import { MasterHistoryTransactionType } from '../master-history/enums/master-history-transaction-type';
+import { getMasterHistoryDescription } from 'src/common/utils/get-master-history-description';
 
 @Injectable()
 export class MaterialService {
@@ -24,6 +27,7 @@ export class MaterialService {
     @InjectRepository(MaterialGrade)
     private readonly materialGradeRepository: Repository<MaterialGrade>,
     private readonly fileUploadService: FileUploadService,
+    private readonly masterHistoryService: MasterHistoryService,
   ) {}
 
   async findAllMaterials(
@@ -142,6 +146,7 @@ export class MaterialService {
   }
 
   async createMaterial(
+    userId: string,
     dto: CreateMaterialDto,
     imageFile?: Express.Multer.File,
   ): Promise<DetailResponseDto<MaterialDetailResponseDto>> {
@@ -205,6 +210,22 @@ export class MaterialService {
       await this.materialGradeRepository.save(grades);
     }
 
+    // Add event to master history
+    await this.masterHistoryService.createMasterHistory({
+      tableName: 'materials',
+      pkName: 'material_id',
+      pkValue: savedMaterial.material_id,
+      transactionType: MasterHistoryTransactionType.INSERT,
+      description: getMasterHistoryDescription(
+        MasterHistoryTransactionType.INSERT,
+        'material',
+        undefined,
+        savedMaterial,
+      ),
+      dataAfter: savedMaterial,
+      createdBy: userId,
+    });
+
     // Query ulang untuk ambil subject + grades
     const taskWithRelations = await this.materialRepository.findOne({
       where: { material_id: savedMaterial.material_id },
@@ -239,6 +260,7 @@ export class MaterialService {
 
   async updateMaterial(
     id: string,
+    userId: string,
     dto: UpdateMaterialDto,
     imageFile?: Express.Multer.File,
   ): Promise<DetailResponseDto<MaterialDetailResponseDto>> {
@@ -347,6 +369,23 @@ export class MaterialService {
       });
     }
 
+    // Add event to master history
+    await this.masterHistoryService.createMasterHistory({
+      tableName: 'materials',
+      pkName: 'material_id',
+      pkValue: updatedMaterial.material_id,
+      transactionType: MasterHistoryTransactionType.UPDATE,
+      description: getMasterHistoryDescription(
+        MasterHistoryTransactionType.UPDATE,
+        'material',
+        existingMaterial,
+        updatedMaterial,
+      ),
+      dataBefore: existingMaterial,
+      dataAfter: updatedMaterial,
+      createdBy: userId,
+    });
+
     // Reload material dengan relasi subject & grades
     const materialWithRelations = await this.materialRepository.findOne({
       where: { material_id: updatedMaterial.material_id },
@@ -365,7 +404,7 @@ export class MaterialService {
     return response;
   }
 
-  async deleteMaterial(id: string): Promise<BaseResponseDto> {
+  async deleteMaterial(id: string, userId: string): Promise<BaseResponseDto> {
     // cek material dulu
     const material = await this.findMaterialOrThrow(id);
 
@@ -373,6 +412,22 @@ export class MaterialService {
       // hapus image dari storage
       await this.fileUploadService.deleteImage(material.image, 'materials');
     }
+
+    // Add event to master history
+    await this.masterHistoryService.createMasterHistory({
+      tableName: 'materials',
+      pkName: 'material_id',
+      pkValue: material.material_id,
+      transactionType: MasterHistoryTransactionType.DELETE,
+      description: getMasterHistoryDescription(
+        MasterHistoryTransactionType.DELETE,
+        'material',
+        material,
+        undefined,
+      ),
+      dataBefore: material,
+      createdBy: userId,
+    });
 
     // Hapus data di material_grades
     await this.materialGradeRepository.delete({

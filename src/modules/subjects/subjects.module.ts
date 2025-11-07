@@ -4,9 +4,14 @@ import { SubjectController } from './subjects.controller';
 import { SubjectService } from './subjects.service';
 import { Subject } from './entities/subject.entity';
 import { CommonModule } from 'src/common/common.module';
+import { MasterHistoryModule } from '../master-history/master-history.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Subject]), CommonModule],
+  imports: [
+    TypeOrmModule.forFeature([Subject]),
+    CommonModule,
+    MasterHistoryModule,
+  ],
   controllers: [SubjectController],
   providers: [SubjectService],
   exports: [SubjectService],

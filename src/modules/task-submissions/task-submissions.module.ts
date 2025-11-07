@@ -7,6 +7,7 @@ import { TaskAttempt } from '../task-attempts/entities/task-attempt.entity';
 import { TaskAnswerLog } from '../task-answer-logs/entities/task-answer-log.entity';
 import { TaskQuestionOption } from '../task-question-options/entities/task-question-option.entity';
 import { UserModule } from '../users/users.module';
+import { ActivityLogModule } from '../activty-logs/activity-logs.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { UserModule } from '../users/users.module';
       TaskQuestionOption,
     ]),
     UserModule,
+    ActivityLogModule,
   ],
   controllers: [TaskSubmissionController],
   providers: [TaskSubmissionService],

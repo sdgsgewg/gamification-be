@@ -10,12 +10,15 @@ import {
   Body,
   UseInterceptors,
   UploadedFile,
+  UseGuards,
+  Req,
 } from '@nestjs/common';
 import { MaterialService } from './materials.service';
 import { FilterMaterialDto } from './dto/requests/filter-material.dto';
 import { CreateMaterialDto } from './dto/requests/create-material.dto';
 import { UpdateMaterialDto } from './dto/requests/update-material.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { OptionalJwtAuthGuard } from 'src/auth/optional-jwt-auth.guard';
 
 @Controller('/materials')
 export class MaterialController {
@@ -35,28 +38,43 @@ export class MaterialController {
   }
 
   @Post()
+  @UseGuards(OptionalJwtAuthGuard)
   @UseInterceptors(FileInterceptor('imageFile'))
   async create(
     @UploadedFile() file: Express.Multer.File,
     @Body('data') rawData: string,
+    @Req() req: any,
   ) {
     const dto: CreateMaterialDto = JSON.parse(rawData);
-    return this.materialService.createMaterial(dto, file);
+
+    // Ambil userId dari request (kalau user login)
+    const userId = req.user?.id || null;
+
+    return this.materialService.createMaterial(userId, dto, file);
   }
 
   @Put(':id')
+  @UseGuards(OptionalJwtAuthGuard)
   @UseInterceptors(FileInterceptor('imageFile'))
   async update(
     @Param('id') id: string,
     @UploadedFile() file: Express.Multer.File,
     @Body('data') rawData: string,
+    @Req() req: any,
   ) {
     const dto: UpdateMaterialDto = JSON.parse(rawData);
-    return this.materialService.updateMaterial(id, dto, file);
+
+    // Ambil userId dari request (kalau user login)
+    const userId = req.user?.id || null;
+
+    return this.materialService.updateMaterial(id, userId, dto, file);
   }
 
   @Delete(':id')
-  async delete(@Param('id') id: string) {
-    return this.materialService.deleteMaterial(id);
+  @UseGuards(OptionalJwtAuthGuard)
+  async delete(@Param('id') id: string, @Req() req: any) {
+    // Ambil userId dari request (kalau user login)
+    const userId = req.user?.id || null;
+    return this.materialService.deleteMaterial(id, userId);
   }
 }

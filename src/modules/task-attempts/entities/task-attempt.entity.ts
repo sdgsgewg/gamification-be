@@ -27,10 +27,10 @@ export class TaskAttempt {
   @Column({ type: 'int4', default: 0 })
   answered_question_count: number;
 
-  @Column({ type: 'varchar', default: 'on_progress' })
+  @Column({ type: 'varchar' })
   status: string;
 
-  @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
+  @Column({ type: 'timestamptz' })
   started_at: Date;
 
   @Column({ type: 'timestamptz' })

@@ -26,6 +26,7 @@ export class TaskAttemptProgress {
   startedAt: string;
   lastAccessedAt: string;
   completedAt: string;
+  timeTaken: string;
   status: TaskAttemptStatus;
 }
 

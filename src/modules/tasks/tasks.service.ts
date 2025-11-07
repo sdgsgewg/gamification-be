@@ -20,6 +20,9 @@ import { SlugHelper } from 'src/common/helpers/slug.helper';
 import { TaskQuestionService } from '../task-questions/task-questions.service';
 import { getDbColumn } from 'src/common/database/get-db-column.util';
 import { TaskDifficultyLabels } from './enums/task-difficulty.enum';
+import { MasterHistoryService } from '../master-history/master-history.service';
+import { MasterHistoryTransactionType } from '../master-history/enums/master-history-transaction-type';
+import { getMasterHistoryDescription } from 'src/common/utils/get-master-history-description';
 
 @Injectable()
 export class TaskService {
@@ -30,6 +33,7 @@ export class TaskService {
     private readonly taskGradeRepository: Repository<TaskGrade>,
     private readonly taskQuestionService: TaskQuestionService,
     private readonly fileUploadService: FileUploadService,
+    private readonly masterHistoryService: MasterHistoryService,
   ) {}
 
   async findAllTasks(
@@ -214,6 +218,7 @@ export class TaskService {
   }
 
   async createTask(
+    userId: string,
     dto: CreateTaskDto,
     imageFile?: Express.Multer.File,
   ): Promise<DetailResponseDto<TaskDetailResponseDto>> {
@@ -284,6 +289,22 @@ export class TaskService {
       );
     }
 
+    // Add event to master history
+    await this.masterHistoryService.createMasterHistory({
+      tableName: 'tasks',
+      pkName: 'task_id',
+      pkValue: savedTask.task_id,
+      transactionType: MasterHistoryTransactionType.INSERT,
+      description: getMasterHistoryDescription(
+        MasterHistoryTransactionType.INSERT,
+        'task',
+        undefined,
+        savedTask,
+      ),
+      dataAfter: savedTask,
+      createdBy: userId,
+    });
+
     // Query ulang untuk ambil tabel relasinya
     const taskWithRelations = await this.taskRepository.findOne({
       where: { task_id: savedTask.task_id },
@@ -352,6 +373,7 @@ export class TaskService {
 
   async updateTask(
     id: string,
+    userId: string,
     dto: UpdateTaskDto,
     imageFile?: Express.Multer.File,
   ): Promise<DetailResponseDto<TaskDetailResponseDto>> {
@@ -415,6 +437,23 @@ export class TaskService {
       );
     }
 
+    // Add event to master history
+    await this.masterHistoryService.createMasterHistory({
+      tableName: 'tasks',
+      pkName: 'task_id',
+      pkValue: updatedTask.task_id,
+      transactionType: MasterHistoryTransactionType.UPDATE,
+      description: getMasterHistoryDescription(
+        MasterHistoryTransactionType.UPDATE,
+        'task',
+        existingTask,
+        updatedTask,
+      ),
+      dataBefore: existingTask,
+      dataAfter: updatedTask,
+      createdBy: userId,
+    });
+
     // Reload with relations
     const taskWithRelations = await this.taskRepository.findOne({
       where: { task_id: updatedTask.task_id },
@@ -441,9 +480,25 @@ export class TaskService {
     return response;
   }
 
-  async deleteTask(id: string): Promise<BaseResponseDto> {
+  async deleteTask(id: string, userId: string): Promise<BaseResponseDto> {
     // Cek tugas dulu
-    await this.findTaskOrThrow(id);
+    const task = await this.findTaskOrThrow(id);
+
+    // Add event to master history
+    await this.masterHistoryService.createMasterHistory({
+      tableName: 'tasks',
+      pkName: 'task_id',
+      pkValue: task.task_id,
+      transactionType: MasterHistoryTransactionType.DELETE,
+      description: getMasterHistoryDescription(
+        MasterHistoryTransactionType.DELETE,
+        'task',
+        task,
+        undefined,
+      ),
+      dataBefore: task,
+      createdBy: userId,
+    });
 
     // Hapus seluruh folder tasks/{taskId} dari storage (termasuk image task & question)
     await this.fileUploadService.deleteFolder('tasks', id);

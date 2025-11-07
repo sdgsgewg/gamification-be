@@ -23,6 +23,8 @@ import { LeaderboardModule } from './modules/leaderboards/leaderboards.module';
 import { ClassModule } from './modules/classes/classes.module';
 import { ClassTaskModule } from './modules/class-tasks/class-tasks.module';
 import { TaskSubmissionModule } from './modules/task-submissions/task-submissions.module';
+import { MasterHistoryModule } from './modules/master-history/master-history.module';
+import { ActivityLogModule } from './modules/activty-logs/activity-logs.module';
 
 @Module({
   imports: [
@@ -61,7 +63,9 @@ import { TaskSubmissionModule } from './modules/task-submissions/task-submission
     LeaderboardModule,
     ClassModule,
     ClassTaskModule,
-    TaskSubmissionModule
+    TaskSubmissionModule,
+    MasterHistoryModule,
+    ActivityLogModule,
     // tambah module baru di sini
   ],
   controllers: [AppController],

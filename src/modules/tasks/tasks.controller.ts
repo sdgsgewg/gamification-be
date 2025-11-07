@@ -10,12 +10,15 @@ import {
   UseInterceptors,
   UploadedFiles,
   Body,
+  UseGuards,
+  Req,
 } from '@nestjs/common';
 import { TaskService } from './tasks.service';
 import { FilterTaskDto } from './dto/requests/filter-task.dto';
 import { CreateTaskDto } from './dto/requests/create-task.dto';
 import { UpdateTaskDto } from './dto/requests/update-task.dto';
 import { AnyFilesInterceptor } from '@nestjs/platform-express';
+import { OptionalJwtAuthGuard } from 'src/auth/optional-jwt-auth.guard';
 
 @Controller('/tasks')
 export class TaskController {
@@ -35,10 +38,12 @@ export class TaskController {
   }
 
   @Post()
+  @UseGuards(OptionalJwtAuthGuard)
   @UseInterceptors(AnyFilesInterceptor())
   async create(
     @UploadedFiles() files: Express.Multer.File[],
     @Body('data') rawData: string,
+    @Req() req: any,
   ) {
     try {
       const dto: CreateTaskDto = JSON.parse(rawData);
@@ -59,7 +64,10 @@ export class TaskController {
         }
       });
 
-      return this.taskService.createTask(dto, cover);
+      // Ambil userId dari request (kalau user login)
+      const userId = req.user?.id || null;
+
+      return this.taskService.createTask(userId, dto, cover);
     } catch (e) {
       console.error('Error create task:', e);
       throw e;
@@ -67,11 +75,13 @@ export class TaskController {
   }
 
   @Put(':id')
+  @UseGuards(OptionalJwtAuthGuard)
   @UseInterceptors(AnyFilesInterceptor())
   async update(
     @Param('id') id: string,
     @UploadedFiles() files: Express.Multer.File[],
     @Body('data') rawData: string,
+    @Req() req: any,
   ) {
     try {
       const dto: UpdateTaskDto = JSON.parse(rawData);
@@ -94,7 +104,10 @@ export class TaskController {
         });
       }
 
-      return this.taskService.updateTask(id, dto, cover);
+      // Ambil userId dari request (kalau user login)
+      const userId = req.user?.id || null;
+
+      return this.taskService.updateTask(id, userId, dto, cover);
     } catch (e) {
       console.error('Error update task:', e);
       throw e;
@@ -102,7 +115,10 @@ export class TaskController {
   }
 
   @Delete(':id')
-  async delete(@Param('id') id: string) {
-    return this.taskService.deleteTask(id);
+  @UseGuards(OptionalJwtAuthGuard)
+  async delete(@Param('id') id: string, @Req() req: any) {
+    // Ambil userId dari request (kalau user login)
+    const userId = req.user?.id || null;
+    return this.taskService.deleteTask(id, userId);
   }
 }

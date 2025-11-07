@@ -1,5 +1,7 @@
+import { ActivityLog } from 'src/modules/activty-logs/entities/activity-log.entity';
 import { ClassStudent } from 'src/modules/class-students/entities/class-student.entity';
 import { Grade } from 'src/modules/grades/entities/grade.entity';
+import { MasterHistory } from 'src/modules/master-history/entities/master-history.entity';
 import { PasswordReset } from 'src/modules/password_resets/entities/password-reset.entity';
 import { Role } from 'src/modules/roles/entities/role.entity';
 import { TaskAttempt } from 'src/modules/task-attempts/entities/task-attempt.entity';
@@ -86,4 +88,10 @@ export class User {
 
   @OneToMany(() => TaskSubmission, (ts) => ts.grader)
   taskSubmissions: TaskSubmission[];
+
+  @OneToMany(() => MasterHistory, (mh) => mh.createdBy)
+  masterHistories: MasterHistory[];
+
+  @OneToMany(() => ActivityLog, (al) => al.user)
+  activityLogs: ActivityLog[];
 }

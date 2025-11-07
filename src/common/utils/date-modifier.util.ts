@@ -1,3 +1,18 @@
+/**
+ * Output: `Nov 3, 2025`
+ */
+export function getDate(date: Date): string {
+  if (!date) return '';
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+/**
+ * Output: `3 November 2025 (13:29 WIB)`
+ */
 export function getDateTime(date: Date): string {
   if (!date) return '';
 

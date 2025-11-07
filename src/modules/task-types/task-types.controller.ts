@@ -8,11 +8,14 @@ import {
   Param,
   BadRequestException,
   Body,
+  UseGuards,
+  Req,
 } from '@nestjs/common';
 import { TaskTypeService } from './task-types.service';
 import { FilterTaskTypeDto } from './dto/requests/filter-task-type.dto';
 import { CreateTaskTypeDto } from './dto/requests/create-task-type.dto';
 import { UpdateTaskTypeDto } from './dto/requests/update-task-type.dto';
+import { OptionalJwtAuthGuard } from 'src/auth/optional-jwt-auth.guard';
 
 @Controller('/task-types')
 export class TaskTypeController {
@@ -32,17 +35,30 @@ export class TaskTypeController {
   }
 
   @Post()
-  async create(@Body() dto: CreateTaskTypeDto) {
-    return this.taskTypeService.createTaskType(dto);
+  @UseGuards(OptionalJwtAuthGuard)
+  async create(@Body() dto: CreateTaskTypeDto, @Req() req: any) {
+        // Ambil userId dari request (kalau user login)
+    const userId = req.user?.id || null;
+    return this.taskTypeService.createTaskType(userId, dto);
   }
 
   @Put(':id')
-  async update(@Param('id') id: string, @Body() dto: UpdateTaskTypeDto) {
-    return this.taskTypeService.updateTaskType(id, dto);
+  @UseGuards(OptionalJwtAuthGuard)
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateTaskTypeDto,
+    @Req() req: any,
+  ) {
+        // Ambil userId dari request (kalau user login)
+    const userId = req.user?.id || null;
+    return this.taskTypeService.updateTaskType(id, userId, dto);
   }
 
   @Delete(':id')
-  async delete(@Param('id') id: string) {
-    return this.taskTypeService.deleteTaskType(id);
+  @UseGuards(OptionalJwtAuthGuard)
+  async delete(@Param('id') id: string, @Req() req: any) {
+        // Ambil userId dari request (kalau user login)
+    const userId = req.user?.id || null;
+    return this.taskTypeService.deleteTaskType(id, userId);
   }
 }

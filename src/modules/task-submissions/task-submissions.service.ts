@@ -12,6 +12,10 @@ import { TaskAttempt } from '../task-attempts/entities/task-attempt.entity';
 import { UserService } from '../users/users.service';
 import { TaskXpHelper } from 'src/common/helpers/task-xp.helper';
 import { TaskQuestionOption } from '../task-question-options/entities/task-question-option.entity';
+import { ActivityLogService } from '../activty-logs/activity-logs.service';
+import { ActivityLogEventType } from '../activty-logs/enums/activity-log-event-type';
+import { getActivityLogDescription } from 'src/common/utils/get-activity-log-description';
+import { UserRole } from '../roles/enums/user-role.enum';
 
 @Injectable()
 export class TaskSubmissionService {
@@ -25,6 +29,7 @@ export class TaskSubmissionService {
     @InjectRepository(TaskQuestionOption)
     private readonly taskQuestionOptionRepository: Repository<TaskQuestionOption>,
     private readonly userService: UserService,
+    private readonly activityLogService: ActivityLogService,
   ) {}
 
   // async findAllTaskSubmissionsByStudents(
@@ -118,8 +123,35 @@ export class TaskSubmissionService {
     await this.userService.updateLevelAndXp(taskAttempt.student_id, xpGained);
 
     // Simpan semua perubahan
-    await this.taskSubmissionRepository.save(submission);
-    await this.taskAttemptRepository.save(taskAttempt);
+    const savedTaskSubmission =
+      await this.taskSubmissionRepository.save(submission);
+    const savedTaskAttempt = await this.taskAttemptRepository.save(taskAttempt);
+
+    // Add event task graded to activity log of teacher
+    await this.activityLogService.createActivityLog({
+      userId: teacherId,
+      eventType: ActivityLogEventType.TASK_GRADED,
+      description: getActivityLogDescription(
+        ActivityLogEventType.TASK_GRADED,
+        'task submission',
+        savedTaskAttempt,
+        UserRole.TEACHER,
+      ),
+      metadata: savedTaskSubmission,
+    });
+
+    // Add event task graded to activity log of student
+    await this.activityLogService.createActivityLog({
+      userId: savedTaskAttempt.student_id,
+      eventType: ActivityLogEventType.TASK_GRADED,
+      description: getActivityLogDescription(
+        ActivityLogEventType.TASK_GRADED,
+        'task submission',
+        savedTaskAttempt,
+        UserRole.STUDENT,
+      ),
+      metadata: savedTaskSubmission,
+    });
 
     return {
       status: 200,

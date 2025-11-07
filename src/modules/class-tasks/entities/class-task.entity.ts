@@ -13,6 +13,12 @@ export class ClassTask {
   @PrimaryGeneratedColumn('uuid')
   class_task_id: string;
 
+  @Column({ type: 'timestamptz', nullable: true })
+  start_time: Date;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  end_time: Date;
+
   @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   created_at: string;
 

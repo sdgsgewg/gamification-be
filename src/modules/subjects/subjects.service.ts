@@ -15,6 +15,9 @@ import { getDbColumn } from 'src/common/database/get-db-column.util';
 import { slugify } from 'src/common/utils/slug.util';
 import { SlugHelper } from 'src/common/helpers/slug.helper';
 import { TaskTypeScope } from '../task-types/enums/task-type-scope.enum';
+import { MasterHistoryService } from '../master-history/master-history.service';
+import { MasterHistoryTransactionType } from '../master-history/enums/master-history-transaction-type';
+import { getMasterHistoryDescription } from 'src/common/utils/get-master-history-description';
 
 @Injectable()
 export class SubjectService {
@@ -22,6 +25,7 @@ export class SubjectService {
     @InjectRepository(Subject)
     private readonly subjectRepository: Repository<Subject>,
     private readonly fileUploadService: FileUploadService,
+    private readonly masterHistoryService: MasterHistoryService,
   ) {}
 
   async findAllSubjects(
@@ -117,6 +121,7 @@ export class SubjectService {
   }
 
   async createSubject(
+    userId: string,
     dto: CreateSubjectDto,
     imageFile?: Express.Multer.File,
   ): Promise<DetailResponseDto<SubjectDetailResponseDto>> {
@@ -170,6 +175,22 @@ export class SubjectService {
       savedSubject.image = imageUrl;
     }
 
+    // Add event to master history
+    await this.masterHistoryService.createMasterHistory({
+      tableName: 'subjects',
+      pkName: 'subject_id',
+      pkValue: savedSubject.subject_id,
+      transactionType: MasterHistoryTransactionType.INSERT,
+      description: getMasterHistoryDescription(
+        MasterHistoryTransactionType.INSERT,
+        'subject',
+        undefined,
+        savedSubject,
+      ),
+      dataAfter: savedSubject,
+      createdBy: userId,
+    });
+
     const subjectDetail = this.getSubjectDetailData(savedSubject);
 
     const response: DetailResponseDto<SubjectDetailResponseDto> = {
@@ -198,6 +219,7 @@ export class SubjectService {
 
   async updateSubject(
     id: string,
+    userId: string,
     dto: UpdateSubjectDto,
     imageFile?: Express.Multer.File,
   ): Promise<DetailResponseDto<SubjectDetailResponseDto>> {
@@ -259,19 +281,36 @@ export class SubjectService {
     // Simpan perubahan utama subject
     const updatedSubject = await this.subjectRepository.save(existingSubject);
 
+    // Add event to master history
+    await this.masterHistoryService.createMasterHistory({
+      tableName: 'subjects',
+      pkName: 'subject_id',
+      pkValue: updatedSubject.subject_id,
+      transactionType: MasterHistoryTransactionType.UPDATE,
+      description: getMasterHistoryDescription(
+        MasterHistoryTransactionType.UPDATE,
+        'subject',
+        existingSubject,
+        updatedSubject,
+      ),
+      dataBefore: existingSubject,
+      dataAfter: updatedSubject,
+      createdBy: userId,
+    });
+
     const subjectDetail = this.getSubjectDetailData(updatedSubject);
 
     const response: DetailResponseDto<SubjectDetailResponseDto> = {
       status: 200,
       isSuccess: true,
-      message: 'Mata pelajaran berhasil diperbarui!',
+      message: 'Subject has been updated!',
       data: subjectDetail,
     };
 
     return response;
   }
 
-  async deleteSubject(id: string): Promise<BaseResponseDto> {
+  async deleteSubject(id: string, userId: string): Promise<BaseResponseDto> {
     // cek subject dulu
     const subject = await this.findSubjectOrThrow(id);
 
@@ -279,6 +318,22 @@ export class SubjectService {
       // hapus image dari storage
       await this.fileUploadService.deleteImage(subject.image, 'subjects');
     }
+
+    // Add event to master history
+    await this.masterHistoryService.createMasterHistory({
+      tableName: 'subjects',
+      pkName: 'subject_id',
+      pkValue: subject.subject_id,
+      transactionType: MasterHistoryTransactionType.DELETE,
+      description: getMasterHistoryDescription(
+        MasterHistoryTransactionType.DELETE,
+        'subject',
+        subject,
+        undefined,
+      ),
+      dataBefore: subject,
+      createdBy: userId,
+    });
 
     // Hapus subject
     await this.subjectRepository.delete(id);

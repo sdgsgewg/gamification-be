@@ -9,6 +9,9 @@ export class UpdateTaskAttemptDto {
   @IsNotEmpty()
   status: TaskAttemptStatus;
 
+  @IsNotEmpty()
+  lastAccessedAt: Date;
+
   @IsOptional()
   answerLogs?: UpdateTaskAnswerLogDto[];
 }

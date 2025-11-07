@@ -14,12 +14,16 @@ import { getDateTimeWithName } from 'src/common/utils/date-modifier.util';
 import { slugify } from 'src/common/utils/slug.util';
 import { SlugHelper } from 'src/common/helpers/slug.helper';
 import { getDbColumn } from 'src/common/database/get-db-column.util';
+import { MasterHistoryService } from '../master-history/master-history.service';
+import { MasterHistoryTransactionType } from '../master-history/enums/master-history-transaction-type';
+import { getMasterHistoryDescription } from 'src/common/utils/get-master-history-description';
 
 @Injectable()
 export class TaskTypeService {
   constructor(
     @InjectRepository(TaskType)
     private readonly taskTypeRepository: Repository<TaskType>,
+    private readonly masterHistoryService: MasterHistoryService,
   ) {}
 
   async findAllTaskTypes(
@@ -118,6 +122,7 @@ export class TaskTypeService {
   }
 
   async createTaskType(
+    userId: string,
     dto: CreateTaskTypeDto,
   ): Promise<DetailResponseDto<TaskTypeDetailResponseDto>> {
     const slug = slugify(dto.name);
@@ -148,9 +153,25 @@ export class TaskTypeService {
       created_by: dto.createdBy ?? null,
     });
 
-    const saved = await this.taskTypeRepository.save(taskType);
+    const savedTaskType = await this.taskTypeRepository.save(taskType);
 
-    const taskTypeDetail = this.getTaskTypeDetailData(saved);
+    // Add event to master history
+    await this.masterHistoryService.createMasterHistory({
+      tableName: 'task_types',
+      pkName: 'task_type_id',
+      pkValue: savedTaskType.task_type_id,
+      transactionType: MasterHistoryTransactionType.INSERT,
+      description: getMasterHistoryDescription(
+        MasterHistoryTransactionType.INSERT,
+        'task type',
+        undefined,
+        savedTaskType,
+      ),
+      dataAfter: savedTaskType,
+      createdBy: userId,
+    });
+
+    const taskTypeDetail = this.getTaskTypeDetailData(savedTaskType);
 
     const response: DetailResponseDto<TaskTypeDetailResponseDto> = {
       status: 200,
@@ -178,6 +199,7 @@ export class TaskTypeService {
 
   async updateTaskType(
     id: string,
+    userId: string,
     dto: UpdateTaskTypeDto,
   ): Promise<DetailResponseDto<TaskTypeDetailResponseDto>> {
     // Cari tipe task yang akan diupdate
@@ -215,6 +237,23 @@ export class TaskTypeService {
     const updatedTaskType =
       await this.taskTypeRepository.save(existingTaskType);
 
+    // Add event to master history
+    await this.masterHistoryService.createMasterHistory({
+      tableName: 'task_types',
+      pkName: 'task_type_id',
+      pkValue: updatedTaskType.task_type_id,
+      transactionType: MasterHistoryTransactionType.UPDATE,
+      description: getMasterHistoryDescription(
+        MasterHistoryTransactionType.UPDATE,
+        'task type',
+        existingTaskType,
+        updatedTaskType,
+      ),
+      dataBefore: existingTaskType,
+      dataAfter: updatedTaskType,
+      createdBy: userId,
+    });
+
     const taskTypeDetail = this.getTaskTypeDetailData(updatedTaskType);
 
     const response: DetailResponseDto<TaskTypeDetailResponseDto> = {
@@ -227,9 +266,25 @@ export class TaskTypeService {
     return response;
   }
 
-  async deleteTaskType(id: string): Promise<BaseResponseDto> {
+  async deleteTaskType(id: string, userId: string): Promise<BaseResponseDto> {
     // cek tipe task dulu
-    await this.findTaskTypeOrThrow(id);
+    const taskType = await this.findTaskTypeOrThrow(id);
+
+    // Add event to master history
+    await this.masterHistoryService.createMasterHistory({
+      tableName: 'task_types',
+      pkName: 'task_type_id',
+      pkValue: taskType.task_type_id,
+      transactionType: MasterHistoryTransactionType.DELETE,
+      description: getMasterHistoryDescription(
+        MasterHistoryTransactionType.DELETE,
+        'task type',
+        taskType,
+        undefined,
+      ),
+      dataBefore: taskType,
+      createdBy: userId,
+    });
 
     await this.taskTypeRepository.delete(id);
 

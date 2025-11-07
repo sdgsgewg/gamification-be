@@ -37,6 +37,9 @@ import { TaskAttemptStatus } from './enums/task-attempt-status.enum';
 import { TaskSubmissionService } from '../task-submissions/task-submissions.service';
 import { TaskXpHelper } from 'src/common/helpers/task-xp.helper';
 import { TaskDifficultyLabels } from '../tasks/enums/task-difficulty.enum';
+import { ActivityLogService } from '../activty-logs/activity-logs.service';
+import { getActivityLogDescription } from 'src/common/utils/get-activity-log-description';
+import { ActivityLogEventType } from '../activty-logs/enums/activity-log-event-type';
 
 @Injectable()
 export class TaskAttemptService {
@@ -50,6 +53,7 @@ export class TaskAttemptService {
     private readonly taskAnswerLogService: TaskAnswerLogService,
     private readonly userService: UserService,
     private readonly taskSubmissionService: TaskSubmissionService,
+    private readonly activityLogService: ActivityLogService,
   ) {}
 
   async findAllTaskAttemptsByUser(
@@ -262,6 +266,7 @@ export class TaskAttemptService {
       startedAt: getDateTime(started_at),
       lastAccessedAt: getDateTime(last_accessed_at),
       completedAt: getDateTime(completed_at),
+      timeTaken: getTimePeriod(started_at, completed_at),
       status: normalizedStatus,
     };
 
@@ -342,22 +347,6 @@ export class TaskAttemptService {
       : null;
   }
 
-  // Helper: Tentukan status
-  private getStatus(
-    answeredQuestionCount: number,
-    completedAt: Date | null,
-    isClassTask = false,
-  ): TaskAttemptStatus {
-    if (answeredQuestionCount === 0) return TaskAttemptStatus.NOT_STARTED;
-    if (completedAt) {
-      // kalau task dari class → SUBMITTED dulu, bukan langsung COMPLETED
-      return isClassTask
-        ? TaskAttemptStatus.SUBMITTED
-        : TaskAttemptStatus.COMPLETED;
-    }
-    return TaskAttemptStatus.ON_PROGRESS;
-  }
-
   // Helper: Ambil task + validasi
   private async getTaskWithQuestions(taskId: string): Promise<Task> {
     const task = await this.taskRepository.findOne({
@@ -434,11 +423,6 @@ export class TaskAttemptService {
       questionCount,
       answeredQuestionCount,
     );
-    const status = this.getStatus(
-      answeredQuestionCount,
-      completedAt,
-      isClassTask,
-    );
 
     const attempt =
       existing ??
@@ -446,12 +430,12 @@ export class TaskAttemptService {
         ...(this.isCreateDto(dto) && { task_id: dto.taskId }),
         ...(this.isCreateDto(dto) && { student_id: dto.studentId }),
         ...(this.isCreateDto(dto) && isClassTask && { class_id: dto.classId }),
-        started_at: existing ? existing.started_at : new Date(),
+        ...(this.isCreateDto(dto) && { started_at: dto.startedAt }),
       });
 
     attempt.answered_question_count = answeredQuestionCount;
-    attempt.status = status;
-    attempt.last_accessed_at = new Date();
+    attempt.status = dto.status;
+    attempt.last_accessed_at = dto.lastAccessedAt;
     attempt.completed_at = completedAt;
 
     // Update points dan xpGained saat status = "COMPLETED" dan semua soal sudah terisi
@@ -479,6 +463,71 @@ export class TaskAttemptService {
     return attempt;
   }
 
+  private async saveActivityLog(
+    existing: TaskAttempt | null,
+    savedTaskAttempt: TaskAttempt,
+  ) {
+    const { status } = savedTaskAttempt;
+
+    switch (status) {
+      case TaskAttemptStatus.ON_PROGRESS:
+        if (existing === null) {
+          // Add event task started to activity log
+          await this.activityLogService.createActivityLog({
+            userId: savedTaskAttempt.student_id,
+            eventType: ActivityLogEventType.TASK_STARTED,
+            description: getActivityLogDescription(
+              ActivityLogEventType.TASK_STARTED,
+              'task attempt',
+              savedTaskAttempt,
+            ),
+            metadata: savedTaskAttempt,
+          });
+        } else {
+          // Add event task last accessed to activity log
+          await this.activityLogService.createActivityLog({
+            userId: savedTaskAttempt.student_id,
+            eventType: ActivityLogEventType.TASK_LAST_ACCESSED,
+            description: getActivityLogDescription(
+              ActivityLogEventType.TASK_LAST_ACCESSED,
+              'task attempt',
+              savedTaskAttempt,
+            ),
+            metadata: savedTaskAttempt,
+          });
+        }
+        break;
+      case TaskAttemptStatus.SUBMITTED:
+        // Add event task submitted to activity log
+        await this.activityLogService.createActivityLog({
+          userId: savedTaskAttempt.student_id,
+          eventType: ActivityLogEventType.TASK_SUBMITTED,
+          description: getActivityLogDescription(
+            ActivityLogEventType.TASK_SUBMITTED,
+            'task attempt',
+            savedTaskAttempt,
+          ),
+          metadata: savedTaskAttempt,
+        });
+        break;
+      case TaskAttemptStatus.COMPLETED:
+        // Add event task completed to activity log
+        await this.activityLogService.createActivityLog({
+          userId: savedTaskAttempt.student_id,
+          eventType: ActivityLogEventType.TASK_COMPLETED,
+          description: getActivityLogDescription(
+            ActivityLogEventType.TASK_COMPLETED,
+            'task attempt',
+            savedTaskAttempt,
+          ),
+          metadata: savedTaskAttempt,
+        });
+        break;
+      default:
+        break;
+    }
+  }
+
   // helper type guard
   private isCreateDto(dto: any): dto is CreateTaskAttemptDto {
     return (
@@ -503,6 +552,9 @@ export class TaskAttemptService {
     const { task_attempt_id } = savedTaskAttempt;
 
     await this.saveAnswerLogs(task_attempt_id, answerLogs, false);
+
+    // Add event to activity log
+    await this.saveActivityLog(savedTaskAttempt, null);
 
     const data: UpsertTaskAttemptResponseDto = await this.getLevelChangeData(
       studentId,
@@ -544,6 +596,9 @@ export class TaskAttemptService {
 
     await this.saveAnswerLogs(task_attempt_id, answerLogs, true);
 
+    // Add event to activity log
+    await this.saveActivityLog(savedTaskAttempt, existing);
+
     const data: UpsertTaskAttemptResponseDto = await this.getLevelChangeData(
       studentId,
       savedTaskAttempt,
@@ -576,15 +631,18 @@ export class TaskAttemptService {
     // create answer log
     await this.saveAnswerLogs(task_attempt_id, answerLogs, false);
 
-    // create task submission if status === "COMPLETED" and  user has answered all questions
+    // create task submission if status === "SUBMITTED" and  user has answered all questions
     if (
-      dto.status === TaskAttemptStatus.COMPLETED &&
+      dto.status === TaskAttemptStatus.SUBMITTED &&
       savedTaskAttempt.answered_question_count === task.taskQuestions.length
     ) {
       await this.taskSubmissionService.createTaskSubmission({
         taskAttemptId: task_attempt_id,
       });
     }
+
+    // Add event to activity log
+    await this.saveActivityLog(savedTaskAttempt, null);
 
     const data: UpsertTaskAttemptResponseDto = await this.getLevelChangeData(
       studentId,
@@ -635,15 +693,18 @@ export class TaskAttemptService {
     // update answer log
     await this.saveAnswerLogs(task_attempt_id, answerLogs, true);
 
-    // create task submission if status === "COMPLETED" and user han answered all questions
+    // create task submission if status === "SUBMITTED" and user han answered all questions
     if (
-      dto.status === TaskAttemptStatus.COMPLETED &&
+      dto.status === TaskAttemptStatus.SUBMITTED &&
       savedTaskAttempt.answered_question_count === task.taskQuestions.length
     ) {
       await this.taskSubmissionService.createTaskSubmission({
         taskAttemptId: task_attempt_id,
       });
     }
+
+    // Add event to activity log
+    await this.saveActivityLog(savedTaskAttempt, existing);
 
     const data: UpsertTaskAttemptResponseDto = await this.getLevelChangeData(
       studentId,

@@ -10,6 +10,12 @@ export class CreateTaskAttemptDto {
   status: TaskAttemptStatus;
 
   @IsNotEmpty()
+  startedAt: Date;
+
+  @IsNotEmpty()
+  lastAccessedAt: Date;
+
+  @IsNotEmpty()
   taskId: string;
 
   @IsNotEmpty()
