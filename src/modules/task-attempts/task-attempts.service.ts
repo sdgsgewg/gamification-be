@@ -84,12 +84,12 @@ export class TaskAttemptService {
       where.last_accessed_at = LessThanOrEqual(filterDto.dateTo);
     }
 
-    // Filter by search text (task name)
+    // Filter by search text (task title)
     if (filterDto.searchText) {
       where.task = {
         ...where.task,
-        name: Raw((alias) => `${alias} ILIKE :name`, {
-          name: `%${filterDto.searchText}%`,
+        title: Raw((alias) => `${alias} ILIKE :title`, {
+          title: `%${filterDto.searchText}%`,
         }),
       };
     }

@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import { IsNotEmpty, IsOptional, ValidateNested } from 'class-validator';
+import { TaskSubmissionStatus } from '../../enums/task-submission-status.enum';
 
 class UpdateAnswerLogDto {
   @IsNotEmpty()
@@ -18,6 +19,9 @@ class UpdateAnswerLogDto {
 export class UpdateTaskSubmissionDto {
   @IsNotEmpty()
   score: number; // total score
+
+  @IsNotEmpty()
+  status: TaskSubmissionStatus;
 
   @IsOptional()
   feedback?: string; // overall feedback

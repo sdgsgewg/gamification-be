@@ -4,7 +4,7 @@ import { Not, Repository } from 'typeorm';
 import { ClassTask } from '../class-tasks/entities/class-task.entity';
 import { Class } from '../classes/entities/class.entity';
 import { FilterClassTaskDto } from './dto/requests/filter-class-task.dto';
-import { ClassTaskResponseDto } from './dto/responses/class-task-response.dto';
+import { StudentClassTaskResponseDto } from './dto/responses/student-class-task-response.dto';
 import {
   getDateTime,
   getTimePeriod,
@@ -29,6 +29,7 @@ import {
   ClassTaskSummaryResponseDto,
 } from './dto/responses/class-task-summary-response.dto';
 import { TaskDifficultyLabels } from '../tasks/enums/task-difficulty.enum';
+import { TeacherClassTaskResponseDto } from './dto/responses/teacher-class-task-response.dto';
 
 @Injectable()
 export class ClassTaskService {
@@ -46,12 +47,12 @@ export class ClassTaskService {
   ) {}
 
   /**
-   * Find available tasks in a class
+   * Find available tasks for student in a class
    */
-  async findClassTasks(
+  async findStudentClassTasks(
     classSlug: string,
     filterDto: FilterClassTaskDto,
-  ): Promise<ClassTaskResponseDto[]> {
+  ): Promise<StudentClassTaskResponseDto[]> {
     // Ambil class berdasarkan slug
     const qb = this.classRepository
       .createQueryBuilder('class')
@@ -67,7 +68,7 @@ export class ClassTaskService {
 
     // Ambil task untuk class tersebut
     const classTasks = await this.classTaskRepository.find({
-      where: { class: { class_id } }, // Penting: hanya ambil task dari class ini
+      where: { class: { class_id } },
       relations: {
         task: {
           taskType: true,
@@ -86,15 +87,117 @@ export class ClassTaskService {
     });
 
     // Mapping ke DTO
-    const tasks: ClassTaskResponseDto[] = classTasks.map((ct) => ({
+    const tasks: StudentClassTaskResponseDto[] = classTasks.map((ct) => ({
       title: ct.task.title,
       slug: ct.task.slug,
       image: ct.task.image != '' ? ct.task.image : null,
       type: ct.task.taskType?.name ?? '-',
       subject: ct.task.subject?.name ?? '-',
       questionCount: Number(ct.task.taskQuestions?.length) ?? 0,
-      deadline: getDateTime(ct.task.end_time) ?? null,
+      deadline: getDateTime(ct.end_time) ?? null,
     }));
+
+    return tasks;
+  }
+
+  /**
+   * Find available tasks for teacher in a class
+   */
+  async findTeacherClassTasks(
+    classSlug: string,
+    filterDto: FilterClassTaskDto,
+  ): Promise<TeacherClassTaskResponseDto[]> {
+    // Ambil class berdasarkan slug
+    const qb = this.classRepository
+      .createQueryBuilder('class')
+      .where('class.slug = :slug', { slug: classSlug });
+
+    const classData = await qb.getOne();
+
+    if (!classData) {
+      throw new NotFoundException(`Class with slug ${classSlug} not found`);
+    }
+
+    const { class_id } = classData;
+
+    // Ambil task untuk class tersebut
+    const classTasks = await this.classTaskRepository.find({
+      where: { class: { class_id } },
+      relations: {
+        class: {
+          classStudents: true,
+        },
+        task: {
+          taskType: true,
+          subject: true,
+          taskQuestions: true,
+        },
+      },
+      order: {
+        task: {
+          created_at: 'DESC',
+          taskQuestions: {
+            order: 'ASC',
+          },
+        },
+      },
+    });
+
+    // Ambil jumlah submission per task dalam satu class
+    const submissionStats = await this.classTaskRepository.manager
+      .createQueryBuilder()
+      .select('ct.task_id', 'taskId')
+      .addSelect('COUNT(ts.task_submission_id)', 'submissionCount')
+      .addSelect(
+        'COUNT(CASE WHEN ts.graded_at IS NOT NULL THEN 1 END)',
+        'gradedCount',
+      )
+      .from('class_tasks', 'ct')
+      .innerJoin(
+        'task_attempts',
+        'ta',
+        'ta.task_id = ct.task_id',
+      )
+      .innerJoin(
+        'task_submissions',
+        'ts',
+        'ts.task_attempt_id = ta.task_attempt_id',
+      )
+      .where('ct.class_id = :classId', { classId: class_id })
+      .groupBy('ct.task_id')
+      .getRawMany();
+
+    // Buat map untuk akses cepat
+    const submissionMap = Object.fromEntries(
+      submissionStats.map((row) => [
+        row.taskId,
+        {
+          submissionCount: Number(row.submissionCount),
+          gradedCount: Number(row.gradedCount),
+        },
+      ]),
+    );
+
+    // Mapping ke DTO
+    const tasks: TeacherClassTaskResponseDto[] = classTasks.map((ct) => {
+      const stat = submissionMap[ct.task.task_id] ?? {
+        submissionCount: 0,
+        gradedCount: 0,
+      };
+
+      return {
+        title: ct.task.title,
+        slug: ct.task.slug,
+        image: ct.task.image != '' ? ct.task.image : null,
+        type: ct.task.taskType?.name ?? '-',
+        subject: ct.task.subject?.name ?? '-',
+        questionCount: Number(ct.task.taskQuestions?.length) ?? 0,
+        totalStudents: ct.class.classStudents.length,
+        submissionCount: stat.submissionCount,
+        gradedCount: stat.gradedCount,
+        deadline: getDateTime(ct.end_time) ?? null,
+      };
+    });
 
     return tasks;
   }

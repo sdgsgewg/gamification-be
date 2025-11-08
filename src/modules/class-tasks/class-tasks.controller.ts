@@ -16,11 +16,11 @@ export class ClassTaskController {
   constructor(private readonly classTaskService: ClassTaskService) {}
 
   /**
-   * [GET] /classes/:classSlug/tasks
-   * Mendapatkan daftar tugas (task) dalam satu kelas
+   * [GET] /classes/:classSlug/tasks/student
+   * Mendapatkan daftar tugas (task) dari murid dalam satu kelas
    */
-  @Get()
-  async getClassTasks(
+  @Get('/student')
+  async getStudentClassTasks(
     @Param('classSlug') classSlug: string,
     @Query() filterDto: FilterClassTaskDto,
   ) {
@@ -28,7 +28,23 @@ export class ClassTaskController {
       throw new BadRequestException('Class slug is required');
     }
 
-    return this.classTaskService.findClassTasks(classSlug, filterDto);
+    return this.classTaskService.findStudentClassTasks(classSlug, filterDto);
+  }
+
+  /**
+   * [GET] /classes/:classSlug/tasks/teacher
+   * Mendapatkan daftar tugas (task) dari guru dalam satu kelas
+   */
+  @Get('/teacher')
+  async getTeacherClassTasks(
+    @Param('classSlug') classSlug: string,
+    @Query() filterDto: FilterClassTaskDto,
+  ) {
+    if (!classSlug) {
+      throw new BadRequestException('Class slug is required');
+    }
+
+    return this.classTaskService.findTeacherClassTasks(classSlug, filterDto);
   }
 
   /**

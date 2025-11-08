@@ -1,4 +1,4 @@
-export class ClassTaskResponseDto {
+export class StudentClassTaskResponseDto {
   title: string;
   slug: string;
   image?: string;

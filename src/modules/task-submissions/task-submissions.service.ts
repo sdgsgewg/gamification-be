@@ -16,6 +16,12 @@ import { ActivityLogService } from '../activty-logs/activity-logs.service';
 import { ActivityLogEventType } from '../activty-logs/enums/activity-log-event-type';
 import { getActivityLogDescription } from 'src/common/utils/get-activity-log-description';
 import { UserRole } from '../roles/enums/user-role.enum';
+import { FilterTaskSubmissionDto } from './dto/requests/filter-task-submission.dto';
+import { GroupedTaskSubmissionResponseDto } from './dto/responses/grouped-task-submission-response.dto';
+import { format } from 'date-fns';
+import { id } from 'date-fns/locale';
+import { getTime } from 'src/common/utils/date-modifier.util';
+// import { TaskSubmissionDetailResponseDto } from './dto/responses/task-submission-detail-response.dto';
 
 @Injectable()
 export class TaskSubmissionService {
@@ -32,12 +38,104 @@ export class TaskSubmissionService {
     private readonly activityLogService: ActivityLogService,
   ) {}
 
-  // async findAllTaskSubmissionsByStudents(
-  //   userId: string,
-  //   filterDto: FilterTaskAttemptDto,
-  // ): Promise<GroupedTaskAttemptResponseDto[]> {}
+  async findTaskSubmissionsInClass(
+    classSlug: string,
+    taskSlug: string,
+    filterDto: FilterTaskSubmissionDto,
+  ): Promise<GroupedTaskSubmissionResponseDto[]> {
+    const qb = this.taskSubmissionRepository
+      .createQueryBuilder('ts')
+      .leftJoinAndSelect('ts.taskAttempt', 'ta')
+      .leftJoinAndSelect('ta.class', 'c')
+      .leftJoinAndSelect('ta.task', 't')
+      .leftJoinAndSelect('ta.student', 's');
 
-  // async findTaskSubmissionById(submissionId: string) {}
+    // Filter berdasarkan class dan task slug
+    qb.where('c.slug = :classSlug', { classSlug }).andWhere(
+      't.slug = :taskSlug',
+      { taskSlug },
+    );
+
+    // Tambahkan filter status
+    if (filterDto.status) {
+      qb.andWhere('ts.status = :status', { status: filterDto.status });
+    }
+
+    // Filter berdasarkan nama siswa
+    if (filterDto.searchText) {
+      qb.andWhere('s.name ILIKE :name', { name: `%${filterDto.searchText}%` });
+    }
+
+    // Sorting dinamis
+    const orderBy = filterDto.orderBy ?? 'ts.created_at';
+    const orderState = filterDto.orderState ?? 'ASC';
+    qb.orderBy(orderBy, orderState as 'ASC' | 'DESC');
+
+    // Eksekusi query
+    const submissions = await qb.getMany();
+
+    if (!submissions.length) {
+      throw new NotFoundException(
+        `No submission found for class with slug ${classSlug} and task with slug ${taskSlug}`,
+      );
+    }
+
+    const groupByGraded = filterDto.status === TaskSubmissionStatus.COMPLETED;
+
+    return this.mapAndGroupTaskSubmissions(submissions, groupByGraded);
+  }
+
+  private mapAndGroupTaskSubmissions(
+    submissions: TaskSubmission[],
+    groupByGraded: boolean,
+  ): GroupedTaskSubmissionResponseDto[] {
+    const grouped = submissions.reduce(
+      (acc, submission) => {
+        const { title, image } = submission.taskAttempt.task;
+        const { name: studentName } = submission.taskAttempt.student;
+        const { task_submission_id, status, created_at, graded_at } =
+          submission;
+
+        // Pilih tanggal berdasarkan mode grouping
+        const dateValue = groupByGraded ? graded_at : created_at;
+        if (!dateValue) return acc;
+
+        const date = new Date(dateValue);
+        if (isNaN(date.getTime())) return acc;
+
+        const dateKey = format(date, 'yyyy-MM-dd');
+        if (!acc[dateKey]) {
+          acc[dateKey] = {
+            dateLabel: format(date, 'd MMM yyyy', { locale: id }),
+            dayLabel: format(date, 'EEEE', { locale: id }),
+            submissions: [],
+          };
+        }
+
+        // Map langsung ke DTO kecil di sini
+        acc[dateKey].submissions.push({
+          id: task_submission_id,
+          title,
+          image: image !== '' ? image : null,
+          studentName,
+          status,
+          submittedTime: getTime(created_at),
+          gradedTime: graded_at ? getTime(graded_at) : null,
+        });
+
+        return acc;
+      },
+      {} as Record<string, GroupedTaskSubmissionResponseDto>,
+    );
+
+    return Object.values(grouped);
+  }
+
+  // async findTaskSubmissionById(
+  //   id: string,
+  // ): Promise<TaskSubmissionDetailResponseDto> {
+
+  // }
 
   // ================================
   // 📦 CREATE TASK SUBMISSION
@@ -70,14 +168,24 @@ export class TaskSubmissionService {
     teacherId: string,
     dto: UpdateTaskSubmissionDto,
   ): Promise<BaseResponseDto> {
+    // [
+    //   'taskAttempt',
+    //   'taskAttempt.taskAnswerLogs',
+    //   'taskAttempt.student',
+    //   'taskAttempt.task',
+    // ],
+
     const submission = await this.taskSubmissionRepository.findOne({
       where: { task_submission_id: id },
-      relations: [
-        'taskAttempt',
-        'taskAttempt.taskAnswerLogs',
-        'taskAttempt.student',
-        'taskAttempt.task',
-      ],
+      relations: {
+        taskAttempt: {
+          taskAnswerLogs: true,
+          student: true,
+          task: {
+            taskQuestions: true,
+          },
+        },
+      },
     });
 
     if (!submission) {
@@ -95,63 +203,85 @@ export class TaskSubmissionService {
       });
     }
 
-    // Hitung total point dari semua jawaban
-    const updatedLogs = await this.taskAnswerLogRepository.find({
-      where: { taskAttempt: { task_attempt_id: taskAttempt.task_attempt_id } },
-    });
+    if (dto.status === TaskSubmissionStatus.COMPLETED) {
+      // Hitung total point dari semua jawaban
+      const updatedLogs = await this.taskAnswerLogRepository.find({
+        where: {
+          taskAttempt: { task_attempt_id: taskAttempt.task_attempt_id },
+        },
+      });
 
-    const { points, xpGained } = await TaskXpHelper.calculatePointsAndXp(
-      taskAttempt.task,
-      updatedLogs,
-      this.taskQuestionOptionRepository,
-    );
+      const { points, xpGained } = await TaskXpHelper.calculatePointsAndXp(
+        taskAttempt.task,
+        updatedLogs,
+        this.taskQuestionOptionRepository,
+      );
 
-    // Update submission summary
-    submission.score = dto.score;
-    submission.feedback = dto.feedback ?? null;
-    submission.status = TaskSubmissionStatus.COMPLETED;
-    submission.graded_by = teacherId;
-    submission.graded_at = new Date();
+      // Total poin maksimal dari seluruh pertanyaan
+      const totalPoints = taskAttempt.task.taskQuestions.reduce(
+        (acc, q) => acc + q.point,
+        0,
+      );
 
-    // Update TaskAttempt jadi COMPLETED
-    taskAttempt.points = points;
-    taskAttempt.xp_gained = xpGained;
-    taskAttempt.status = TaskAttemptStatus.COMPLETED;
-    taskAttempt.completed_at = new Date();
+      // Hitung skor
+      const score =
+        totalPoints > 0 ? Math.round((points / totalPoints) * 100) : 0;
 
-    //  Update level dan XP user
-    await this.userService.updateLevelAndXp(taskAttempt.student_id, xpGained);
+      // Update submission summary
+      submission.score = score;
+      submission.status = TaskSubmissionStatus.COMPLETED;
+      submission.graded_at = new Date();
 
-    // Simpan semua perubahan
-    const savedTaskSubmission =
+      // Update TaskAttempt jadi COMPLETED
+      taskAttempt.points = points;
+      taskAttempt.xp_gained = xpGained;
+      taskAttempt.status = TaskAttemptStatus.COMPLETED;
+      taskAttempt.completed_at = new Date();
+
+      //  Update level dan XP user
+      await this.userService.updateLevelAndXp(taskAttempt.student_id, xpGained);
+
+      // Simpan semua perubahan
+      const savedTaskAttempt =
+        await this.taskAttemptRepository.save(taskAttempt);
+      const savedTaskSubmission =
+        await this.taskSubmissionRepository.save(submission);
+
+      // Add event task graded to activity log of teacher
+      await this.activityLogService.createActivityLog({
+        userId: teacherId,
+        eventType: ActivityLogEventType.TASK_GRADED,
+        description: getActivityLogDescription(
+          ActivityLogEventType.TASK_GRADED,
+          'task submission',
+          savedTaskAttempt,
+          UserRole.TEACHER,
+        ),
+        metadata: savedTaskSubmission,
+      });
+
+      // Add event task graded to activity log of student
+      await this.activityLogService.createActivityLog({
+        userId: savedTaskAttempt.student_id,
+        eventType: ActivityLogEventType.TASK_GRADED,
+        description: getActivityLogDescription(
+          ActivityLogEventType.TASK_GRADED,
+          'task submission',
+          savedTaskAttempt,
+          UserRole.STUDENT,
+        ),
+        metadata: savedTaskSubmission,
+      });
+    } else {
+      // Update submission summary
+      submission.feedback = dto.feedback ?? null;
+      submission.status = TaskSubmissionStatus.ON_PROGRESS;
+      submission.graded_by = teacherId;
+      submission.graded_at = new Date();
+
+      // Simpan semua perubahan
       await this.taskSubmissionRepository.save(submission);
-    const savedTaskAttempt = await this.taskAttemptRepository.save(taskAttempt);
-
-    // Add event task graded to activity log of teacher
-    await this.activityLogService.createActivityLog({
-      userId: teacherId,
-      eventType: ActivityLogEventType.TASK_GRADED,
-      description: getActivityLogDescription(
-        ActivityLogEventType.TASK_GRADED,
-        'task submission',
-        savedTaskAttempt,
-        UserRole.TEACHER,
-      ),
-      metadata: savedTaskSubmission,
-    });
-
-    // Add event task graded to activity log of student
-    await this.activityLogService.createActivityLog({
-      userId: savedTaskAttempt.student_id,
-      eventType: ActivityLogEventType.TASK_GRADED,
-      description: getActivityLogDescription(
-        ActivityLogEventType.TASK_GRADED,
-        'task submission',
-        savedTaskAttempt,
-        UserRole.STUDENT,
-      ),
-      metadata: savedTaskSubmission,
-    });
+    }
 
     return {
       status: 200,
