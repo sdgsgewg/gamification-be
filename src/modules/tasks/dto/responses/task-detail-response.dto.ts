@@ -1,3 +1,24 @@
+export class AssignedClassInfo {
+  id: string;
+  name: string;
+  slug: string;
+  submissionCount: number; // Jumlah siswa yang sudah submit
+  totalStudents: number; // Jumlah total siswa di kelas
+  gradedCount: number; // Jumlah submission yang sudah dinilai
+  deadline?: string; // Tenggat waktu tugas
+}
+
+export class TaskDuration {
+  startTime?: Date;
+  endTime?: Date;
+  duration?: string;
+}
+
+export class TaskHistory {
+  createdBy: string;
+  updatedBy?: string;
+}
+
 export class TaskQuestionOption {
   optionId: string;
   text: string;
@@ -27,10 +48,8 @@ export class TaskDetailResponseDto {
   taskGrade: string;
   questionCount: number;
   difficulty: string;
-  startTime?: Date;
-  endTime?: Date;
-  duration?: string;
-  createdBy: string;
-  updatedBy?: string;
+  assignedClasses?: AssignedClassInfo[];
+  duration?: TaskDuration;
+  history: TaskHistory;
   questions: TaskQuestion[];
 }

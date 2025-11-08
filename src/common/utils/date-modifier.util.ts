@@ -41,6 +41,9 @@ export function getDateTime(date: Date): string {
   return `${day} ${month} ${year} (${hours}:${minutes} WIB)`;
 }
 
+/**
+ * Output: `1 Month 2 Weeks 3 Day 1 Hour 40 Minutes`
+ */
 export function getTimePeriod(startTime: Date, endTime: Date): string {
   if (!startTime || !endTime) return '';
 
@@ -56,15 +59,19 @@ export function getTimePeriod(startTime: Date, endTime: Date): string {
   const minutes = diffMinutes % 60;
 
   const parts: string[] = [];
-  if (months > 0) parts.push(`${months} Bulan`);
-  if (weeks > 0) parts.push(`${weeks} Minggu`);
-  if (days > 0) parts.push(`${days} Hari`);
-  if (hours > 0) parts.push(`${hours} Jam`);
-  if (minutes > 0) parts.push(`${minutes} Menit`);
+  if (months > 0) parts.push(`${months} ${months > 1 ? `Months` : `Month`}`);
+  if (weeks > 0) parts.push(`${weeks} ${weeks > 1 ? `Weeks` : `Week`}`);
+  if (days > 0) parts.push(`${days} ${days > 1 ? `Days` : `Day`}`);
+  if (hours > 0) parts.push(`${hours} ${hours > 1 ? `Hours` : `Hour`}`);
+  if (minutes > 0)
+    parts.push(`${minutes} ${minutes > 1 ? `Minutes` : `Minute`}`);
 
   return parts.join(' ');
 }
 
+/**
+ * Output: `Admin 1 (3 November 2025 (13:29 WIB))`
+ */
 export function getDateTimeWithName(date: Date, name?: string): string {
   if (!date) return '';
 
@@ -93,6 +100,10 @@ export function getDateTimeWithName(date: Date, name?: string): string {
   return `${name} (${day} ${month} ${year}, ${hours}:${minutes} WIB)`;
 }
 
+/**
+ * Output: `11:30 AM`
+ * Output: `11:30 PM`
+ */
 export function getTime(date: Date): string {
   if (!date) return '';
 

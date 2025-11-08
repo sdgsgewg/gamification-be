@@ -85,7 +85,7 @@ export class Task {
   @JoinColumn({ name: 'task_type_id' })
   taskType: TaskType;
 
-  @OneToMany(() => ClassTask, (cs) => cs.class)
+  @OneToMany(() => ClassTask, (cs) => cs.task)
   classTasks: ClassTask[];
 
   @OneToMany(() => TaskGrade, (tg) => tg.task)

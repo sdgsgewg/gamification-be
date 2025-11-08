@@ -11,6 +11,7 @@ import { slugify } from '../../common/utils/slug.util';
 import { DetailResponseDto } from 'src/common/responses/detail-response.dto';
 import { BaseResponseDto } from 'src/common/responses/base-response.dto';
 import {
+  getDateTime,
   getDateTimeWithName,
   getTimePeriod,
 } from 'src/common/utils/date-modifier.util';
@@ -23,6 +24,7 @@ import { TaskDifficultyLabels } from './enums/task-difficulty.enum';
 import { MasterHistoryService } from '../master-history/master-history.service';
 import { MasterHistoryTransactionType } from '../master-history/enums/master-history-transaction-type';
 import { getMasterHistoryDescription } from 'src/common/utils/get-master-history-description';
+import { ClassTask } from '../class-tasks/entities/class-task.entity';
 
 @Injectable()
 export class TaskService {
@@ -61,6 +63,12 @@ export class TaskService {
         'COUNT(DISTINCT taskQuestions.task_question_id)',
         'questionCount',
       )
+      .addSelect((subQuery) => {
+        return subQuery
+          .select('COUNT(DISTINCT ct.class_task_id)')
+          .from(ClassTask, 'ct')
+          .where('ct.task_id = task.task_id');
+      }, 'assignedClassCount')
       .groupBy('task.task_id')
       .addGroupBy('task.title')
       .addGroupBy('taskType.name')
@@ -98,6 +106,12 @@ export class TaskService {
       });
     }
 
+    if (filterDto.creatorId) {
+      qb.andWhere('task.creator_id = :creatorId', {
+        creatorId: filterDto.creatorId,
+      });
+    }
+
     // order by
     const orderBy = filterDto.orderBy ?? 'createdAt';
     const orderState = filterDto.orderState ?? 'DESC';
@@ -117,8 +131,9 @@ export class TaskService {
       subject: t.subject,
       material: t.material,
       taskGrade: t.taskGrade || null,
-      questionCount: Number(t.questionCount) || 0,
+      questionCount: Number(t.questionCount) ?? 0,
       difficulty: TaskDifficultyLabels[t.difficulty],
+      assignedClassCount: Number(t.assignedClassCount) ?? 0,
     }));
 
     return taskOverviews;
@@ -160,16 +175,20 @@ export class TaskService {
           : null,
       questionCount: taskWithRelations.taskQuestions.length,
       difficulty: TaskDifficultyLabels[taskWithRelations.difficulty],
-      startTime: taskWithRelations.start_time ?? null,
-      endTime: taskWithRelations.end_time ?? null,
-      duration: getTimePeriod(
-        taskWithRelations.start_time,
-        taskWithRelations.end_time,
-      ),
-      createdBy: `${getDateTimeWithName(taskWithRelations.created_at, taskWithRelations.created_by)}`,
-      updatedBy: taskWithRelations.updated_by
-        ? `${getDateTimeWithName(taskWithRelations.updated_at, taskWithRelations.updated_by)}`
-        : null,
+      duration: {
+        startTime: taskWithRelations.start_time ?? null,
+        endTime: taskWithRelations.end_time ?? null,
+        duration: getTimePeriod(
+          taskWithRelations.start_time,
+          taskWithRelations.end_time,
+        ),
+      },
+      history: {
+        createdBy: `${getDateTimeWithName(taskWithRelations.created_at, taskWithRelations.created_by)}`,
+        updatedBy: taskWithRelations.updated_by
+          ? `${getDateTimeWithName(taskWithRelations.updated_at, taskWithRelations.updated_by)}`
+          : null,
+      },
       questions:
         taskWithRelations.taskQuestions?.map((q) => ({
           questionId: q.task_question_id,
@@ -198,6 +217,9 @@ export class TaskService {
       .leftJoinAndSelect('task.taskGrades', 'taskGrade')
       .leftJoinAndSelect('taskGrade.grade', 'grade')
       .leftJoinAndSelect('task.taskQuestions', 'taskQuestion')
+      .leftJoinAndSelect('task.classTasks', 'classTasks')
+      .leftJoinAndSelect('classTasks.class', 'class')
+      .leftJoinAndSelect('class.classStudents', 'classStudents')
       .leftJoinAndSelect(
         'taskQuestion.taskQuestionOptions',
         'taskQuestionOption',
@@ -212,7 +234,55 @@ export class TaskService {
       throw new NotFoundException(`Task with slug ${slug} not found`);
     }
 
+    // Ambil jumlah submission per class
+    const submissionStats = await this.taskRepository.manager
+      .createQueryBuilder()
+      .select('ct.class_id', 'classId')
+      .addSelect('COUNT(ts.task_submission_id)', 'submissionCount')
+      .addSelect(
+        'COUNT(CASE WHEN ts.graded_at IS NOT NULL THEN 1 END)',
+        'gradedCount',
+      )
+      .from('class_tasks', 'ct')
+      .innerJoin('task_attempts', 'ta', 'ta.class_id = ct.class_id')
+      .innerJoin(
+        'task_submissions',
+        'ts',
+        'ts.task_attempt_id = ta.task_attempt_id',
+      )
+      .where('ct.task_id = :taskId', { taskId: task.task_id })
+      .groupBy('ct.class_id')
+      .getRawMany();
+
+    // Buat map untuk akses cepat
+    const submissionMap = Object.fromEntries(
+      submissionStats.map((row) => [
+        row.classId,
+        {
+          submissionCount: Number(row.submissionCount),
+          gradedCount: Number(row.gradedCount),
+        },
+      ]),
+    );
+
     const taskDetail = this.getTaskDetailData(task);
+
+    taskDetail.assignedClasses = task.classTasks.map((ct) => {
+      const stat = submissionMap[ct.class.class_id] ?? {
+        submissionCount: 0,
+        gradedCount: 0,
+      };
+
+      return {
+        id: ct.class.class_id,
+        name: ct.class.name,
+        slug: ct.class.slug,
+        submissionCount: stat.submissionCount,
+        totalStudents: ct.class.classStudents?.length ?? 0,
+        gradedCount: stat.gradedCount,
+        deadline: ct.end_time ? getDateTime(ct.end_time) : null,
+      };
+    });
 
     return taskDetail;
   }
