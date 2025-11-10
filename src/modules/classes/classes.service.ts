@@ -148,24 +148,25 @@ export class ClassService {
     return classOverviews;
   }
 
-  async findClassBySlug(slug: string): Promise<ClassDetailResponseDto> {
+  async findClassBySlug(classSlug: string): Promise<ClassDetailResponseDto> {
     // Ambil class berdasarkan slug
     const qb = this.classRepository
       .createQueryBuilder('class')
-      .where('class.slug = :slug', { slug });
+      .where('class.slug = :slug', { slug: classSlug });
 
     const classData = await qb.getOne();
 
     if (!classData) {
-      throw new NotFoundException(`Class with slug ${slug} not found`);
+      throw new NotFoundException(`Class with slug ${classSlug} not found`);
     }
 
-    const { class_id, name, description, image } = classData;
+    const { class_id, name, slug, description, image } = classData;
 
     // Build DTO
     const classDetail: ClassDetailResponseDto = {
       id: class_id,
       name,
+      slug,
       description,
       image: image !== '' ? image : null,
     };
@@ -177,18 +178,18 @@ export class ClassService {
     slug: string,
     filterDto: FilterClassMemberDto,
   ): Promise<ClassMemberResponseDto> {
-    // Ambil class berdasarkan slug
-    const qb = this.classRepository
-      .createQueryBuilder('class')
-      .where('class.slug = :slug', { slug });
-
-    const classData = await qb.getOne();
+    const classData = await this.classRepository.findOne({
+      where: { slug },
+      relations: {
+        teacher: true,
+      },
+    });
 
     if (!classData) {
       throw new NotFoundException(`Class with slug ${slug} not found`);
     }
 
-    const { class_id } = classData;
+    const { class_id, teacher } = classData;
 
     // (Optional) Ambil member (teacher + students)
     const classStudents = await this.classStudentRepository.find({
@@ -199,11 +200,8 @@ export class ClassService {
     const member: ClassMemberResponseDto = {
       teacher: [
         {
-          name: classData.teacher?.name ?? '-',
-          image:
-            classData.teacher?.image && classData.teacher?.image !== ''
-              ? classData.teacher.image
-              : null,
+          name: teacher?.name ?? '-',
+          image: teacher?.image && teacher?.image !== '' ? teacher.image : null,
         },
       ],
       students: classStudents.map((cs) => ({
@@ -232,7 +230,7 @@ export class ClassService {
       return new BaseResponseDto(
         400,
         false,
-        `Kelas dengan nama "${dto.name}" sudah terdaftar`,
+        `Class with name "${dto.name}" has been registered`,
       );
     }
 
@@ -273,7 +271,7 @@ export class ClassService {
     const response: BaseResponseDto = {
       status: 200,
       isSuccess: true,
-      message: 'Kelas berhasi dibuat!',
+      message: 'Class has been created!',
     };
 
     return response;
@@ -341,7 +339,7 @@ export class ClassService {
       return new BaseResponseDto(
         400,
         false,
-        `Kelas dengan nama "${dto.name}" sudah terdaftar`,
+        `Class with name "${dto.name}" has been registered`,
       );
     }
 
@@ -359,7 +357,7 @@ export class ClassService {
     const response: BaseResponseDto = {
       status: 200,
       isSuccess: true,
-      message: 'Kelas berhasil diperbarui!',
+      message: 'Class has been updated!',
     };
 
     return response;
