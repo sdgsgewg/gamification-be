@@ -7,6 +7,7 @@ import {
   UseGuards,
   Get,
   Query,
+  BadRequestException,
 } from '@nestjs/common';
 import { UpdateTaskSubmissionDto } from './dto/requests/update-task-submission.dto';
 import { TaskSubmissionService } from './task-submissions.service';
@@ -38,13 +39,25 @@ export class TaskSubmissionController {
    * [GET] /:id
    * Mendapatkan detail submission + detail task + pertanyaan + jawaban
    */
-  //   @Get(':id')
-  //   async getTaskSubmissionDetail(@Param('id') id: string) {
-  //     if (!id) {
-  //       throw new BadRequestException('Task submission id is required');
-  //     }
-  //     return this.taskSubmissionService.findTaskSubmissionById(id);
-  //   }
+  @Get(':id')
+  async getTaskSubmissionDetail(@Param('id') id: string) {
+    if (!id) {
+      throw new BadRequestException('Task submission id is required');
+    }
+    return this.taskSubmissionService.findTaskSubmissionById(id);
+  }
+
+  /**
+   * [GET] /review/:id
+   * Mendapatkan detail submission + pertanyaan + jawaban
+   */
+  @Get('review/:id')
+  async getTaskSubmissionWithAnswers(@Param('id') id: string) {
+    if (!id) {
+      throw new BadRequestException('Task submission id is required');
+    }
+    return this.taskSubmissionService.findTaskSubmissionWithAnswers(id);
+  }
 
   @Put(':id')
   @UseGuards(OptionalJwtAuthGuard)

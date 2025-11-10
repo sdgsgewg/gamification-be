@@ -7,11 +7,15 @@ import { CommonModule } from 'src/common/common.module';
 import { UserController } from './users.controller';
 import { UserService } from './users.service';
 import { RoleModule } from '../roles/roles.module';
+import { MasterHistoryModule } from '../master-history/master-history.module';
+import { ActivityLogModule } from '../activty-logs/activity-logs.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User, Role, Grade]),
     RoleModule,
+    MasterHistoryModule,
+    ActivityLogModule,
     CommonModule,
   ],
   controllers: [UserController],

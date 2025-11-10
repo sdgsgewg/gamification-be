@@ -6,18 +6,22 @@ import { CreateTaskAnswerLogDto } from './dto/requests/create-task-answer-log.dt
 import { UpdateTaskAnswerLogDto } from './dto/requests/update-task-answer-log.dto';
 import { FileUploadService } from 'src/common/services/file-upload.service';
 import { TaskQuestionOption } from '../task-question-options/entities/task-question-option.entity';
+import { QuestionType } from '../task-questions/enums/question-type.enum';
+import { TaskQuestion } from '../task-questions/entities/task-question.entity';
 
 @Injectable()
 export class TaskAnswerLogService {
   constructor(
     @InjectRepository(TaskAnswerLog)
     private readonly taskAnswerLogRepository: Repository<TaskAnswerLog>,
+    @InjectRepository(TaskQuestion)
+    private readonly taskQuestionRepository: Repository<TaskQuestion>,
     @InjectRepository(TaskQuestionOption)
     private readonly taskQuestionOptionRepository: Repository<TaskQuestionOption>,
     private readonly fileUploadService: FileUploadService,
   ) {}
 
-  // 🔹 Helper: upload gambar jika ada
+  // Helper: upload gambar jika ada
   private async handleImageUpload(
     imageFile: Express.Multer.File | undefined,
     answerLogId: string,
@@ -43,8 +47,13 @@ export class TaskAnswerLogService {
     return uploadResult.url;
   }
 
-  // 🔹 Helper: isi nilai is_correct dari opsi soal
-  private async resolveIsCorrect(optionId?: string): Promise<boolean> {
+  // Helper: isi nilai is_correct dari tipe soal dan opsi jawaban soal
+  private async resolveIsCorrect(
+    questionType: QuestionType,
+    optionId?: string,
+  ): Promise<boolean | null> {
+    if ([QuestionType.FILL_BLANK, QuestionType.ESSAY].includes(questionType))
+      return null;
     if (!optionId) return false;
     const option = await this.taskQuestionOptionRepository.findOne({
       where: { task_question_option_id: optionId },
@@ -52,13 +61,19 @@ export class TaskAnswerLogService {
     return option?.is_correct ?? false;
   }
 
-  // 🔹 Helper: buat atau update satu log jawaban
+  // Helper: buat atau update satu log jawaban
   private async saveOrUpdateAnswerLog(
     taskAttemptId: string,
     dto: CreateTaskAnswerLogDto | UpdateTaskAnswerLogDto,
     existingLog?: TaskAnswerLog,
   ): Promise<TaskAnswerLog> {
-    const isCorrect = await this.resolveIsCorrect(dto.optionId);
+    const question = await this.taskQuestionRepository.findOne({
+      where: { task_question_id: dto.questionId },
+    });
+
+    const questionType = question.type as QuestionType;
+
+    const isCorrect = await this.resolveIsCorrect(questionType, dto.optionId);
 
     let imageUrl = existingLog?.image || '';
 

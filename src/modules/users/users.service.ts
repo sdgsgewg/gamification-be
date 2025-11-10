@@ -14,6 +14,9 @@ import { CreateUserDto } from 'src/auth/dto/requests/create-user.dto';
 import { RoleService } from '../roles/roles.service';
 import { LevelHelper } from 'src/common/helpers/level.helper';
 import { UserStatsResponseDto } from './dto/responses/user-stats-response.dto';
+import { UserRecentActivityResponse } from './dto/responses/user-recent-activity-response.dto';
+import { MasterHistoryService } from '../master-history/master-history.service';
+import { ActivityLogService } from '../activty-logs/activity-logs.service';
 
 @Injectable()
 export class UserService {
@@ -21,6 +24,8 @@ export class UserService {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly roleService: RoleService,
+    private readonly masterHistoryService: MasterHistoryService,
+    private readonly activityLogService: ActivityLogService,
   ) {}
 
   async findAllUsers(
@@ -264,5 +269,20 @@ export class UserService {
     existingUser.level = newLevel;
     existingUser.xp = newXp;
     await this.userRepository.save(existingUser);
+  }
+
+  async findUserRecentActivities(
+    userId: string,
+  ): Promise<UserRecentActivityResponse[]> {
+    const userMasterHistories =
+      await this.masterHistoryService.findUserMasterHistory(userId);
+    const userActivityLogs =
+      await this.activityLogService.findUserActivityLogs(userId);
+
+    const userRecentActivities = userMasterHistories.concat(userActivityLogs);
+
+    const response: UserRecentActivityResponse[] = userRecentActivities;
+
+    return response;
   }
 }

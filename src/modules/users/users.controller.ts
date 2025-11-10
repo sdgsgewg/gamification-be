@@ -49,4 +49,11 @@ export class UserController {
     }
     return this.userService.findUserBy('username', username);
   }
+
+  @Get('recent-activities')
+  async getUserRecentActivities(@Req() req: any) {
+    // Ambil userId dari request (kalau user login)
+    const userId = req.user?.id || null;
+    return this.userService.findUserRecentActivities(userId);
+  }
 }

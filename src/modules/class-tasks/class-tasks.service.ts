@@ -453,8 +453,8 @@ export class ClassTaskService {
             gradedBy: recentAttempt.taskSubmission.graded_by
               ? recentAttempt.taskSubmission.grader.name
               : null,
-            gradedAt: recentAttempt.taskSubmission.graded_at
-              ? getDateTime(recentAttempt.taskSubmission.graded_at)
+            gradedAt: recentAttempt.taskSubmission.finish_graded_at
+              ? getDateTime(recentAttempt.taskSubmission.finish_graded_at)
               : null,
           }
         : null,

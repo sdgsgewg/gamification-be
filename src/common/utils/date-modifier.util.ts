@@ -11,7 +11,7 @@ export function getDate(date: Date): string {
 }
 
 /**
- * Output: `3 November 2025 (13:29 WIB)`
+ * Output: `3 November 2025 (13:29)`
  */
 export function getDateTime(date: Date): string {
   if (!date) return '';
@@ -38,7 +38,7 @@ export function getDateTime(date: Date): string {
   const hours = date.getHours().toString().padStart(2, '0');
   const minutes = date.getMinutes().toString().padStart(2, '0');
 
-  return `${day} ${month} ${year} (${hours}:${minutes} WIB)`;
+  return `${day} ${month} ${year} (${hours}:${minutes})`;
 }
 
 /**

@@ -26,18 +26,26 @@ export class TaskTypeController {
     return this.taskTypeService.findAllTaskTypes(filterDto);
   }
 
+  @Get(':id')
+  async getTaskTypeById(@Param('id') id: string) {
+    if (!id) {
+      throw new BadRequestException('Task Type id is required');
+    }
+    return this.taskTypeService.findTaskTypeBy('id', id);
+  }
+
   @Get(':slug')
-  async getTaskTypeDetail(@Param('slug') slug: string) {
+  async getTaskTypeBySlug(@Param('slug') slug: string) {
     if (!slug) {
       throw new BadRequestException('Task Type slug is required');
     }
-    return this.taskTypeService.findTaskTypeBySlug(slug);
+    return this.taskTypeService.findTaskTypeBy('slug', slug);
   }
 
   @Post()
   @UseGuards(OptionalJwtAuthGuard)
   async create(@Body() dto: CreateTaskTypeDto, @Req() req: any) {
-        // Ambil userId dari request (kalau user login)
+    // Ambil userId dari request (kalau user login)
     const userId = req.user?.id || null;
     return this.taskTypeService.createTaskType(userId, dto);
   }
@@ -49,7 +57,7 @@ export class TaskTypeController {
     @Body() dto: UpdateTaskTypeDto,
     @Req() req: any,
   ) {
-        // Ambil userId dari request (kalau user login)
+    // Ambil userId dari request (kalau user login)
     const userId = req.user?.id || null;
     return this.taskTypeService.updateTaskType(id, userId, dto);
   }
@@ -57,7 +65,7 @@ export class TaskTypeController {
   @Delete(':id')
   @UseGuards(OptionalJwtAuthGuard)
   async delete(@Param('id') id: string, @Req() req: any) {
-        // Ambil userId dari request (kalau user login)
+    // Ambil userId dari request (kalau user login)
     const userId = req.user?.id || null;
     return this.taskTypeService.deleteTaskType(id, userId);
   }

@@ -20,7 +20,14 @@ import { FilterTaskSubmissionDto } from './dto/requests/filter-task-submission.d
 import { GroupedTaskSubmissionResponseDto } from './dto/responses/grouped-task-submission-response.dto';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
-import { getTime } from 'src/common/utils/date-modifier.util';
+import { getDateTime, getTime } from 'src/common/utils/date-modifier.util';
+import {
+  SubmissionProgress,
+  SubmissionSummary,
+  TaskDetail,
+  TaskSubmissionDetailResponseDto,
+} from './dto/responses/task-submission-detail-response.dto';
+import { TaskSubmissionWithAnswersResponseDto } from './dto/responses/task-submission-with-answers-response.dto';
 // import { TaskSubmissionDetailResponseDto } from './dto/responses/task-submission-detail-response.dto';
 
 @Injectable()
@@ -93,11 +100,11 @@ export class TaskSubmissionService {
       (acc, submission) => {
         const { title, image } = submission.taskAttempt.task;
         const { name: studentName } = submission.taskAttempt.student;
-        const { task_submission_id, status, created_at, graded_at } =
+        const { task_submission_id, status, created_at, finish_graded_at } =
           submission;
 
         // Pilih tanggal berdasarkan mode grouping
-        const dateValue = groupByGraded ? graded_at : created_at;
+        const dateValue = groupByGraded ? finish_graded_at : created_at;
         if (!dateValue) return acc;
 
         const date = new Date(dateValue);
@@ -120,7 +127,7 @@ export class TaskSubmissionService {
           studentName,
           status,
           submittedTime: getTime(created_at),
-          gradedTime: graded_at ? getTime(graded_at) : null,
+          gradedTime: finish_graded_at ? getTime(finish_graded_at) : null,
         });
 
         return acc;
@@ -131,11 +138,191 @@ export class TaskSubmissionService {
     return Object.values(grouped);
   }
 
-  // async findTaskSubmissionById(
-  //   id: string,
-  // ): Promise<TaskSubmissionDetailResponseDto> {
+  async findTaskSubmissionById(
+    id: string,
+  ): Promise<TaskSubmissionDetailResponseDto> {
+    const submission = await this.taskSubmissionRepository.findOne({
+      where: { task_submission_id: id },
+      relations: {
+        taskAttempt: {
+          task: {
+            taskQuestions: true,
+          },
+          taskAnswerLogs: true,
+        },
+      },
+    });
 
-  // }
+    if (!submission) {
+      throw new NotFoundException('Task submission not found');
+    }
+
+    const {
+      title,
+      slug,
+      description,
+      image,
+      subject,
+      material,
+      taskGrades,
+      taskQuestions,
+      difficulty,
+      taskType,
+    } = submission.taskAttempt.task;
+
+    const taskDetail: TaskDetail = {
+      title,
+      slug,
+      description: description ?? null,
+      image: image ?? null,
+      subject: subject.name,
+      material: material ? material.name : null,
+      grade: taskGrades
+        .map((tg) => tg.grade.name.replace('Kelas', ''))
+        .join(', '),
+      questionCount: taskQuestions.length,
+      difficulty,
+      type: taskType.name,
+    };
+
+    const reviewedQuestionCount = submission.taskAttempt.taskAnswerLogs.filter(
+      (answer) => !answer.is_correct,
+    ).length;
+    const totalQuestionCount = submission.taskAttempt.task.taskQuestions.length;
+    const { start_graded_at, last_graded_at, finish_graded_at, status } =
+      submission;
+
+    const progress: SubmissionProgress = {
+      reviewedQuestionCount,
+      totalQuestionCount,
+      startGradedAt: start_graded_at ? getDateTime(start_graded_at) : null,
+      lastGradedAt: last_graded_at ? getDateTime(last_graded_at) : null,
+      finishGradedAt: finish_graded_at ? getDateTime(finish_graded_at) : null,
+      status: TaskSubmissionStatus[status],
+    };
+
+    const { score, feedback, taskAttempt } = submission;
+    const { xp_gained } = taskAttempt;
+    const pointGained = taskAttempt.taskAnswerLogs.reduce(
+      (acc, answer) => acc + (answer.is_correct ? answer.question.point : 0),
+      0,
+    );
+    const totalPoints = submission.taskAttempt.task.taskQuestions.reduce(
+      (acc, question) => acc + question.point,
+      0,
+    );
+
+    const summary: SubmissionSummary = {
+      score,
+      feedback,
+      pointGained,
+      totalPoints,
+      xpGained: xp_gained,
+    };
+
+    const { task, taskAnswerLogs } = submission.taskAttempt;
+
+    const questions =
+      task.taskQuestions?.map((q) => {
+        const userAnswer = taskAnswerLogs.find(
+          (log) => log.question_id === q.task_question_id,
+        );
+
+        return {
+          questionId: q.task_question_id,
+          text: q.text,
+          point: q.point,
+          type: q.type,
+          timeLimit: q.time_limit ?? null,
+          image: q.image ?? null,
+          options: q.taskQuestionOptions?.map((o) => ({
+            optionId: o.task_question_option_id,
+            text: o.text,
+            isCorrect: o.is_correct,
+            isSelected: userAnswer?.option_id === o.task_question_option_id,
+          })),
+          userAnswer: userAnswer
+            ? {
+                answerLogId: userAnswer.task_answer_log_id,
+                text: userAnswer.answer_text,
+                image: userAnswer.image,
+                optionId: userAnswer.option_id,
+                isCorrect: userAnswer.is_correct,
+              }
+            : null,
+        };
+      }) || [];
+
+    const response: TaskSubmissionDetailResponseDto = {
+      id,
+      taskDetail,
+      progress,
+      summary,
+      questions,
+    };
+
+    return response;
+  }
+
+  async findTaskSubmissionWithAnswers(
+    id: string,
+  ): Promise<TaskSubmissionWithAnswersResponseDto> {
+    const submission = await this.taskSubmissionRepository.findOne({
+      where: { task_submission_id: id },
+      relations: {
+        taskAttempt: {
+          task: {
+            taskQuestions: true,
+          },
+          taskAnswerLogs: true,
+        },
+      },
+    });
+
+    if (!submission) {
+      throw new NotFoundException('Task submission not found');
+    }
+
+    const { task, taskAnswerLogs } = submission.taskAttempt;
+
+    const questions =
+      task.taskQuestions?.map((q) => {
+        const userAnswer = taskAnswerLogs.find(
+          (log) => log.question_id === q.task_question_id,
+        );
+
+        return {
+          questionId: q.task_question_id,
+          text: q.text,
+          point: q.point,
+          type: q.type,
+          timeLimit: q.time_limit ?? null,
+          image: q.image ?? null,
+          options: q.taskQuestionOptions?.map((o) => ({
+            optionId: o.task_question_option_id,
+            text: o.text,
+            isCorrect: o.is_correct,
+            isSelected: userAnswer?.option_id === o.task_question_option_id,
+          })),
+          userAnswer: userAnswer
+            ? {
+                answerLogId: userAnswer.task_answer_log_id,
+                text: userAnswer.answer_text,
+                image: userAnswer.image,
+                optionId: userAnswer.option_id,
+                isCorrect: userAnswer.is_correct,
+              }
+            : null,
+        };
+      }) || [];
+
+    const response: TaskSubmissionWithAnswersResponseDto = {
+      id,
+      questions,
+    };
+
+    return response;
+  }
 
   // ================================
   // 📦 CREATE TASK SUBMISSION
@@ -230,7 +417,8 @@ export class TaskSubmissionService {
       // Update submission summary
       submission.score = score;
       submission.status = TaskSubmissionStatus.COMPLETED;
-      submission.graded_at = new Date();
+      submission.last_graded_at = dto.lastGradedAt;
+      submission.finish_graded_at = new Date();
 
       // Update TaskAttempt jadi COMPLETED
       taskAttempt.points = points;
@@ -277,7 +465,11 @@ export class TaskSubmissionService {
       submission.feedback = dto.feedback ?? null;
       submission.status = TaskSubmissionStatus.ON_PROGRESS;
       submission.graded_by = teacherId;
-      submission.graded_at = new Date();
+
+      if (!submission.start_graded_at)
+        submission.start_graded_at = dto.startGradedAt;
+
+      submission.last_graded_at = dto.lastGradedAt;
 
       // Simpan semua perubahan
       await this.taskSubmissionRepository.save(submission);

@@ -93,7 +93,7 @@ export class TaskTypeService {
       name: taskType.name,
       slug: taskType.slug,
       description: taskType.description,
-      scope: capitalizeFirstLowerRest(taskType.scope),
+      scope: taskType.scope,
       hasDeadline: taskType.has_deadline,
       isRepeatable: taskType.is_repeatable,
       createdBy: `${getDateTimeWithName(taskType.created_at, taskType.created_by)}`,
@@ -105,15 +105,25 @@ export class TaskTypeService {
     return data;
   }
 
-  async findTaskTypeBySlug(slug: string): Promise<TaskTypeDetailResponseDto> {
-    const qb = this.taskTypeRepository
-      .createQueryBuilder('taskType')
-      .where('taskType.slug = :slug', { slug });
+  async findTaskTypeBy(
+    field: 'id' | 'slug',
+    value: string,
+  ): Promise<TaskTypeDetailResponseDto> {
+    const qb = this.taskTypeRepository.createQueryBuilder('taskType');
+    // .where('taskType.slug = :slug', { slug });
+
+    if (field === 'id') {
+      qb.where('taskType.task_type_id = :value', { value });
+    } else if (field === 'slug') {
+      qb.where('taskType.slug = :value', { value });
+    }
 
     const taskType = await qb.getOne();
 
     if (!taskType) {
-      throw new NotFoundException(`Task type with slug ${slug} not found`);
+      throw new NotFoundException(
+        `Task type with ${field === 'id' ? 'id' : 'slug'} ${value} not found`,
+      );
     }
 
     const taskTypeDetail = this.getTaskTypeDetailData(taskType);

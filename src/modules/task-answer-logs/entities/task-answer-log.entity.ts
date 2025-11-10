@@ -20,7 +20,7 @@ export class TaskAnswerLog {
   @Column({ type: 'text', nullable: true })
   image: string;
 
-  @Column({ type: 'boolean' })
+  @Column({ type: 'boolean', nullable: true })
   is_correct: boolean;
 
   @Column({ type: 'int4', nullable: true })

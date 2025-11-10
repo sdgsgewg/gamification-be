@@ -23,6 +23,12 @@ export class UpdateTaskSubmissionDto {
   @IsNotEmpty()
   status: TaskSubmissionStatus;
 
+  @IsNotEmpty()
+  startGradedAt: Date;
+
+  @IsNotEmpty()
+  lastGradedAt: Date;
+
   @IsOptional()
   feedback?: string; // overall feedback
 

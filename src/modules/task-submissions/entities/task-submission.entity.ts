@@ -31,7 +31,13 @@ export class TaskSubmission {
   graded_by: string;
 
   @Column({ type: 'timestamptz', nullable: true })
-  graded_at: Date;
+  start_graded_at: Date;
+  
+  @Column({ type: 'timestamptz', nullable: true })
+  last_graded_at: Date;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  finish_graded_at: Date;
 
   @Column('uuid')
   task_attempt_id: string;

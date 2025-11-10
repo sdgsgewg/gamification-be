@@ -240,7 +240,7 @@ export class TaskService {
       .select('ct.class_id', 'classId')
       .addSelect('COUNT(ts.task_submission_id)', 'submissionCount')
       .addSelect(
-        'COUNT(CASE WHEN ts.graded_at IS NOT NULL THEN 1 END)',
+        'COUNT(CASE WHEN ts.finish_graded_at IS NOT NULL THEN 1 END)',
         'gradedCount',
       )
       .from('class_tasks', 'ct')
