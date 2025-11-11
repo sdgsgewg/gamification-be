@@ -99,6 +99,7 @@ export class ClassService {
 
   async findNotJoinedClasses(
     userId: string,
+    filterDto: FilterClassDto,
   ): Promise<ClassOverviewResponseDto[]> {
     // Ambil user untuk validasi role
     const user = await this.userService.findUserBy('id', userId);
@@ -122,6 +123,13 @@ export class ClassService {
       )`,
       { userId },
     );
+
+    // Filter pencarian (opsional)
+    if (filterDto.searchText) {
+      qb.where('class.name ILIKE :searchText', {
+        searchText: `%${filterDto.searchText}%`,
+      });
+    }
 
     // Urutkan hasil (default: createdAt DESC)
     qb.orderBy('class.created_at', 'DESC');

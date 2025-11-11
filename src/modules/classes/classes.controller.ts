@@ -35,11 +35,14 @@ export class ClassController {
 
   @Get('not-joined')
   @UseGuards(OptionalJwtAuthGuard)
-  async getNotJoinedClasses(@Req() req: any) {
+  async getNotJoinedClasses(
+    @Query() filterDto: FilterClassDto,
+    @Req() req: any,
+  ) {
     // Ambil userId dari request (kalau user login)
     const userId = req.user?.id || null;
 
-    return this.classService.findNotJoinedClasses(userId);
+    return this.classService.findNotJoinedClasses(userId, filterDto);
   }
 
   @Get(':slug')

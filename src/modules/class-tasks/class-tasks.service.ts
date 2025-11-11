@@ -30,6 +30,10 @@ import {
 } from './dto/responses/class-task-summary-response.dto';
 import { TaskDifficultyLabels } from '../tasks/enums/task-difficulty.enum';
 import { TeacherClassTaskResponseDto } from './dto/responses/teacher-class-task-response.dto';
+import { ShareTaskIntoClassesDto } from './dto/requests/share-task-into-classes-request.dto';
+import { AvailableClassesResponseDto } from './dto/responses/available-classes-reponse.dto';
+import { BaseResponseDto } from 'src/common/responses/base-response.dto';
+import { FilterClassDto } from '../classes/dto/requests/filter-class.dto';
 
 @Injectable()
 export class ClassTaskService {
@@ -38,8 +42,8 @@ export class ClassTaskService {
     private readonly classTaskRepository: Repository<ClassTask>,
     @InjectRepository(Class)
     private readonly classRepository: Repository<Class>,
-    // @InjectRepository(Task)
-    // private readonly taskRepository: Repository<Task>,
+    @InjectRepository(Task)
+    private readonly taskRepository: Repository<Task>,
     @InjectRepository(TaskAttempt)
     private readonly taskAttemptRepository: Repository<TaskAttempt>,
     @InjectRepository(TaskAnswerLog)
@@ -153,11 +157,7 @@ export class ClassTaskService {
         'gradedCount',
       )
       .from('class_tasks', 'ct')
-      .innerJoin(
-        'task_attempts',
-        'ta',
-        'ta.task_id = ct.task_id',
-      )
+      .innerJoin('task_attempts', 'ta', 'ta.task_id = ct.task_id')
       .innerJoin(
         'task_submissions',
         'ts',
@@ -704,5 +704,113 @@ export class ClassTaskService {
       completedAt: getDateTime(completed_at),
       questions,
     };
+  }
+
+  /**
+   * Find classes that can be shared for this task
+   */
+  async findAvailableClasses(
+    taskId: string,
+    teacherId: string,
+    filterDto: FilterClassDto,
+  ): Promise<AvailableClassesResponseDto[]> {
+    console.log('Task id: ', taskId);
+    console.log('Teacher id: ', teacherId);
+    console.log('Filter dto: ', JSON.stringify(filterDto, null, 2));
+
+    const { searchText } = filterDto;
+
+    // Subquery: ambil semua class_id yang sudah punya task ini
+    const subQuery = this.classTaskRepository
+      .createQueryBuilder('ct')
+      .select('ct.class_id')
+      .where('ct.task_id = :taskId', { taskId });
+
+    // Query utama: ambil class milik guru yang belum punya task ini
+    const qb = this.classRepository
+      .createQueryBuilder('c')
+      .where('c.teacher_id = :teacherId', { teacherId })
+      .andWhere(`c.class_id NOT IN (${subQuery.getQuery()})`)
+      .setParameters(subQuery.getParameters());
+
+    // Tambahkan filter pencarian
+    if (searchText) {
+      qb.andWhere(
+        '(LOWER(c.name) LIKE LOWER(:searchText) OR LOWER(c.slug) LIKE LOWER(:searchText))',
+        {
+          searchText: `%${searchText}%`,
+        },
+      );
+    }
+
+    const classes = await qb.getMany();
+
+    const response: AvailableClassesResponseDto[] = classes.map((cls) => ({
+      id: cls.class_id,
+      name: cls.name,
+      slug: cls.slug,
+    }));
+
+    return response;
+  }
+
+  /**
+   * Share tasks into multiple classes
+   */
+  async shareTaskIntoClasses(
+    dto: ShareTaskIntoClassesDto,
+  ): Promise<BaseResponseDto> {
+    const { taskId, classIds, startTime, endTime } = dto;
+
+    if (!classIds || classIds.length === 0) {
+      return {
+        status: 400,
+        isSuccess: false,
+        message: 'No class IDs provided.',
+      };
+    }
+
+    const task = await this.taskRepository.findOne({
+      where: { task_id: taskId },
+    });
+
+    if (!task) {
+      return {
+        status: 404,
+        isSuccess: false,
+        message: 'Task not found.',
+      };
+    }
+
+    const finalStartTime = startTime
+      ? startTime
+      : task.start_time
+        ? task.start_time
+        : null;
+    const finalEndtIme = endTime
+      ? endTime
+      : task.end_time
+        ? task.end_time
+        : null;
+
+    const newClassTasks = classIds.map((classId) =>
+      this.classTaskRepository.create({
+        class_id: classId,
+        task_id: taskId,
+        start_time: finalStartTime,
+        end_time: finalEndtIme,
+      }),
+    );
+
+    // Simpan semua sekaligus
+    await this.classTaskRepository.save(newClassTasks);
+
+    const response: BaseResponseDto = {
+      status: 200,
+      isSuccess: true,
+      message: 'Task has been shared into selected classes.',
+    };
+
+    return response;
   }
 }
