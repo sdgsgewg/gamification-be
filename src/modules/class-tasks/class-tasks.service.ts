@@ -6,7 +6,9 @@ import { Class } from '../classes/entities/class.entity';
 import { FilterClassTaskDto } from './dto/requests/filter-class-task.dto';
 import { StudentClassTaskResponseDto } from './dto/responses/student-class-task-response.dto';
 import {
+  getDate,
   getDateTime,
+  getTime,
   getTimePeriod,
 } from 'src/common/utils/date-modifier.util';
 import {
@@ -34,6 +36,11 @@ import { ShareTaskIntoClassesDto } from './dto/requests/share-task-into-classes-
 import { AvailableClassesResponseDto } from './dto/responses/available-classes-reponse.dto';
 import { BaseResponseDto } from 'src/common/responses/base-response.dto';
 import { FilterClassDto } from '../classes/dto/requests/filter-class.dto';
+import { FilterTaskAttemptDto } from '../task-attempts/dto/requests/filter-task-attempt.dto';
+import { GroupedTaskAttemptResponseDto } from '../task-attempts/dto/responses/grouped-task-attempt.dto';
+import { format } from 'date-fns';
+import { id } from 'date-fns/locale';
+import { TaskAttemptOverviewResponseDto } from '../task-attempts/dto/responses/task-attempt-overview.dto';
 
 @Injectable()
 export class ClassTaskService {
@@ -49,6 +56,110 @@ export class ClassTaskService {
     @InjectRepository(TaskAnswerLog)
     private readonly taskAnswerLogRepository: Repository<TaskAnswerLog>,
   ) {}
+
+  /**
+   * Find tasks from all classes
+   */
+  async findTasksFromAllClasses(
+    userId: string,
+    filterDto: FilterTaskAttemptDto,
+  ): Promise<GroupedTaskAttemptResponseDto[]> {
+    // Ambil semua class task dengan relasi task dan class
+    const classTasks = await this.classTaskRepository.find({
+      relations: {
+        task: true,
+        class: true,
+      },
+      order: {
+        end_time: 'DESC',
+      },
+    });
+
+    if (!classTasks.length) {
+      throw new NotFoundException(`No class tasks found`);
+    }
+
+    // Ambil semua task attempt user untuk sinkronisasi progress
+    const attempts = await this.taskAttemptRepository.find({
+      where: { student_id: userId },
+      relations: { task: true, class: true },
+    });
+
+    // Gabungkan: setiap class task → cari task attempt-nya
+    const combined = classTasks.map((ct) => {
+      const matchingAttempt = attempts.find(
+        (a) => a.task_id === ct.task_id && a.class_id === ct.class_id,
+      );
+
+      return {
+        classTask: ct,
+        attempt: matchingAttempt ?? null,
+      };
+    });
+
+    // Apply filter status kalau ada
+    let filtered = combined;
+    if (filterDto.status) {
+      filtered = combined.filter((item) =>
+        item.attempt
+          ? item.attempt.status === filterDto.status
+          : filterDto.status === TaskAttemptStatus.NOT_STARTED,
+      );
+    }
+
+    // Mapping ke grouped DTO
+    const grouped = filtered.reduce(
+      (acc, { classTask, attempt }) => {
+        const task = classTask.task;
+        const classEntity = classTask.class;
+
+        const dateValue =
+          attempt?.last_accessed_at || attempt?.completed_at || null;
+        const dateKey = dateValue
+          ? format(new Date(dateValue), 'yyyy-MM-dd')
+          : 'no-date';
+
+        if (!acc[dateKey]) {
+          if (dateValue) {
+            const date = new Date(dateValue);
+            acc[dateKey] = {
+              dateLabel: format(date, 'd MMM yyyy', { locale: id }),
+              dayLabel: format(date, 'EEEE', { locale: id }),
+              attempts: [],
+            };
+          } else {
+            acc[dateKey] = {
+              dateLabel: 'Belum Dikerjakan',
+              dayLabel: '',
+              attempts: [],
+            };
+          }
+        }
+
+        const taskDto: TaskAttemptOverviewResponseDto = {
+          id: attempt?.task_attempt_id ?? null,
+          title: task.title,
+          image: task.image || null,
+          status: attempt?.status ?? TaskAttemptStatus.NOT_STARTED,
+          classSlug: classEntity.slug,
+          taskSlug: task.slug,
+          deadline: getDate(classTask.end_time),
+          lastAccessedTime: attempt?.last_accessed_at
+            ? getTime(attempt.last_accessed_at)
+            : null,
+          completedTime: attempt?.completed_at
+            ? getTime(attempt.completed_at)
+            : null,
+        };
+
+        acc[dateKey].attempts.push(taskDto);
+        return acc;
+      },
+      {} as Record<string, GroupedTaskAttemptResponseDto>,
+    );
+
+    return Object.values(grouped);
+  }
 
   /**
    * Find available tasks for student in a class

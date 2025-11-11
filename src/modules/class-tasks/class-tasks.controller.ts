@@ -14,10 +14,25 @@ import { OptionalJwtAuthGuard } from 'src/auth/optional-jwt-auth.guard';
 import { ClassTaskService } from './class-tasks.service';
 import { ShareTaskIntoClassesDto } from './dto/requests/share-task-into-classes-request.dto';
 import { FilterClassDto } from '../classes/dto/requests/filter-class.dto';
+import { FilterTaskAttemptDto } from '../task-attempts/dto/requests/filter-task-attempt.dto';
 
 @Controller('class-tasks')
 export class ClassTaskController {
   constructor(private readonly classTaskService: ClassTaskService) {}
+
+  /**
+   * [GET] /class-tasks
+   * Mendapatkan daftar tugas (task) dari semua kelas
+   */
+  @Get('')
+  @UseGuards(OptionalJwtAuthGuard)
+  async getTasksFromAllClasses(
+    @Req() req: any,
+    @Query() filterDto: FilterTaskAttemptDto,
+  ) {
+    const userId = req.user?.id || null;
+    return this.classTaskService.findTasksFromAllClasses(userId, filterDto);
+  }
 
   /**
    * [GET] /classes/:classSlug/tasks/student
@@ -122,7 +137,7 @@ export class ClassTaskController {
   }
 
   /**
-   * [GET] /class-tasks/:taskId
+   * [GET] /class-tasks/available-classes/:taskId
    * Mendapatkan daftar kelak yang dapat dibagikan untuk satu tugas
    */
   @Get('available-classes/:taskId')

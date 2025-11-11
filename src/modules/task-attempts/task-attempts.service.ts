@@ -25,6 +25,7 @@ import {
   TaskAttemptStats,
 } from './dto/responses/task-attempt-detail.dto';
 import {
+  getDate,
   getDateTime,
   getTime,
   getTimePeriod,
@@ -166,6 +167,7 @@ export class TaskAttemptService {
           status,
           classSlug: attempt.class.slug,
           taskSlug: attempt.task.slug,
+          deadline: getDate(attempt.task.end_time),
           lastAccessedTime: getTime(last_accessed_at),
           completedTime: completed_at ? getTime(completed_at) : null,
         });
