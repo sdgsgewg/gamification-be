@@ -13,5 +13,8 @@ export class UpdateTaskAttemptDto {
   lastAccessedAt: Date;
 
   @IsOptional()
+  startedAt: Date;
+
+  @IsOptional()
   answerLogs?: UpdateTaskAnswerLogDto[];
 }

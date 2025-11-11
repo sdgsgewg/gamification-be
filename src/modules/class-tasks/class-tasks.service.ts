@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Not, Repository } from 'typeorm';
+import { In, Not, Repository } from 'typeorm';
 import { ClassTask } from '../class-tasks/entities/class-task.entity';
 import { Class } from '../classes/entities/class.entity';
 import { FilterClassTaskDto } from './dto/requests/filter-class-task.dto';
@@ -282,7 +282,10 @@ export class ClassTaskService {
           student_id: userId,
           task_id: task.task_id,
           class_id: classEntity.class_id,
-          status: TaskAttemptStatus.SUBMITTED || TaskAttemptStatus.COMPLETED,
+          status: In([
+            TaskAttemptStatus.SUBMITTED,
+            TaskAttemptStatus.COMPLETED,
+          ]),
         },
         relations: {
           task: {
@@ -394,7 +397,9 @@ export class ClassTaskService {
         ? {
             startedAt: getDateTime(recentAttempt.started_at),
             lastAccessedAt: getDateTime(recentAttempt.last_accessed_at),
-            submittedAt: getDateTime(recentAttempt.taskSubmission.created_at),
+            submittedAt: getDateTime(
+              recentAttempt.taskSubmission?.created_at ?? null,
+            ),
             completedAt: getDateTime(recentAttempt.completed_at),
             status: recentAttempt.status as TaskAttemptStatus,
           }
@@ -408,7 +413,7 @@ export class ClassTaskService {
                 (acc, question) => acc + (question.point ?? 0),
                 0,
               ),
-              score: recentAttempt.taskSubmission.score,
+              score: recentAttempt.taskSubmission?.score ?? null,
             }
           : null,
       duration,
@@ -445,13 +450,13 @@ export class ClassTaskService {
               };
             })
           : [],
-      submission: recentAttempt.taskSubmission
+      submission: recentAttempt?.taskSubmission
         ? {
             score: recentAttempt.taskSubmission.score,
             feedback: recentAttempt.taskSubmission.feedback,
             status: recentAttempt.taskSubmission.status,
             gradedBy: recentAttempt.taskSubmission.graded_by
-              ? recentAttempt.taskSubmission.grader.name
+              ? (recentAttempt.taskSubmission.grader?.name ?? null)
               : null,
             gradedAt: recentAttempt.taskSubmission.finish_graded_at
               ? getDateTime(recentAttempt.taskSubmission.finish_graded_at)
@@ -507,11 +512,11 @@ export class ClassTaskService {
 
     const { task } = classTask;
 
-    // 3️⃣ Default values
+    // Default values
     let lastAttemptId: string | null = null;
     let attemptAnswerLogs: TaskAnswerLog[] = [];
 
-    // 4️⃣ Jika user login → cari attempt dan jawaban user
+    // Jika user login → cari attempt dan jawaban user
     if (userId) {
       const latestAttempt = await this.taskAttemptRepository.findOne({
         where: {
@@ -782,28 +787,53 @@ export class ClassTaskService {
       };
     }
 
-    const finalStartTime = startTime
-      ? startTime
-      : task.start_time
-        ? task.start_time
-        : null;
-    const finalEndtIme = endTime
-      ? endTime
-      : task.end_time
-        ? task.end_time
-        : null;
+    const finalStartTime = startTime ?? task.start_time ?? null;
+    const finalEndTime = endTime ?? task.end_time ?? null;
 
     const newClassTasks = classIds.map((classId) =>
       this.classTaskRepository.create({
         class_id: classId,
         task_id: taskId,
         start_time: finalStartTime,
-        end_time: finalEndtIme,
+        end_time: finalEndTime,
       }),
     );
 
     // Simpan semua sekaligus
     await this.classTaskRepository.save(newClassTasks);
+
+    // Buat task attempt untuk siswa di kelas
+    for (const classId of classIds) {
+      // ambil semua student di kelas tersebut
+      const classEntity = await this.classRepository.findOne({
+        where: { class_id: classId },
+        relations: {
+          classStudents: {
+            student: true,
+          },
+        },
+      });
+
+      if (
+        !classEntity ||
+        !classEntity.classStudents ||
+        classEntity.classStudents.length === 0
+      )
+        continue;
+
+      // siapkan task attempts
+      const taskAttempts = classEntity.classStudents.map((cs) =>
+        this.taskAttemptRepository.create({
+          task_id: taskId,
+          student_id: cs.student.user_id,
+          class_id: classId,
+          status: TaskAttemptStatus.NOT_STARTED,
+        }),
+      );
+
+      // simpan sekaligus biar efisien
+      await this.taskAttemptRepository.save(taskAttempts);
+    }
 
     const response: BaseResponseDto = {
       status: 200,

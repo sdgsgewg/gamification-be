@@ -12,6 +12,7 @@ import {
   OneToOne,
   OneToMany,
 } from 'typeorm';
+import { TaskAttemptStatus } from '../enums/task-attempt-status.enum';
 
 @Entity('task_attempts')
 export class TaskAttempt {
@@ -24,16 +25,16 @@ export class TaskAttempt {
   @Column({ type: 'int4', nullable: true })
   xp_gained: number;
 
-  @Column({ type: 'int4', default: 0 })
+  @Column({ type: 'int4', default: 0, nullable: true })
   answered_question_count: number;
 
   @Column({ type: 'varchar' })
-  status: string;
+  status: TaskAttemptStatus;
 
-  @Column({ type: 'timestamptz' })
+  @Column({ type: 'timestamptz', nullable: true })
   started_at: Date;
 
-  @Column({ type: 'timestamptz' })
+  @Column({ type: 'timestamptz', nullable: true })
   last_accessed_at: Date;
 
   @Column({ type: 'timestamptz', nullable: true })

@@ -40,6 +40,7 @@ import { TaskDifficultyLabels } from '../tasks/enums/task-difficulty.enum';
 import { ActivityLogService } from '../activty-logs/activity-logs.service';
 import { getActivityLogDescription } from 'src/common/utils/get-activity-log-description';
 import { ActivityLogEventType } from '../activty-logs/enums/activity-log-event-type';
+import { UserRole } from '../roles/enums/user-role.enum';
 
 @Injectable()
 export class TaskAttemptService {
@@ -135,18 +136,26 @@ export class TaskAttemptService {
 
         // Pilih tanggal berdasarkan mode grouping
         const dateValue = groupByCompleted ? completed_at : last_accessed_at;
-        if (!dateValue) return acc;
 
-        const date = new Date(dateValue);
-        if (isNaN(date.getTime())) return acc;
+        const dateKey = dateValue
+          ? format(new Date(dateValue), 'yyyy-MM-dd')
+          : 'no-date';
 
-        const dateKey = format(date, 'yyyy-MM-dd');
         if (!acc[dateKey]) {
-          acc[dateKey] = {
-            dateLabel: format(date, 'd MMM yyyy', { locale: id }),
-            dayLabel: format(date, 'EEEE', { locale: id }),
-            attempts: [],
-          };
+          if (dateValue) {
+            const date = new Date(dateValue);
+            acc[dateKey] = {
+              dateLabel: format(date, 'd MMM yyyy', { locale: id }),
+              dayLabel: format(date, 'EEEE', { locale: id }),
+              attempts: [],
+            };
+          } else {
+            acc[dateKey] = {
+              dateLabel: 'Belum Dikerjakan',
+              dayLabel: '',
+              attempts: [],
+            };
+          }
         }
 
         // Map langsung ke DTO kecil di sini
@@ -435,8 +444,9 @@ export class TaskAttemptService {
 
     attempt.answered_question_count = answeredQuestionCount;
     attempt.status = dto.status;
+    if (!existing.started_at) attempt.started_at = dto.startedAt;
     attempt.last_accessed_at = dto.lastAccessedAt;
-    attempt.completed_at = completedAt;
+    if (!isClassTask) attempt.completed_at = completedAt;
 
     // Update points dan xpGained saat status = "COMPLETED" dan semua soal sudah terisi
     if (
@@ -469,58 +479,79 @@ export class TaskAttemptService {
   ) {
     const { status } = savedTaskAttempt;
 
+    const taskAttemptWithRelations = await this.taskAttemptRepository.findOne({
+      where: { task_attempt_id: savedTaskAttempt.task_attempt_id },
+      relations: ['task', 'class', 'student'],
+    });
+
+    const data = taskAttemptWithRelations ?? savedTaskAttempt;
+
     switch (status) {
       case TaskAttemptStatus.ON_PROGRESS:
         if (existing === null) {
           // Add event task started to activity log
           await this.activityLogService.createActivityLog({
-            userId: savedTaskAttempt.student_id,
+            userId: data.student_id,
             eventType: ActivityLogEventType.TASK_STARTED,
             description: getActivityLogDescription(
               ActivityLogEventType.TASK_STARTED,
               'task attempt',
-              savedTaskAttempt,
+              data,
             ),
-            metadata: savedTaskAttempt,
+            metadata: data,
           });
         } else {
           // Add event task last accessed to activity log
           await this.activityLogService.createActivityLog({
-            userId: savedTaskAttempt.student_id,
+            userId: data.student_id,
             eventType: ActivityLogEventType.TASK_LAST_ACCESSED,
             description: getActivityLogDescription(
               ActivityLogEventType.TASK_LAST_ACCESSED,
               'task attempt',
-              savedTaskAttempt,
+              data,
             ),
-            metadata: savedTaskAttempt,
+            metadata: data,
           });
         }
         break;
       case TaskAttemptStatus.SUBMITTED:
-        // Add event task submitted to activity log
+        // Add event task submitted to activity log of student
         await this.activityLogService.createActivityLog({
-          userId: savedTaskAttempt.student_id,
+          userId: data.student_id,
           eventType: ActivityLogEventType.TASK_SUBMITTED,
           description: getActivityLogDescription(
             ActivityLogEventType.TASK_SUBMITTED,
             'task attempt',
-            savedTaskAttempt,
+            data,
+            UserRole.STUDENT,
           ),
-          metadata: savedTaskAttempt,
+          metadata: data,
+        });
+
+        // Add event task submitted to activity log of teacher
+        await this.activityLogService.createActivityLog({
+          userId: data.class.teacher_id,
+          eventType: ActivityLogEventType.TASK_SUBMITTED,
+          description: getActivityLogDescription(
+            ActivityLogEventType.TASK_SUBMITTED,
+            'task attempt',
+            data,
+            UserRole.TEACHER,
+          ),
+          metadata: data,
         });
         break;
       case TaskAttemptStatus.COMPLETED:
         // Add event task completed to activity log
         await this.activityLogService.createActivityLog({
-          userId: savedTaskAttempt.student_id,
+          userId: data.student_id,
           eventType: ActivityLogEventType.TASK_COMPLETED,
           description: getActivityLogDescription(
             ActivityLogEventType.TASK_COMPLETED,
             'task attempt',
-            savedTaskAttempt,
+            data,
           ),
-          metadata: savedTaskAttempt,
+          metadata: data,
         });
         break;
       default:
@@ -554,7 +585,7 @@ export class TaskAttemptService {
     await this.saveAnswerLogs(task_attempt_id, answerLogs, false);
 
     // Add event to activity log
-    await this.saveActivityLog(savedTaskAttempt, null);
+    await this.saveActivityLog(null, savedTaskAttempt);
 
     const data: UpsertTaskAttemptResponseDto = await this.getLevelChangeData(
       studentId,
@@ -597,7 +628,7 @@ export class TaskAttemptService {
     await this.saveAnswerLogs(task_attempt_id, answerLogs, true);
 
     // Add event to activity log
-    await this.saveActivityLog(savedTaskAttempt, existing);
+    await this.saveActivityLog(existing, savedTaskAttempt);
 
     const data: UpsertTaskAttemptResponseDto = await this.getLevelChangeData(
       studentId,
@@ -642,7 +673,7 @@ export class TaskAttemptService {
     }
 
     // Add event to activity log
-    await this.saveActivityLog(savedTaskAttempt, null);
+    await this.saveActivityLog(null, savedTaskAttempt);
 
     const data: UpsertTaskAttemptResponseDto = await this.getLevelChangeData(
       studentId,
@@ -704,7 +735,7 @@ export class TaskAttemptService {
     }
 
     // Add event to activity log
-    await this.saveActivityLog(savedTaskAttempt, existing);
+    await this.saveActivityLog(existing, savedTaskAttempt);
 
     const data: UpsertTaskAttemptResponseDto = await this.getLevelChangeData(
       studentId,

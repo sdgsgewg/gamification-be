@@ -15,7 +15,11 @@ export function getActivityLogDescription(
       return `You last accessed the task "${data?.task.title || 'Unnamed Task'}".`;
 
     case ActivityLogEventType.TASK_SUBMITTED:
-      return `You submitted the task "${data?.task.title || 'Unnamed Task'}".`;
+      return role === UserRole.STUDENT
+        ? `You submitted the task "${data?.task.title || 'Unnamed Task'}" that is assigned in class "${data?.class?.name || 'Unnamed Class'}".`
+        : role === UserRole.TEACHER
+          ? `${data?.student.name || 'A student'} from class "${data?.class?.name || 'Unnamed Class'}" have submitted the task "${data?.task?.title || 'unnamed task'}".`
+          : '';
 
     case ActivityLogEventType.TASK_COMPLETED:
       return `You completed the task "${data?.task.title || 'Unnamed Task'}" and earned ${data?.xpGained} XP.`;

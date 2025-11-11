@@ -13,7 +13,13 @@ export function getMasterHistoryDescription(
     case MasterHistoryTransactionType.UPDATE:
       const oldName = oldData?.name || oldData?.title || 'item';
       const newName = newData?.name || newData?.title || oldName;
-      return `You updated the ${entityName} "${oldName}" to "${newName}".`;
+
+      const text =
+        oldName !== newName
+          ? `You updated the ${entityName} "${oldName}" to "${newName}".`
+          : `You updated the ${entityName} "${oldName}"`;
+
+      return text;
 
     case MasterHistoryTransactionType.DELETE:
       return `You deleted the ${entityName} "${oldData?.name || oldData?.title || 'item'}".`;

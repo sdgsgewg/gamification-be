@@ -31,6 +31,7 @@ export class ActivityLogService {
 
     const activityLogOverviews: ActivityLogOverviewResponseDto[] =
       activityLogs.map((al) => ({
+        id: al.id,
         description: al.description,
         createdAt: getDate(al.created_at),
       }));

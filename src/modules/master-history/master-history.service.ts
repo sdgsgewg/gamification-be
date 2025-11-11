@@ -30,9 +30,10 @@ export class MasterHistoryService {
     });
 
     const masterHistoryOverviews: MasterHistoryOverviewResponseDto[] =
-      masterHistory.map((al) => ({
-        description: al.description,
-        createdAt: getDate(al.created_at),
+      masterHistory.map((mh) => ({
+        id: mh.id,
+        description: mh.description,
+        createdAt: getDate(mh.created_at),
       }));
 
     return masterHistoryOverviews;
