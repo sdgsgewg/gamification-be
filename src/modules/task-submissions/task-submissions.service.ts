@@ -14,7 +14,7 @@ import { TaskXpHelper } from 'src/common/helpers/task-xp.helper';
 import { TaskQuestionOption } from '../task-question-options/entities/task-question-option.entity';
 import { ActivityLogService } from '../activty-logs/activity-logs.service';
 import { ActivityLogEventType } from '../activty-logs/enums/activity-log-event-type';
-import { getActivityLogDescription } from 'src/common/utils/get-activity-log-description';
+import { getActivityLogDescription } from 'src/common/utils/get-activity-log-description.util';
 import { UserRole } from '../roles/enums/user-role.enum';
 import { FilterTaskSubmissionDto } from './dto/requests/filter-task-submission.dto';
 import { GroupedTaskSubmissionResponseDto } from './dto/responses/grouped-task-submission-response.dto';

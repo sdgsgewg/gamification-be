@@ -17,7 +17,8 @@ import { SlugHelper } from 'src/common/helpers/slug.helper';
 import { TaskTypeScope } from '../task-types/enums/task-type-scope.enum';
 import { MasterHistoryService } from '../master-history/master-history.service';
 import { MasterHistoryTransactionType } from '../master-history/enums/master-history-transaction-type';
-import { getMasterHistoryDescription } from 'src/common/utils/get-master-history-description';
+import { getMasterHistoryDescription } from 'src/common/utils/get-master-history-description.util';
+import { getResponseMessage } from 'src/common/utils/get-response-message.util';
 
 @Injectable()
 export class SubjectService {
@@ -196,7 +197,10 @@ export class SubjectService {
     const response: DetailResponseDto<SubjectDetailResponseDto> = {
       status: 200,
       isSuccess: true,
-      message: 'Mata pelajaran berhasi dibuat!',
+      message: getResponseMessage({
+        entity: 'subject',
+        action: 'create',
+      }),
       data: subjectDetail,
     };
 
@@ -303,7 +307,10 @@ export class SubjectService {
     const response: DetailResponseDto<SubjectDetailResponseDto> = {
       status: 200,
       isSuccess: true,
-      message: 'Subject has been updated!',
+      message: getResponseMessage({
+        entity: 'subject',
+        action: 'update',
+      }),
       data: subjectDetail,
     };
 
@@ -341,7 +348,10 @@ export class SubjectService {
     const response: BaseResponseDto = {
       status: 200,
       isSuccess: true,
-      message: 'Mata pelajaran berhasil dihapus!',
+      message: getResponseMessage({
+        entity: 'subject',
+        action: 'delete',
+      }),
     };
 
     return response;

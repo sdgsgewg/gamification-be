@@ -16,7 +16,8 @@ import { SlugHelper } from 'src/common/helpers/slug.helper';
 import { getDbColumn } from 'src/common/database/get-db-column.util';
 import { MasterHistoryService } from '../master-history/master-history.service';
 import { MasterHistoryTransactionType } from '../master-history/enums/master-history-transaction-type';
-import { getMasterHistoryDescription } from 'src/common/utils/get-master-history-description';
+import { getMasterHistoryDescription } from 'src/common/utils/get-master-history-description.util';
+import { getResponseMessage } from 'src/common/utils/get-response-message.util';
 
 @Injectable()
 export class TaskTypeService {
@@ -186,7 +187,10 @@ export class TaskTypeService {
     const response: DetailResponseDto<TaskTypeDetailResponseDto> = {
       status: 200,
       isSuccess: true,
-      message: 'Tipe tugas berhasil dibuat!',
+      message: getResponseMessage({
+        entity: 'task-type',
+        action: 'create',
+      }),
       data: taskTypeDetail,
     };
 
@@ -269,7 +273,10 @@ export class TaskTypeService {
     const response: DetailResponseDto<TaskTypeDetailResponseDto> = {
       status: 200,
       isSuccess: true,
-      message: 'Tipe tugas berhasil diperbarui!',
+      message: getResponseMessage({
+        entity: 'task-type',
+        action: 'update',
+      }),
       data: taskTypeDetail,
     };
 
@@ -301,7 +308,10 @@ export class TaskTypeService {
     const response: BaseResponseDto = {
       status: 200,
       isSuccess: true,
-      message: 'Tipe tugas berhasil dihapus!',
+      message: getResponseMessage({
+        entity: 'task-type',
+        action: 'delete',
+      }),
     };
 
     return response;

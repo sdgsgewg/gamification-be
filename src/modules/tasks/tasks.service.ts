@@ -23,8 +23,9 @@ import { getDbColumn } from 'src/common/database/get-db-column.util';
 import { TaskDifficultyLabels } from './enums/task-difficulty.enum';
 import { MasterHistoryService } from '../master-history/master-history.service';
 import { MasterHistoryTransactionType } from '../master-history/enums/master-history-transaction-type';
-import { getMasterHistoryDescription } from 'src/common/utils/get-master-history-description';
+import { getMasterHistoryDescription } from 'src/common/utils/get-master-history-description.util';
 import { ClassTask } from '../class-tasks/entities/class-task.entity';
+import { getResponseMessage } from 'src/common/utils/get-response-message.util';
 
 @Injectable()
 export class TaskService {
@@ -394,7 +395,10 @@ export class TaskService {
     const response: DetailResponseDto<TaskDetailResponseDto> = {
       status: 200,
       isSuccess: true,
-      message: 'Task created successfully',
+      message: getResponseMessage({
+        entity: 'task',
+        action: 'create',
+      }),
       data: taskDetail,
     };
 
@@ -543,7 +547,10 @@ export class TaskService {
     const response: DetailResponseDto<TaskDetailResponseDto> = {
       status: 200,
       isSuccess: true,
-      message: 'Task updated successfully',
+      message: getResponseMessage({
+        entity: 'task',
+        action: 'update',
+      }),
       data: taskDetail,
     };
 
@@ -585,7 +592,10 @@ export class TaskService {
     const response: BaseResponseDto = {
       status: 200,
       isSuccess: true,
-      message: 'Task deleted successfully',
+      message: getResponseMessage({
+        entity: 'task',
+        action: 'delete',
+      }),
     };
 
     return response;

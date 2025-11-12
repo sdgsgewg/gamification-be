@@ -39,9 +39,10 @@ import { TaskSubmissionService } from '../task-submissions/task-submissions.serv
 import { TaskXpHelper } from 'src/common/helpers/task-xp.helper';
 import { TaskDifficultyLabels } from '../tasks/enums/task-difficulty.enum';
 import { ActivityLogService } from '../activty-logs/activity-logs.service';
-import { getActivityLogDescription } from 'src/common/utils/get-activity-log-description';
+import { getActivityLogDescription } from 'src/common/utils/get-activity-log-description.util';
 import { ActivityLogEventType } from '../activty-logs/enums/activity-log-event-type';
 import { UserRole } from '../roles/enums/user-role.enum';
+import { getResponseMessage } from 'src/common/utils/get-response-message.util';
 
 @Injectable()
 export class TaskAttemptService {
@@ -597,7 +598,10 @@ export class TaskAttemptService {
     return {
       status: 200,
       isSuccess: true,
-      message: 'Task attempt has been created!',
+      message: getResponseMessage({
+        entity: 'task-attempt',
+        action: 'create',
+      }),
       data,
     };
   }
@@ -640,7 +644,10 @@ export class TaskAttemptService {
     return {
       status: 200,
       isSuccess: true,
-      message: 'Task attempt has been updated!',
+      message: getResponseMessage({
+        entity: 'task-attempt',
+        action: 'update',
+      }),
       data,
     };
   }
@@ -685,7 +692,10 @@ export class TaskAttemptService {
     return {
       status: 200,
       isSuccess: true,
-      message: 'Task attempt has been created!',
+      message: getResponseMessage({
+        entity: 'task-attempt',
+        action: 'create',
+      }),
       data,
     };
   }
@@ -747,7 +757,10 @@ export class TaskAttemptService {
     return {
       status: 200,
       isSuccess: true,
-      message: 'Task attempt has been updated!',
+      message: getResponseMessage({
+        entity: 'task-attempt',
+        action: 'update',
+      }),
       data,
     };
   }

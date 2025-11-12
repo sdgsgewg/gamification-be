@@ -21,6 +21,7 @@ import { UpdateClassDto } from './dto/requests/update-class.dto';
 import { ClassMemberResponseDto } from './dto/responses/class-member-response.dto';
 import { FilterClassMemberDto } from './dto/requests/filter-class-member.dto';
 import { UserRole } from '../roles/enums/user-role.enum';
+import { getResponseMessage } from 'src/common/utils/get-response-message.util';
 
 @Injectable()
 export class ClassService {
@@ -298,7 +299,10 @@ export class ClassService {
     const response: BaseResponseDto = {
       status: 200,
       isSuccess: true,
-      message: 'Class has been created!',
+      message: getResponseMessage({
+        entity: 'class',
+        action: 'create',
+      }),
     };
 
     return response;
@@ -384,7 +388,10 @@ export class ClassService {
     const response: BaseResponseDto = {
       status: 200,
       isSuccess: true,
-      message: 'Class has been updated!',
+      message: getResponseMessage({
+        entity: 'class',
+        action: 'update',
+      }),
     };
 
     return response;
