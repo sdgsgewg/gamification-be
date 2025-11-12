@@ -25,6 +25,11 @@ export class ClassController {
   constructor(private readonly classService: ClassService) {}
 
   @Get('')
+  async getAllClasses() {
+    return this.classService.findAllClasses();
+  }
+
+  @Get('user')
   @UseGuards(OptionalJwtAuthGuard)
   async getUserClasses(@Query() filterDto: FilterClassDto, @Req() req: any) {
     // Ambil userId dari request (kalau user login)

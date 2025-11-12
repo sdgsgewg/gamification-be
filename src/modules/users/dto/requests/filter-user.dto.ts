@@ -7,7 +7,7 @@ export class FilterUserDto {
 
   @IsOptional()
   @IsString()
-  roleId?: string;
+  role?: string;
 
   @IsOptional()
   @IsString()

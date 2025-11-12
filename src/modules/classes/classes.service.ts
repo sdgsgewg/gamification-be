@@ -33,6 +33,25 @@ export class ClassService {
     private readonly fileUploadService: FileUploadService,
   ) {}
 
+  async findAllClasses(): Promise<ClassOverviewResponseDto[]> {
+    const classes = await this.classRepository.find({
+      relations: {
+        classStudents: true,
+      },
+    });
+
+    // Mapping hasil ke DTO
+    const classOverviews: ClassOverviewResponseDto[] = classes.map((c) => ({
+      id: c.class_id,
+      name: c.name,
+      slug: c.slug,
+      image: c.image ?? null,
+      studentCount: c.classStudents.length,
+    }));
+
+    return classOverviews;
+  }
+
   async findUserClasses(
     userId: string,
     filterDto: FilterClassDto,

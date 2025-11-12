@@ -3,4 +3,5 @@ export class ClassOverviewResponseDto {
   name: string;
   slug: string;
   image?: string;
+  studentCount?: number;
 }

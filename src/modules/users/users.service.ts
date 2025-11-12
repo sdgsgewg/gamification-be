@@ -17,6 +17,7 @@ import { UserStatsResponseDto } from './dto/responses/user-stats-response.dto';
 import { UserRecentActivityResponse } from './dto/responses/user-recent-activity-response.dto';
 import { MasterHistoryService } from '../master-history/master-history.service';
 import { ActivityLogService } from '../activty-logs/activity-logs.service';
+import { UserRole } from '../roles/enums/user-role.enum';
 
 @Injectable()
 export class UserService {
@@ -47,13 +48,19 @@ export class UserService {
         'grade.name AS "grade"',
         'user.level AS "level"',
         'user.xp AS "xp"',
-        'user.emailVerifiedAt AS "emailVerifiedAt"',
-        'user.createdAt AS "createdAt"',
+        'user.email_verified_at AS "emailVerifiedAt"',
+        'user.created_at AS "createdAt"',
       ]);
 
     if (filterDto.searchText) {
       qb.andWhere('user.name ILIKE :searchText', {
         searchText: `%${filterDto.searchText}%`,
+      });
+    }
+
+    if (filterDto.role) {
+      qb.andWhere('role.name = :role', {
+        role: filterDto.role,
       });
     }
 
@@ -172,7 +179,7 @@ export class UserService {
 
     let user = null;
 
-    if (roleName === 'Student') {
+    if (roleName === UserRole.STUDENT) {
       user = this.userRepository.create({
         email,
         password: hashedPassword,
@@ -181,7 +188,7 @@ export class UserService {
         xp: 0,
         created_at: new Date(),
       });
-    } else if (roleName === 'Teacher') {
+    } else if (roleName === UserRole.TEACHER) {
       user = this.userRepository.create({
         email,
         password: hashedPassword,

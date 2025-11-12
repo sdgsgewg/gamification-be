@@ -17,6 +17,7 @@ export class ActivityLogService {
   async findUserActivityLogs(
     userId: string,
   ): Promise<ActivityLogOverviewResponseDto[]> {
+    console.log('User id: ', userId);
     const activityLogs = await this.activityLogRepository.find({
       where: {
         user_id: userId,
