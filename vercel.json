@@ -4,7 +4,7 @@
   "outputDirectory": "dist",
   "functions": {
     "api/nest.js": {
-      "runtime": "nodejs18.x",
+      "runtime": "vercel-node@3.0.0",
       "includeFiles": "dist/**"
     }
   },
