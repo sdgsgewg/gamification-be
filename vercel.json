@@ -2,6 +2,11 @@
   "version": 2,
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "builds": [{ "src": "api/nest.js", "use": "@vercel/node" }],
+  "functions": {
+    "api/nest.js": {
+      "runtime": "nodejs18.x",
+      "includeFiles": "dist/**"
+    }
+  },
   "routes": [{ "src": "/(.*)", "dest": "api/nest.js" }]
 }
