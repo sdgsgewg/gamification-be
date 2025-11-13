@@ -51,7 +51,7 @@ import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import { ValidationPipe } from '@nestjs/common';
 import * as cookieParser from 'cookie-parser';
-import * as express from 'express';
+import express from 'express';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import { json, urlencoded } from 'express';
 
