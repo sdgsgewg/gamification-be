@@ -12,13 +12,16 @@ import {
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { JwtService } from '@nestjs/jwt';
-import { UserSessionService } from 'src/user-sessions/user-sessions.service';
-import { ForgotPasswordDto } from './dto/forgot-password.dto';
-import { ResetPasswordDto } from './dto/reset-password.dto';
-import { LoginDto } from './dto/login.dto';
-import { RegisterStep1Dto } from './dto/register-step1.dto';
-import { CompleteProfileDto } from './dto/complete-profile.dto';
+import { UserSessionService } from 'src/modules/user-sessions/user-sessions.service';
+import { ForgotPasswordDto } from './dto/requests/forgot-password.dto';
+import { ResetPasswordDto } from './dto/requests/reset-password.dto';
+import { LoginDto } from './dto/requests/login.dto';
+import { CreateUserDto } from './dto/requests/create-user.dto';
+import { CompleteProfileDto } from './dto/requests/complete-profile.dto';
 import { AuthGuard } from '@nestjs/passport';
+import { BaseResponseDto } from 'src/common/responses/base-response.dto';
+import { DetailResponseDto } from 'src/common/responses/detail-response.dto';
+import { LoginDetailResponseDto } from './dto/responses/login-detail-response';
 
 @Controller('/auth')
 export class AuthController {
@@ -29,8 +32,8 @@ export class AuthController {
   ) {}
 
   @Post('/register')
-  async registerStep1(@Body() dto: RegisterStep1Dto) {
-    return this.authService.registerStep1(dto);
+  async registerStep1(@Body() dto: CreateUserDto) {
+    return this.authService.register(dto);
   }
 
   @Post('/verify-email')
@@ -54,13 +57,14 @@ export class AuthController {
   ) {
     const result = await this.authService.login(body);
 
-    const refreshToken = result.refreshToken;
+    const { accessToken, refreshToken, user } = result.data;
+
     const remember = body.remember ?? false;
 
     const userAgent = req.headers['user-agent'] || 'unknown';
 
     await this.userSessionService.createSession(
-      result.user.user_id,
+      user.userId,
       refreshToken,
       userAgent,
     );
@@ -71,6 +75,16 @@ export class AuthController {
       : this.convertExpiryToMs('1d'); // 30 hari / 1 hari
 
     // Set refresh token as HTTP-only cookie
+    // Production
+    // res.cookie('refresh_token', refreshToken, {
+    //   httpOnly: true,
+    //   secure: true,
+    //   sameSite: 'none',
+    //   path: '/',
+    //   domain: '.inspiraumkm.com',
+    // });
+
+    // Development
     res.cookie('refresh_token', refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -79,11 +93,19 @@ export class AuthController {
       maxAge: cookieMaxAge,
     });
 
-    return {
+    const response: DetailResponseDto<LoginDetailResponseDto> = {
+      status: 200,
+      isSuccess: true,
       message: 'Login successful',
-      accessToken: result.accessToken,
-      user: result.user,
+      data: {
+        accessToken,
+        user,
+        remember,
+        cookieMaxAge,
+      },
     };
+
+    return response;
   }
 
   @Get('google')
@@ -149,20 +171,27 @@ export class AuthController {
 
     try {
       const payload = this.jwtService.verify(token, {
-        secret: process.env.SUPABASE_SERVICE_ROLE_KEY,
+        secret: process.env.JWT_SECRET,
         clockTolerance: 30, // 30 detik toleransi perbedaan waktu
         ignoreExpiration: false, // Pastikan false di production
       });
 
       // Generate new token dengan secret yang sama
       const newAccessToken = this.jwtService.sign(
-        { uid: payload.uid, email: payload.email },
-        { expiresIn: process.env.ACCESS_TOKEN_EXPIRY || '15m' },
+        {
+          id: payload.id || payload.uid, // fallback kalau field-nya uid
+          email: payload.email,
+          role: payload.role || 'user',
+        },
+        {
+          secret: process.env.JWT_SECRET,
+          expiresIn: process.env.ACCESS_TOKEN_EXPIRY || '15m',
+        },
       );
 
       return res.json({ accessToken: newAccessToken });
     } catch (err: any) {
-      console.warn('Invalid refresh token payload');
+      console.warn('Invalid refresh token payload', err.message);
       throw new UnauthorizedException('Invalid refresh token');
     }
   }
@@ -185,9 +214,31 @@ export class AuthController {
       await this.userSessionService.deleteSession(token);
     }
 
-    res.clearCookie('refresh_token', { path: '/' });
+    // Production
+    // res.clearCookie('refresh_token', {
+    //   httpOnly: true,
+    //   secure: true,
+    //   sameSite: 'none',
+    //   path: '/',
+    //   domain: '.gamification.com',
+    // });
 
-    return res.status(200).json({ message: 'Logged out' });
+    // Development
+
+    res.clearCookie('refresh_token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/',
+    });
+
+    const response: BaseResponseDto = {
+      status: 200,
+      isSuccess: true,
+      message: 'Logged out',
+    };
+
+    return response;
   }
 
   // Helper untuk konversi "15m", "30d" → milliseconds
