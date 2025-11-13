@@ -25,6 +25,7 @@ import { ClassTaskModule } from './modules/class-tasks/class-tasks.module';
 import { TaskSubmissionModule } from './modules/task-submissions/task-submissions.module';
 import { MasterHistoryModule } from './modules/master-history/master-history.module';
 import { ActivityLogModule } from './modules/activty-logs/activity-logs.module';
+import { MaterialGradeModule } from './modules/material-grades/material-grades.module';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { ActivityLogModule } from './modules/activty-logs/activity-logs.module';
     UserModule,
     SubjectModule,
     MaterialModule,
+    MaterialGradeModule,
     TaskTypeModule,
     TaskModule,
     TaskQuestionModule,
