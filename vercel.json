@@ -3,5 +3,9 @@
   "builds": [{ "src": "api/index.js", "use": "@vercel/node" }],
   "routes": [{ "src": "/(.*)", "dest": "api/index.js" }],
   "buildCommand": "npm run build",
-  "includeFiles": ["dist/**"]
+  "functions": {
+    "api/index.js": {
+      "includeFiles": "dist/**"
+    }
+  }
 }
