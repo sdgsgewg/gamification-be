@@ -55,10 +55,9 @@ import express from 'express';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import { json, urlencoded } from 'express';
 
-const server = express();
-
-async function createApp(expressInstance: express.Express) {
-  const app = await NestFactory.create(AppModule, new ExpressAdapter(expressInstance));
+async function createApp() {
+  const expressApp = express();
+  const app = await NestFactory.create(AppModule, new ExpressAdapter(expressApp));
   const configService = app.get(ConfigService);
 
   app.setGlobalPrefix('api');
@@ -69,7 +68,6 @@ async function createApp(expressInstance: express.Express) {
     next();
   });
 
-  // Payload size limit (penting kalau upload file)
   app.use(json({ limit: '10mb' }));
   app.use(urlencoded({ extended: true, limit: '10mb' }));
 
@@ -88,13 +86,14 @@ async function createApp(expressInstance: express.Express) {
   });
 
   await app.init();
-  return app;
+  return expressApp;
 }
 
-// 🟩 Handler untuk Vercel
-const expressApp = server;
+// Pastikan default export berupa function, bukan Promise
+const handler = async (req, res) => {
+  const app = await createApp();
+  return app(req, res);
+};
 
-createApp(expressApp);
+export default handler;
 
-// Vercel membutuhkan default export function
-export default expressApp;
