@@ -29,6 +29,7 @@ import { MaterialGradeModule } from './modules/material-grades/material-grades.m
 import { TaskGradeModule } from './modules/task-grades/task-grades.module';
 import { PasswordResetModule } from './modules/password_resets/password-resets.module';
 import { UserSessionModule } from './modules/user-sessions/user-sessions.module';
+import { CommonModule } from './common/common.module';
 
 @Module({
   imports: [
@@ -74,6 +75,7 @@ import { UserSessionModule } from './modules/user-sessions/user-sessions.module'
     TaskSubmissionModule,
     MasterHistoryModule,
     ActivityLogModule,
+    CommonModule,
     // tambah module baru di sini
   ],
   controllers: [AppController],
