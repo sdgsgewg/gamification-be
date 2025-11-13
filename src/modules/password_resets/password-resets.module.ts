@@ -5,7 +5,7 @@ import { PasswordResetService } from './password-resets.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([PasswordReset])],
-  //   controllers: [PasswordResetController],
+    // controllers: [PasswordResetController],
   providers: [PasswordResetService],
   exports: [PasswordResetService], // <== kalau mau dipakai di module lain
 })

@@ -27,6 +27,8 @@ import { MasterHistoryModule } from './modules/master-history/master-history.mod
 import { ActivityLogModule } from './modules/activty-logs/activity-logs.module';
 import { MaterialGradeModule } from './modules/material-grades/material-grades.module';
 import { TaskGradeModule } from './modules/task-grades/task-grades.module';
+import { PasswordResetModule } from './modules/password_resets/password-resets.module';
+import { UserSessionModule } from './modules/user-sessions/user-sessions.module';
 
 @Module({
   imports: [
@@ -50,6 +52,8 @@ import { TaskGradeModule } from './modules/task-grades/task-grades.module';
     }),
     SupabaseModule,
     AuthModule,
+    PasswordResetModule,
+    UserSessionModule,
     RoleModule,
     GradeModule,
     UserModule,
