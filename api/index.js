@@ -13,19 +13,30 @@
 //   }
 // };
 
-import path from 'path';
-import { fileURLToPath } from 'url';
+// import path from 'path';
+// import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// const __filename = fileURLToPath(import.meta.url);
+// const __dirname = path.dirname(__filename);
+
+// export default async function handler(req, res) {
+//   try {
+//     const appPath = path.join(__dirname, '../dist/main.js');
+//     const { default: app } = await import(appPath);
+//     return app(req, res);
+//   } catch (err) {
+//     console.error('Error loading NestJS app:', err);
+//     res.status(500).send('NestJS app not built or failed to load.');
+//   }
+// }
+
+import app from '../dist/main.js';
 
 export default async function handler(req, res) {
   try {
-    const appPath = path.join(__dirname, '../dist/main.js');
-    const { default: app } = await import(appPath);
     return app(req, res);
   } catch (err) {
-    console.error('Error loading NestJS app:', err);
-    res.status(500).send('NestJS app not built or failed to load.');
+    console.error('Error running NestJS app:', err);
+    res.status(500).send('NestJS app failed to load.');
   }
 }
