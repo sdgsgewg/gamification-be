@@ -8,7 +8,7 @@
   "type": "module",
   "scripts": {
     "prebuild": "rimraf dist",
-    "postbuild": "echo \"NestJS build complete.\"",
+    "postbuild": "cp -r dist api/dist",
     "build": "nest build && echo \"✅ NestJS build complete.\"",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
