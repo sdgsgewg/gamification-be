@@ -1,6 +1,7 @@
 {
   "version": 2,
   "buildCommand": "npm run build",
+  "outputDirectory": "dist",
   "builds": [{ "src": "api/nest.js", "use": "@vercel/node" }],
   "routes": [{ "src": "/(.*)", "dest": "api/nest.js" }]
 }
