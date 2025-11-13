@@ -19,6 +19,24 @@ export class TaskSubmissionController {
   constructor(private readonly taskSubmissionService: TaskSubmissionService) {}
 
   /**
+   * [GET]
+   * Mendapatkan daftar pengumpulan tugas dari seluruh kelas milik guru
+   */
+  @Get('')
+  @UseGuards(OptionalJwtAuthGuard)
+  async getAllTaskSubmissions(
+    @Req() req: any,
+    @Query() filterDto: FilterTaskSubmissionDto,
+  ) {
+    // Ambil userId dari request (kalau user login)
+    const userId = req.user?.id || null;
+    return this.taskSubmissionService.findAllTaskSubmissions(
+      userId,
+      filterDto,
+    );
+  }
+
+  /**
    * [GET] /classes/:classSlug/tasks/:taskSlug
    * Mendapatkan detail satu task (tanpa pertanyaan)
    */
@@ -59,6 +77,10 @@ export class TaskSubmissionController {
     return this.taskSubmissionService.findTaskSubmissionWithAnswers(id);
   }
 
+  /**
+   * [PUT] /:id
+   * Melakukan update pada task submission
+   */
   @Put(':id')
   @UseGuards(OptionalJwtAuthGuard)
   async update(

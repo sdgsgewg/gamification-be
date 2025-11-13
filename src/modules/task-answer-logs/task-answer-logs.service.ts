@@ -74,6 +74,7 @@ export class TaskAnswerLogService {
     const questionType = question.type as QuestionType;
 
     const isCorrect = await this.resolveIsCorrect(questionType, dto.optionId);
+    const pointAwarded = [QuestionType.FILL_BLANK, QuestionType.ESSAY].includes(question.type as QuestionType) ? null : question.point;
 
     let imageUrl = existingLog?.image || '';
 
@@ -82,6 +83,7 @@ export class TaskAnswerLogService {
       ...existingLog,
       answer_text: dto.answerText,
       is_correct: isCorrect,
+      point_awarded: pointAwarded,
       task_attempt_id: taskAttemptId,
       question_id: dto.questionId,
       option_id: dto.optionId,
@@ -140,7 +142,7 @@ export class TaskAnswerLogService {
         ?.filter((al) => !!al.answerLogId)
         .map((al) => al.answerLogId) || [];
 
-    // 🔹 Hapus logs yang tidak ada di request
+    // Hapus logs yang tidak ada di request
     const toDelete = existingIds.filter((id) => !incomingIds.includes(id));
     if (toDelete.length > 0) {
       await this.taskAnswerLogRepository.delete({
@@ -148,7 +150,7 @@ export class TaskAnswerLogService {
       });
     }
 
-    // 🔹 Insert / update logs baru
+    // Insert / update logs baru
     const promises = answerLogsDto.map((dto) => {
       if (!dto.optionId && !dto.answerText && !dto.imageFile) return;
 

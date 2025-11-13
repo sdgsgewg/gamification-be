@@ -4,6 +4,7 @@ type EntityName =
   | 'task-type'
   | 'task'
   | 'task-attempt'
+  | 'task-submission'
   | 'user'
   | 'class'
   | string;

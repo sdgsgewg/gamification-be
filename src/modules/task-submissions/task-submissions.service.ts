@@ -6,7 +6,10 @@ import { BaseResponseDto } from 'src/common/responses/base-response.dto';
 import { CreateTaskSubmissionDto } from './dto/requests/create-task-submission.dto';
 import { UpdateTaskSubmissionDto } from './dto/requests/update-task-submission.dto';
 import { TaskAnswerLog } from '../task-answer-logs/entities/task-answer-log.entity';
-import { TaskSubmissionStatus } from './enums/task-submission-status.enum';
+import {
+  TaskSubmissionStatus,
+  TaskSubmissionStatusLabels,
+} from './enums/task-submission-status.enum';
 import { TaskAttemptStatus } from '../task-attempts/enums/task-attempt-status.enum';
 import { TaskAttempt } from '../task-attempts/entities/task-attempt.entity';
 import { UserService } from '../users/users.service';
@@ -28,7 +31,7 @@ import {
   TaskSubmissionDetailResponseDto,
 } from './dto/responses/task-submission-detail-response.dto';
 import { TaskSubmissionWithAnswersResponseDto } from './dto/responses/task-submission-with-answers-response.dto';
-// import { TaskSubmissionDetailResponseDto } from './dto/responses/task-submission-detail-response.dto';
+import { TaskDifficultyLabels } from '../tasks/enums/task-difficulty.enum';
 
 @Injectable()
 export class TaskSubmissionService {
@@ -44,6 +47,49 @@ export class TaskSubmissionService {
     private readonly userService: UserService,
     private readonly activityLogService: ActivityLogService,
   ) {}
+
+  async findAllTaskSubmissions(
+    userId: string,
+    filterDto: FilterTaskSubmissionDto,
+  ): Promise<GroupedTaskSubmissionResponseDto[]> {
+    const qb = this.taskSubmissionRepository
+      .createQueryBuilder('ts')
+      .leftJoinAndSelect('ts.taskAttempt', 'ta')
+      .leftJoinAndSelect('ta.class', 'c')
+      .leftJoinAndSelect('ta.task', 't')
+      .leftJoinAndSelect('ta.student', 's');
+
+    // Filter berdasarkan user id
+    qb.where('c.teacher_id = :teacherId', { teacherId: userId });
+
+    // Tambahkan filter status
+    if (filterDto.status) {
+      qb.andWhere('ts.status = :status', { status: filterDto.status });
+    }
+
+    // Filter berdasarkan nama siswa
+    if (filterDto.searchText) {
+      qb.andWhere('s.name ILIKE :name', { name: `%${filterDto.searchText}%` });
+    }
+
+    // Sorting dinamis
+    const orderBy = filterDto.orderBy ?? 'ts.created_at';
+    const orderState = filterDto.orderState ?? 'ASC';
+    qb.orderBy(orderBy, orderState as 'ASC' | 'DESC');
+
+    // Eksekusi query
+    const submissions = await qb.getMany();
+
+    if (!submissions.length) {
+      throw new NotFoundException(
+        `No submission found for teacher with id ${userId}`,
+      );
+    }
+
+    const groupByGraded = filterDto.status === TaskSubmissionStatus.COMPLETED;
+
+    return this.mapAndGroupTaskSubmissions(submissions, groupByGraded);
+  }
 
   async findTaskSubmissionsInClass(
     classSlug: string,
@@ -99,9 +145,15 @@ export class TaskSubmissionService {
     const grouped = submissions.reduce(
       (acc, submission) => {
         const { title, image } = submission.taskAttempt.task;
+        const { name: className } = submission.taskAttempt.class;
         const { name: studentName } = submission.taskAttempt.student;
-        const { task_submission_id, status, created_at, finish_graded_at } =
-          submission;
+        const {
+          task_submission_id,
+          status,
+          created_at,
+          last_graded_at,
+          finish_graded_at,
+        } = submission;
 
         // Pilih tanggal berdasarkan mode grouping
         const dateValue = groupByGraded ? finish_graded_at : created_at;
@@ -119,15 +171,23 @@ export class TaskSubmissionService {
           };
         }
 
+        const gradedTime =
+          status === TaskSubmissionStatus.COMPLETED
+            ? getTime(finish_graded_at)
+            : status === TaskSubmissionStatus.ON_PROGRESS
+              ? getTime(last_graded_at)
+              : getTime(created_at);
+
         // Map langsung ke DTO kecil di sini
         acc[dateKey].submissions.push({
           id: task_submission_id,
           title,
           image: image !== '' ? image : null,
+          className,
           studentName,
           status,
           submittedTime: getTime(created_at),
-          gradedTime: finish_graded_at ? getTime(finish_graded_at) : null,
+          gradedTime,
         });
 
         return acc;
@@ -146,9 +206,38 @@ export class TaskSubmissionService {
       relations: {
         taskAttempt: {
           task: {
-            taskQuestions: true,
+            subject: true,
+            material: true,
+            taskType: true,
+            taskGrades: {
+              grade: true,
+            },
+            taskQuestions: {
+              taskQuestionOptions: true,
+            },
           },
-          taskAnswerLogs: true,
+          taskAnswerLogs: {
+            question: true,
+          },
+          student: true,
+          class: {
+            teacher: true,
+          },
+        },
+      },
+      order: {
+        taskAttempt: {
+          task: {
+            taskQuestions: {
+              order: 'ASC',
+              taskQuestionOptions: {
+                order: 'ASC',
+              },
+            },
+          },
+          taskAnswerLogs: {
+            created_at: 'ASC',
+          },
         },
       },
     });
@@ -157,6 +246,11 @@ export class TaskSubmissionService {
       throw new NotFoundException('Task submission not found');
     }
 
+    // Get student and class name
+    const { name: studentName } = submission.taskAttempt.student;
+    const { name: className } = submission.taskAttempt.class;
+
+    // Get task detail
     const {
       title,
       slug,
@@ -181,10 +275,11 @@ export class TaskSubmissionService {
         .map((tg) => tg.grade.name.replace('Kelas', ''))
         .join(', '),
       questionCount: taskQuestions.length,
-      difficulty,
+      difficulty: TaskDifficultyLabels[difficulty],
       type: taskType.name,
     };
 
+    // Get submission progress
     const reviewedQuestionCount = submission.taskAttempt.taskAnswerLogs.filter(
       (answer) => !answer.is_correct,
     ).length;
@@ -198,17 +293,18 @@ export class TaskSubmissionService {
       startGradedAt: start_graded_at ? getDateTime(start_graded_at) : null,
       lastGradedAt: last_graded_at ? getDateTime(last_graded_at) : null,
       finishGradedAt: finish_graded_at ? getDateTime(finish_graded_at) : null,
-      status: TaskSubmissionStatus[status],
+      status: TaskSubmissionStatusLabels[status],
     };
 
+    // Get submission summary
     const { score, feedback, taskAttempt } = submission;
     const { xp_gained } = taskAttempt;
     const pointGained = taskAttempt.taskAnswerLogs.reduce(
-      (acc, answer) => acc + (answer.is_correct ? answer.question.point : 0),
+      (acc, answer) => acc + (answer.point_awarded ?? 0),
       0,
     );
-    const totalPoints = submission.taskAttempt.task.taskQuestions.reduce(
-      (acc, question) => acc + question.point,
+    const totalPoints = taskAttempt.task.taskQuestions.reduce(
+      (acc, question) => acc + (question.point ?? 0),
       0,
     );
 
@@ -255,6 +351,8 @@ export class TaskSubmissionService {
 
     const response: TaskSubmissionDetailResponseDto = {
       id,
+      studentName,
+      className,
       taskDetail,
       progress,
       summary,
@@ -272,9 +370,34 @@ export class TaskSubmissionService {
       relations: {
         taskAttempt: {
           task: {
-            taskQuestions: true,
+            subject: true,
+            material: true,
+            taskType: true,
+            taskGrades: {
+              grade: true,
+            },
+            taskQuestions: {
+              taskQuestionOptions: true,
+            },
           },
-          taskAnswerLogs: true,
+          taskAnswerLogs: {
+            question: true,
+          },
+        },
+      },
+      order: {
+        taskAttempt: {
+          task: {
+            taskQuestions: {
+              order: 'ASC',
+              taskQuestionOptions: {
+                order: 'ASC',
+              },
+            },
+          },
+          taskAnswerLogs: {
+            created_at: 'ASC',
+          },
         },
       },
     });
@@ -313,6 +436,9 @@ export class TaskSubmissionService {
                 isCorrect: userAnswer.is_correct,
               }
             : null,
+          isCorrect: userAnswer?.is_correct ?? null,
+          pointAwarded: userAnswer?.point_awarded ?? null,
+          teacherNotes: userAnswer?.teacher_notes ?? null,
         };
       }) || [];
 
@@ -355,13 +481,6 @@ export class TaskSubmissionService {
     teacherId: string,
     dto: UpdateTaskSubmissionDto,
   ): Promise<BaseResponseDto> {
-    // [
-    //   'taskAttempt',
-    //   'taskAttempt.taskAnswerLogs',
-    //   'taskAttempt.student',
-    //   'taskAttempt.task',
-    // ],
-
     const submission = await this.taskSubmissionRepository.findOne({
       where: { task_submission_id: id },
       relations: {
@@ -478,7 +597,7 @@ export class TaskSubmissionService {
     return {
       status: 200,
       isSuccess: true,
-      message: 'Koreksi tugas berhasil disimpan!',
+      message: 'Submission has been saved.',
     };
   }
 }

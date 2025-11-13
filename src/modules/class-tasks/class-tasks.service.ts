@@ -830,10 +830,6 @@ export class ClassTaskService {
     teacherId: string,
     filterDto: FilterClassDto,
   ): Promise<AvailableClassesResponseDto[]> {
-    console.log('Task id: ', taskId);
-    console.log('Teacher id: ', teacherId);
-    console.log('Filter dto: ', JSON.stringify(filterDto, null, 2));
-
     const { searchText } = filterDto;
 
     // Subquery: ambil semua class_id yang sudah punya task ini

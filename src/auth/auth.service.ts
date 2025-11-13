@@ -233,12 +233,6 @@ export class AuthService {
 
     const now = new Date();
 
-    console.log('Now: ', now.toISOString());
-    console.log(
-      'Reset password expires at: ',
-      new Date(existingPasswordReset.expiresAt).toISOString(),
-    );
-
     if (new Date(existingPasswordReset.expiresAt) < now) {
       console.warn(`Token reset ${token} sudah kadaluarsa.`);
       return {

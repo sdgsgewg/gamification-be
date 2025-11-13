@@ -6,8 +6,8 @@ class UpdateAnswerLogDto {
   @IsNotEmpty()
   answerLogId: string;
 
-  @IsNotEmpty()
-  isCorrect: boolean;
+  @IsOptional()
+  isCorrect?: boolean;
 
   @IsOptional()
   pointAwarded?: number;
@@ -18,13 +18,10 @@ class UpdateAnswerLogDto {
 
 export class UpdateTaskSubmissionDto {
   @IsNotEmpty()
-  score: number; // total score
-
-  @IsNotEmpty()
   status: TaskSubmissionStatus;
 
-  @IsNotEmpty()
-  startGradedAt: Date;
+  @IsOptional()
+  startGradedAt?: Date;
 
   @IsNotEmpty()
   lastGradedAt: Date;

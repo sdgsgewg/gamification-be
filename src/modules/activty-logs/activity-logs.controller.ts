@@ -11,7 +11,6 @@ export class ActivityLogController {
   async getUserActivityLogs(@Req() req: any) {
     // Ambil userId dari request (kalau user login)
     const userId = req.user?.id || null;
-    console.log("User id: ", userId);
     return this.activityLogService.findUserActivityLogs(userId);
   }
 }

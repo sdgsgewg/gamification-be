@@ -545,8 +545,6 @@ export class ActivityService {
     });
 
     if (!attempt) {
-      console.log('No attempt found');
-
       throw new NotFoundException(
         `No attempt found for user ${userId} on task ${taskSlug}`,
       );

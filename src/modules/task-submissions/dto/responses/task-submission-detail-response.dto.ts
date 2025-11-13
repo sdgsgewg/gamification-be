@@ -56,6 +56,8 @@ export class Question {
 
 export class TaskSubmissionDetailResponseDto {
   id: string;
+  studentName: string;
+  className: string;
   taskDetail: TaskDetail;
   progress: SubmissionProgress;
   summary: SubmissionSummary;
