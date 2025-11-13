@@ -43,31 +43,28 @@
 // }
 // bootstrap();
 
-
 // --- SETUP KHUSUS UNTUK DEPLOY DI VERCEL ---
 
+import 'tsconfig-paths/register';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import { ValidationPipe } from '@nestjs/common';
 import * as cookieParser from 'cookie-parser';
-import express from 'express';
+import express, { Request, Response } from 'express';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import { json, urlencoded } from 'express';
 
 async function createApp() {
   const expressApp = express();
-  const app = await NestFactory.create(AppModule, new ExpressAdapter(expressApp));
+  const app = await NestFactory.create(
+    AppModule,
+    new ExpressAdapter(expressApp),
+  );
   const configService = app.get(ConfigService);
 
   app.setGlobalPrefix('api');
   app.use(cookieParser());
-
-  app.use((req, res, next) => {
-    res.setHeader('Cache-Control', 'no-store');
-    next();
-  });
-
   app.use(json({ limit: '10mb' }));
   app.use(urlencoded({ extended: true, limit: '10mb' }));
 
@@ -90,10 +87,9 @@ async function createApp() {
 }
 
 // Pastikan default export berupa function, bukan Promise
-const handler = async (req, res) => {
+const handler = async (req: Request, res: Response) => {
   const app = await createApp();
   return app(req, res);
 };
 
 export default handler;
-

@@ -48,7 +48,7 @@ import { CommonModule } from './common/common.module';
         database: config.get<string>('DB_NAME'),
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
         // autoLoadEntities: true,
-        synchronize: true, // ⚠️ jangan pakai di production
+        synchronize: config.get<string>('NODE_ENV') !== 'production',
       }),
     }),
     SupabaseModule,
