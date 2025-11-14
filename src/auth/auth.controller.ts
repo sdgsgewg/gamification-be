@@ -22,6 +22,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { BaseResponseDto } from 'src/common/responses/base-response.dto';
 import { DetailResponseDto } from 'src/common/responses/detail-response.dto';
 import { LoginDetailResponseDto } from './dto/responses/login-detail-response';
+import { clearRefreshTokenCookie, setRefreshTokenCookie } from 'src/common/utils/cookie.util';
 
 @Controller('/auth')
 export class AuthController {
@@ -75,23 +76,7 @@ export class AuthController {
       : this.convertExpiryToMs('1d'); // 30 hari / 1 hari
 
     // Set refresh token as HTTP-only cookie
-    // Production
-    // res.cookie('refresh_token', refreshToken, {
-    //   httpOnly: true,
-    //   secure: true,
-    //   sameSite: 'none',
-    //   path: '/',
-    //   domain: '.inspiraumkm.com',
-    // });
-
-    // Development
-    res.cookie('refresh_token', refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/',
-      maxAge: cookieMaxAge,
-    });
+    setRefreshTokenCookie(res, refreshToken, cookieMaxAge);
 
     const response: DetailResponseDto<LoginDetailResponseDto> = {
       status: 200,
@@ -209,34 +194,26 @@ export class AuthController {
   @Post('/logout')
   async logout(@Req() req: Request, @Res() res: Response) {
     const token = req.cookies['refresh_token'];
+    const isProd = process.env.NODE_ENV === 'production';
 
     if (token) {
       await this.userSessionService.deleteSession(token);
     }
 
-    // Production
-    // res.clearCookie('refresh_token', {
-    //   httpOnly: true,
-    //   secure: true,
-    //   sameSite: 'none',
-    //   path: '/',
-    //   domain: '.gamification.com',
-    // });
+    console.log("Clearing cookie...");
 
-    // Development
+    // Clear cookie
+    clearRefreshTokenCookie(res);
 
-    res.clearCookie('refresh_token', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/',
-    });
+    console.log("Cleared cookie.");
 
     const response: BaseResponseDto = {
       status: 200,
       isSuccess: true,
       message: 'Logged out',
     };
+
+    console.log("Logout response: ", JSON.stringify(response, null, 2));
 
     return response;
   }
