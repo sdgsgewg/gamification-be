@@ -1,7 +1,8 @@
 // import { NestFactory } from '@nestjs/core';
 // import { AppModule } from './app.module';
 // import { ConfigService } from '@nestjs/config';
-// import * as cookieParser from 'cookie-parser';
+// // import * as cookieParser from 'cookie-parser';
+// import cookieParser from 'cookie-parser';
 // import { ValidationPipe } from '@nestjs/common';
 // import { json, urlencoded } from 'express';
 
@@ -49,7 +50,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import { ValidationPipe } from '@nestjs/common';
-import * as cookieParser from 'cookie-parser';
+import cookieParser from 'cookie-parser';
 import express, { Request, Response } from 'express';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import { json, urlencoded } from 'express';

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import * as dayjs from 'dayjs';
+// import * as dayjs from 'dayjs';
+import dayjs from 'dayjs';
 import { SupabaseService } from 'src/integrations/supabase/supabase.service';
 
 @Injectable()
