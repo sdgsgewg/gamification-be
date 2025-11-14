@@ -2,7 +2,7 @@
   "version": 2,
   "functions": {
     "api/nest.js": {
-      "runtime": "nodejs18.x",
+      "runtime": "@vercel/node",
       "memory": 1024
     }
   },
