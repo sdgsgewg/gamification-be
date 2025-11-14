@@ -63,7 +63,7 @@ async function createApp() {
   );
   const configService = app.get(ConfigService);
 
-  app.setGlobalPrefix('api');
+  // app.setGlobalPrefix('api');
   app.use(cookieParser());
   app.use(json({ limit: '10mb' }));
   app.use(urlencoded({ extended: true, limit: '10mb' }));
