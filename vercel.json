@@ -1,6 +1,10 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
+  "functions": {
+    "api/nest.js": {
+      "runtime": "nodejs18.x",
+      "memory": 1024
+    }
+  },
   "routes": [{ "src": "/(.*)", "dest": "api/nest.js" }]
 }

@@ -5,10 +5,9 @@
   "author": "",
   "private": true,
   "license": "UNLICENSED",
-  "type": "module",
   "scripts": {
     "prebuild": "rimraf dist",
-    "postbuild": "cp -r dist api/dist",
+    "postbuild": "cp -r dist api/",
     "build": "nest build && echo \"✅ NestJS build complete.\"",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",

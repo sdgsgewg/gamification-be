@@ -91,4 +91,4 @@ const handler = async (req: Request, res: Response) => {
   return app(req, res);
 };
 
-export default handler;
+module.exports = handler;
