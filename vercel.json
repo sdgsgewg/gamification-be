@@ -1,7 +1,5 @@
 {
   "version": 2,
-  "functions": {
-    "api/nest.js": {}
-  },
+  "buildCommand": "npm run build",
   "routes": [{ "src": "/(.*)", "dest": "api/nest.js" }]
 }
