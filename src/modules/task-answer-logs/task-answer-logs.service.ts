@@ -21,6 +21,27 @@ export class TaskAnswerLogService {
     private readonly fileUploadService: FileUploadService,
   ) {}
 
+  // ===============================
+  // FIND ALL LOGS BY ATTEMPT ID
+  // ===============================
+  async findAllByAttemptId(taskAttemptId: string): Promise<TaskAnswerLog[]> {
+    return this.taskAnswerLogRepository.find({
+      where: { task_attempt_id: taskAttemptId },
+      relations: {
+        question: true,
+        option: true,
+      },
+      order: {
+        question: {
+          order: 'ASC',
+          taskQuestionOptions: {
+            order: 'ASC',
+          },
+        },
+      },
+    });
+  }
+
   // Helper: upload gambar jika ada
   private async handleImageUpload(
     imageFile: Express.Multer.File | undefined,
@@ -74,7 +95,11 @@ export class TaskAnswerLogService {
     const questionType = question.type as QuestionType;
 
     const isCorrect = await this.resolveIsCorrect(questionType, dto.optionId);
-    const pointAwarded = [QuestionType.FILL_BLANK, QuestionType.ESSAY].includes(question.type as QuestionType) ? null : question.point;
+    const pointAwarded = [QuestionType.FILL_BLANK, QuestionType.ESSAY].includes(
+      question.type as QuestionType,
+    )
+      ? null
+      : question.point;
 
     let imageUrl = existingLog?.image || '';
 

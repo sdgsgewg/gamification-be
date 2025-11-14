@@ -1,9 +1,31 @@
 import { TaskAttemptStatus } from 'src/modules/task-attempts/enums/task-attempt-status.enum';
 
+export class TaskDetail {
+  title: string;
+  slug: string;
+  description?: string;
+  image?: string;
+  subject: { id: string; name: string };
+  material?: { id: string; name: string };
+  grade: string;
+  questionCount: number;
+  difficulty: string;
+  createdBy: string;
+  type: TaskType;
+}
+
 export class TaskType {
   id: string;
   name: string;
   isRepeatable: boolean;
+}
+
+export class SubmissionSummary {
+  pointGained: number;
+  totalPoints: number;
+  score: number;
+  xpGained: number;
+  feedback: string;
 }
 
 export class CurrentAttempt {
@@ -19,13 +41,6 @@ export class RecentAttempt {
   submittedAt?: string;
   completedAt?: string;
   status?: TaskAttemptStatus;
-}
-
-export class TaskAttemptStats {
-  pointGained: number;
-  totalPoints: number;
-  xpGained: number;
-  score: number;
 }
 
 export class TaskDuration {
@@ -60,31 +75,14 @@ export class Question {
   userAnswer?: AnswerLog;
 }
 
-export class TaskSubmission {
-  score: number;
-  feedback: string;
-  status: string;
-  gradedBy: string;
-  gradedAt: string;
-}
-
 export class ClassTaskDetailResponseDto {
   id: string;
-  title: string;
-  slug: string;
-  description?: string;
-  image?: string;
-  subject: { id: string; name: string };
-  material?: { id: string; name: string };
-  grade: string;
-  questionCount: number;
-  difficulty: string;
-  createdBy: string;
-  type: TaskType;
+  teacherName: string;
+  className: string;
+  taskDetail: TaskDetail;
+  summary?: SubmissionSummary;
   currAttempt?: CurrentAttempt;
   recentAttempt?: RecentAttempt;
-  stats?: TaskAttemptStats;
   duration?: TaskDuration;
   questions?: Question[];
-  submission?: TaskSubmission;
 }

@@ -279,6 +279,26 @@ export class TaskSubmissionService {
       type: taskType.name,
     };
 
+    // Get submission summary
+    const { score, feedback, taskAttempt } = submission;
+    const { xp_gained } = taskAttempt;
+    const pointGained = taskAttempt.taskAnswerLogs.reduce(
+      (acc, answer) => acc + (answer.point_awarded ?? 0),
+      0,
+    );
+    const totalPoints = taskAttempt.task.taskQuestions.reduce(
+      (acc, question) => acc + (question.point ?? 0),
+      0,
+    );
+
+    const summary: SubmissionSummary = {
+      pointGained,
+      totalPoints,
+      score,
+      xpGained: xp_gained,
+      feedback,
+    };
+
     // Get submission progress
     const reviewedQuestionCount = submission.taskAttempt.taskAnswerLogs.filter(
       (answer) => !answer.is_correct,
@@ -296,25 +316,7 @@ export class TaskSubmissionService {
       status: TaskSubmissionStatusLabels[status],
     };
 
-    // Get submission summary
-    const { score, feedback, taskAttempt } = submission;
-    const { xp_gained } = taskAttempt;
-    const pointGained = taskAttempt.taskAnswerLogs.reduce(
-      (acc, answer) => acc + (answer.point_awarded ?? 0),
-      0,
-    );
-    const totalPoints = taskAttempt.task.taskQuestions.reduce(
-      (acc, question) => acc + (question.point ?? 0),
-      0,
-    );
-
-    const summary: SubmissionSummary = {
-      score,
-      feedback,
-      pointGained,
-      totalPoints,
-      xpGained: xp_gained,
-    };
+    // Get submission questions
 
     const { task, taskAnswerLogs } = submission.taskAttempt;
 
@@ -354,8 +356,8 @@ export class TaskSubmissionService {
       studentName,
       className,
       taskDetail,
-      progress,
       summary,
+      progress,
       questions,
     };
 
@@ -434,6 +436,8 @@ export class TaskSubmissionService {
                 image: userAnswer.image,
                 optionId: userAnswer.option_id,
                 isCorrect: userAnswer.is_correct,
+                pointAwarded: userAnswer?.point_awarded ?? null,
+                teacherNotes: userAnswer?.teacher_notes ?? null,
               }
             : null,
           isCorrect: userAnswer?.is_correct ?? null,
@@ -520,7 +524,6 @@ export class TaskSubmissionService {
       const { points, xpGained } = await TaskXpHelper.calculatePointsAndXp(
         taskAttempt.task,
         updatedLogs,
-        this.taskQuestionOptionRepository,
       );
 
       // Total poin maksimal dari seluruh pertanyaan
@@ -538,6 +541,7 @@ export class TaskSubmissionService {
       submission.status = TaskSubmissionStatus.COMPLETED;
       submission.last_graded_at = dto.lastGradedAt;
       submission.finish_graded_at = new Date();
+      submission.feedback = dto.feedback ?? null;
 
       // Update TaskAttempt jadi COMPLETED
       taskAttempt.points = points;
@@ -580,8 +584,6 @@ export class TaskSubmissionService {
         metadata: savedTaskSubmission,
       });
     } else {
-      // Update submission summary
-      submission.feedback = dto.feedback ?? null;
       submission.status = TaskSubmissionStatus.ON_PROGRESS;
       submission.graded_by = teacherId;
 

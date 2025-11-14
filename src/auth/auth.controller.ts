@@ -194,26 +194,19 @@ export class AuthController {
   @Post('/logout')
   async logout(@Req() req: Request, @Res() res: Response) {
     const token = req.cookies['refresh_token'];
-    const isProd = process.env.NODE_ENV === 'production';
 
     if (token) {
       await this.userSessionService.deleteSession(token);
     }
 
-    console.log("Clearing cookie...");
-
     // Clear cookie
     clearRefreshTokenCookie(res);
-
-    console.log("Cleared cookie.");
 
     const response: BaseResponseDto = {
       status: 200,
       isSuccess: true,
       message: 'Logged out',
     };
-
-    console.log("Logout response: ", JSON.stringify(response, null, 2));
 
     return response;
   }

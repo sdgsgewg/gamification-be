@@ -447,6 +447,7 @@ export class ClassTaskService {
     currAttemptMeta: CurrentAttempt,
     recentAttempt: TaskAttempt | null,
   ): ClassTaskDetailResponseDto {
+    const task = classTask.task;
     const {
       task_id,
       title,
@@ -462,15 +463,7 @@ export class ClassTaskService {
       start_time,
       end_time,
       created_by,
-    } = classTask.task;
-
-    // const score = Math.round((points / totalPoints) * 100);
-
-    const type: TaskType = {
-      id: taskType.task_type_id,
-      name: taskType.name,
-      isRepeatable: taskType.is_repeatable,
-    };
+    } = task;
 
     const currAttempt: CurrentAttempt | null =
       currAttemptMeta?.status === TaskAttemptStatus.ON_PROGRESS
@@ -483,27 +476,64 @@ export class ClassTaskService {
       duration: getTimePeriod(start_time, end_time),
     };
 
+    // ===========================
+    //  BUILD RESPONSE
+    // ===========================
     return {
       id: task_id,
-      title,
-      slug,
-      description: description ?? null,
-      image: image ?? null,
-      subject: subject ? { id: subject.subject_id, name: subject.name } : null,
-      material: material
-        ? { id: material.material_id, name: material.name }
-        : null,
-      grade:
-        taskGrades?.length > 0
-          ? taskGrades
-              .map((tg) => tg.grade?.name.replace('Kelas ', ''))
-              .join(', ')
+      teacherName: classTask.class.teacher?.name ?? 'Unknown',
+      className: classTask.class.name,
+      taskDetail: {
+        title,
+        slug,
+        description: description ?? null,
+        image: image ?? null,
+        subject: subject
+          ? { id: subject.subject_id, name: subject.name }
           : null,
-      difficulty: TaskDifficultyLabels[difficulty] ?? 'Unknown',
-      questionCount: taskQuestions?.length || 0,
-      createdBy: created_by || 'Unknown',
-      type,
-      currAttempt,
+        material: material
+          ? { id: material.material_id, name: material.name }
+          : null,
+        grade:
+          taskGrades?.length > 0
+            ? taskGrades
+                .map((g) => g.grade?.name?.replace('Kelas ', ''))
+                .join(', ')
+            : null,
+        difficulty: TaskDifficultyLabels[difficulty] ?? 'Unknown',
+        questionCount: taskQuestions?.length || 0,
+        createdBy: created_by ?? 'Unknown',
+        type: {
+          id: taskType.task_type_id,
+          name: taskType.name,
+          isRepeatable: taskType.is_repeatable,
+        },
+      },
+
+      // ===========================
+      //  SUMMARY (ONLY IF SUBMITTED)
+      // ===========================
+      summary: recentAttempt?.taskSubmission
+        ? {
+            pointGained: recentAttempt.points ?? 0,
+            totalPoints: taskQuestions.reduce(
+              (sum, q) => sum + (q.point ?? 0),
+              0,
+            ),
+            score: recentAttempt.taskSubmission.score ?? null,
+            xpGained: recentAttempt.xp_gained ?? 0,
+            feedback: recentAttempt.taskSubmission.feedback ?? null,
+          }
+        : null,
+
+      // ===========================
+      //  CURRENT ATTEMPT
+      // ===========================
+      currAttempt: currAttempt ?? null,
+
+      // ===========================
+      //  RECENT ATTEMPT
+      // ===========================
       recentAttempt: recentAttempt
         ? {
             startedAt: getDateTime(recentAttempt.started_at),
@@ -515,22 +545,18 @@ export class ClassTaskService {
             status: recentAttempt.status as TaskAttemptStatus,
           }
         : null,
-      stats:
-        recentAttempt && recentAttempt.taskSubmission
-          ? {
-              pointGained: recentAttempt.points,
-              xpGained: recentAttempt.xp_gained,
-              totalPoints: taskQuestions.reduce(
-                (acc, question) => acc + (question.point ?? 0),
-                0,
-              ),
-              score: recentAttempt.taskSubmission?.score ?? null,
-            }
-          : null,
+
+      // ===========================
+      //  DURATION
+      // ===========================
       duration,
+
+      // ===========================
+      //  QUESTIONS + USER ANSWERS
+      // ===========================
       questions:
-        recentAttempt && recentAttempt.taskSubmission
-          ? recentAttempt.task.taskQuestions.map((q) => {
+        recentAttempt && recentAttempt.taskAnswerLogs
+          ? taskQuestions.map((q) => {
               const userAnswer = recentAttempt.taskAnswerLogs.find(
                 (log) => log.question_id === q.task_question_id,
               );
@@ -561,19 +587,6 @@ export class ClassTaskService {
               };
             })
           : [],
-      submission: recentAttempt?.taskSubmission
-        ? {
-            score: recentAttempt.taskSubmission.score,
-            feedback: recentAttempt.taskSubmission.feedback,
-            status: recentAttempt.taskSubmission.status,
-            gradedBy: recentAttempt.taskSubmission.graded_by
-              ? (recentAttempt.taskSubmission.grader?.name ?? null)
-              : null,
-            gradedAt: recentAttempt.taskSubmission.finish_graded_at
-              ? getDateTime(recentAttempt.taskSubmission.finish_graded_at)
-              : null,
-          }
-        : null,
     };
   }
 

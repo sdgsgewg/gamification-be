@@ -7,5 +7,6 @@ export class TaskAttemptOverviewResponseDto {
   taskSlug?: string;
   deadline: string;
   lastAccessedTime: string;
+  submittedTime?: string;
   completedTime?: string;
 }

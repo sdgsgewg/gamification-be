@@ -11,6 +11,14 @@ export class TaskDetail {
   type: string;
 }
 
+export class SubmissionSummary {
+  pointGained: number;
+  totalPoints: number;
+  score: number;
+  xpGained: number;
+  feedback: string;
+}
+
 export class SubmissionProgress {
   reviewedQuestionCount: number;
   totalQuestionCount: number;
@@ -18,14 +26,6 @@ export class SubmissionProgress {
   lastGradedAt?: string;
   finishGradedAt?: string;
   status: string;
-}
-
-export class SubmissionSummary {
-  score: number;
-  feedback: string;
-  pointGained: number;
-  totalPoints: number;
-  xpGained: number;
 }
 
 export class AnswerLog {
@@ -59,7 +59,7 @@ export class TaskSubmissionDetailResponseDto {
   studentName: string;
   className: string;
   taskDetail: TaskDetail;
-  progress: SubmissionProgress;
   summary: SubmissionSummary;
+  progress: SubmissionProgress;
   questions?: Question[];
 }

@@ -4,6 +4,8 @@ export class AnswerLog {
   image: string | null;
   optionId: string | null;
   isCorrect: boolean | null;
+  pointAwarded?: number | null;
+  teacherNotes?: string | null;
 }
 
 export class QuestionOption {
@@ -22,9 +24,6 @@ export class Question {
   image?: string;
   options?: QuestionOption[];
   userAnswer?: AnswerLog;
-  isCorrect?: boolean | null;
-  pointAwarded?: number | null;
-  teacherNotes?: string | null;
 }
 
 export class TaskSubmissionWithAnswersResponseDto {
