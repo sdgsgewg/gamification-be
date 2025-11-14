@@ -1,10 +1,7 @@
 {
   "version": 2,
   "functions": {
-    "api/nest.js": {
-      "runtime": "@vercel/node",
-      "memory": 1024
-    }
+    "api/nest.js": {}
   },
   "routes": [{ "src": "/(.*)", "dest": "api/nest.js" }]
 }
