@@ -1,3 +1,20 @@
+import { TaskStatus } from '../../enums/task-status.enum';
+
+export class TaskDetail {
+  title: string;
+  slug: string;
+  description?: string;
+  image?: string;
+  subject: { subjectId: string; name: string };
+  material?: { materialId: string; name: string };
+  taskType: { taskTypeId: string; name: string };
+  taskGradeIds: string[];
+  taskGrade: string;
+  questionCount: number;
+  difficulty: string;
+  status: TaskStatus;
+}
+
 export class AssignedClassInfo {
   id: string;
   name: string;
@@ -16,6 +33,8 @@ export class TaskDuration {
 
 export class TaskHistory {
   createdBy: string;
+  publishedAt?: string;
+  finalizedAt?: string;
   updatedBy?: string;
 }
 
@@ -36,18 +55,8 @@ export class TaskQuestion {
 }
 
 export class TaskDetailResponseDto {
-  taskId: string;
-  title: string;
-  slug: string;
-  description?: string;
-  image?: string;
-  subject: { subjectId: string; name: string };
-  material?: { materialId: string; name: string };
-  taskType: { taskTypeId: string; name: string };
-  taskGradeIds: string[];
-  taskGrade: string;
-  questionCount: number;
-  difficulty: string;
+  id: string;
+  taskDetail: TaskDetail;
   assignedClasses?: AssignedClassInfo[];
   duration?: TaskDuration;
   history: TaskHistory;

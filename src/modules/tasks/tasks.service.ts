@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Task } from './entities/task.entity';
@@ -26,6 +30,7 @@ import { MasterHistoryTransactionType } from '../master-history/enums/master-his
 import { getMasterHistoryDescription } from 'src/common/utils/get-master-history-description.util';
 import { ClassTask } from '../class-tasks/entities/class-task.entity';
 import { getResponseMessage } from 'src/common/utils/get-response-message.util';
+import { TaskStatus } from './enums/task-status.enum';
 
 @Injectable()
 export class TaskService {
@@ -54,6 +59,8 @@ export class TaskService {
         'task.task_id AS "taskId"',
         'task.title AS "title"',
         'task.slug AS "slug"',
+        'task.is_published::boolean AS "isPublished"',
+        'task.is_finalized::boolean AS "isFinalized"',
         'task.difficulty AS "difficulty"',
         'taskType.name AS "taskType"',
         'subject.name AS "subject"',
@@ -72,110 +79,122 @@ export class TaskService {
       }, 'assignedClassCount')
       .groupBy('task.task_id')
       .addGroupBy('task.title')
+      .addGroupBy('task.difficulty')
       .addGroupBy('taskType.name')
       .addGroupBy('subject.name')
       .addGroupBy('material.name');
 
-    // filter
+    // Filter
     if (filterDto.searchText) {
       qb.andWhere('task.title ILIKE :searchText', {
         searchText: `%${filterDto.searchText}%`,
       });
     }
-
     if (filterDto.subjectId) {
       qb.andWhere('task.subject_id = :subjectId', {
         subjectId: filterDto.subjectId,
       });
     }
-
     if (filterDto.materialId) {
       qb.andWhere('task.material_id = :materialId', {
         materialId: filterDto.materialId,
       });
     }
-
     if (filterDto.taskTypeId) {
       qb.andWhere('task.task_type_id = :taskTypeId', {
         taskTypeId: filterDto.taskTypeId,
       });
     }
-
-    if (filterDto.gradeIds && filterDto.gradeIds.length > 0) {
+    if (filterDto.gradeIds?.length) {
       qb.andWhere('taskGrade.grade_id IN (:...gradeIds)', {
         gradeIds: filterDto.gradeIds,
       });
     }
-
     if (filterDto.creatorId) {
       qb.andWhere('task.creator_id = :creatorId', {
         creatorId: filterDto.creatorId,
       });
     }
 
-    // order by
+    // Order by
     const orderBy = filterDto.orderBy ?? 'createdAt';
     const orderState = filterDto.orderState ?? 'DESC';
-
-    // otomatis mapping property → nama kolom DB, fallback ke created_at
     const dbColumn = getDbColumn(Task, orderBy as keyof Task);
-
     qb.orderBy(`task.${dbColumn}`, orderState);
 
     const rawTasks = await qb.getRawMany();
 
-    const taskOverviews: TaskOverviewResponseDto[] = rawTasks.map((t) => ({
-      taskId: t.taskId,
-      title: t.title,
-      slug: t.slug,
-      taskType: t.taskType,
-      subject: t.subject,
-      material: t.material,
-      taskGrade: t.taskGrade || null,
-      questionCount: Number(t.questionCount) ?? 0,
-      difficulty: TaskDifficultyLabels[t.difficulty],
-      assignedClassCount: Number(t.assignedClassCount) ?? 0,
-    }));
+    const taskOverviews: TaskOverviewResponseDto[] = rawTasks.map((t) => {
+      // pastikan boolean
+      const isFinalized = t.isFinalized === true || t.isFinalized === 'true';
+      const isPublished = t.isPublished === true || t.isPublished === 'true';
+
+      return {
+        taskId: t.taskId,
+        title: t.title,
+        slug: t.slug,
+        taskType: t.taskType,
+        subject: t.subject,
+        material: t.material,
+        taskGrade: t.taskGrade || null,
+        questionCount: Number(t.questionCount) || 0,
+        difficulty: TaskDifficultyLabels[t.difficulty],
+        assignedClassCount: Number(t.assignedClassCount) || 0,
+        status: isFinalized
+          ? TaskStatus.FINALIZED
+          : isPublished
+            ? TaskStatus.PUBLISHED
+            : TaskStatus.DRAFT,
+      };
+    });
 
     return taskOverviews;
   }
 
   private getTaskDetailData(taskWithRelations: Task): TaskDetailResponseDto {
     const data: TaskDetailResponseDto = {
-      taskId: taskWithRelations.task_id,
-      title: taskWithRelations.title,
-      slug: taskWithRelations.slug,
-      description: taskWithRelations.description ?? null,
-      image: taskWithRelations.image ?? null,
-      subject: taskWithRelations.subject
-        ? {
-            subjectId: taskWithRelations.subject.subject_id,
-            name: taskWithRelations.subject.name,
-          }
-        : null,
-      material: taskWithRelations.material
-        ? {
-            materialId: taskWithRelations.material.material_id,
-            name: taskWithRelations.material.name,
-          }
-        : null,
-      taskType: taskWithRelations.taskType
-        ? {
-            taskTypeId: taskWithRelations.taskType.task_type_id,
-            name: taskWithRelations.taskType.name,
-          }
-        : null,
-      taskGradeIds: taskWithRelations.taskGrades
-        ? taskWithRelations.taskGrades.map((tg) => tg.grade_id)
-        : [],
-      taskGrade:
-        taskWithRelations.taskGrades && taskWithRelations.taskGrades.length > 0
-          ? taskWithRelations.taskGrades
-              .map((tg) => tg.grade.name.replace('Kelas ', ''))
-              .join(', ')
+      id: taskWithRelations.task_id,
+      taskDetail: {
+        title: taskWithRelations.title,
+        slug: taskWithRelations.slug,
+        description: taskWithRelations.description ?? null,
+        image: taskWithRelations.image ?? null,
+        subject: taskWithRelations.subject
+          ? {
+              subjectId: taskWithRelations.subject.subject_id,
+              name: taskWithRelations.subject.name,
+            }
           : null,
-      questionCount: taskWithRelations.taskQuestions.length,
-      difficulty: TaskDifficultyLabels[taskWithRelations.difficulty],
+        material: taskWithRelations.material
+          ? {
+              materialId: taskWithRelations.material.material_id,
+              name: taskWithRelations.material.name,
+            }
+          : null,
+        taskType: taskWithRelations.taskType
+          ? {
+              taskTypeId: taskWithRelations.taskType.task_type_id,
+              name: taskWithRelations.taskType.name,
+            }
+          : null,
+        taskGradeIds: taskWithRelations.taskGrades
+          ? taskWithRelations.taskGrades.map((tg) => tg.grade_id)
+          : [],
+        taskGrade:
+          taskWithRelations.taskGrades &&
+          taskWithRelations.taskGrades.length > 0
+            ? taskWithRelations.taskGrades
+                .map((tg) => tg.grade.name.replace('Kelas ', ''))
+                .join(', ')
+            : null,
+        questionCount: taskWithRelations.taskQuestions.length,
+        difficulty: TaskDifficultyLabels[taskWithRelations.difficulty],
+        status: taskWithRelations.is_finalized
+          ? TaskStatus.FINALIZED
+          : taskWithRelations.is_published
+            ? TaskStatus.PUBLISHED
+            : TaskStatus.DRAFT,
+      },
       duration: {
         startTime: taskWithRelations.start_time ?? null,
         endTime: taskWithRelations.end_time ?? null,
@@ -188,6 +207,12 @@ export class TaskService {
         createdBy: `${getDateTimeWithName(taskWithRelations.created_at, taskWithRelations.created_by)}`,
         updatedBy: taskWithRelations.updated_by
           ? `${getDateTimeWithName(taskWithRelations.updated_at, taskWithRelations.updated_by)}`
+          : null,
+        publishedAt: taskWithRelations.published_at
+          ? getDateTime(taskWithRelations.published_at)
+          : null,
+        finalizedAt: taskWithRelations.finalized_at
+          ? getDateTime(taskWithRelations.finalized_at)
           : null,
       },
       questions:
@@ -406,11 +431,10 @@ export class TaskService {
   }
 
   private async findTaskOrThrow(id: string) {
-    const qb = this.taskRepository
-      .createQueryBuilder('task')
-      .where('task.task_id = :id', { id });
-
-    const task = await qb.getOne();
+    const task = await this.taskRepository.findOne({
+      where: { task_id: id },
+      relations: ['creator'],
+    });
 
     if (!task) {
       throw new NotFoundException(`Task with id ${id} not found`);
@@ -452,6 +476,9 @@ export class TaskService {
     imageFile?: Express.Multer.File,
   ): Promise<DetailResponseDto<TaskDetailResponseDto>> {
     const existingTask = await this.findTaskOrThrow(id);
+
+    if (existingTask.is_finalized)
+      throw new BadRequestException('Finalized task cannot be edited.');
 
     let imageUrl = existingTask.image;
 
@@ -595,6 +622,145 @@ export class TaskService {
       message: getResponseMessage({
         entity: 'task',
         action: 'delete',
+      }),
+    };
+
+    return response;
+  }
+
+  async publishTask(id: string, userId: string) {
+    const existingTask = await this.findTaskOrThrow(id);
+
+    if (existingTask.is_finalized)
+      throw new BadRequestException(
+        'Task has been finalized and cannot be republished.',
+      );
+
+    if (existingTask.is_published)
+      throw new BadRequestException('Task is already published.');
+
+    existingTask.is_published = true;
+    existingTask.published_at = new Date();
+    existingTask.updated_at = new Date();
+    existingTask.updated_by = existingTask.creator.name;
+
+    const updatedTask = await this.taskRepository.save(existingTask);
+
+    // Add event to master history
+    await this.masterHistoryService.createMasterHistory({
+      tableName: 'tasks',
+      pkName: 'task_id',
+      pkValue: updatedTask.task_id,
+      transactionType: MasterHistoryTransactionType.PUBLISH,
+      description: getMasterHistoryDescription(
+        MasterHistoryTransactionType.PUBLISH,
+        'task',
+        existingTask,
+        undefined,
+      ),
+      dataBefore: existingTask,
+      dataAfter: updatedTask,
+      createdBy: userId,
+    });
+
+    const response: BaseResponseDto = {
+      status: 200,
+      isSuccess: true,
+      message: getResponseMessage({
+        entity: 'task',
+        action: 'publish',
+      }),
+    };
+
+    return response;
+  }
+
+  async unpublishTask(id: string, userId: string) {
+    const existingTask = await this.findTaskOrThrow(id);
+
+    if (!existingTask.is_published)
+      throw new BadRequestException('Task is not published.');
+
+    if (existingTask.is_finalized)
+      throw new BadRequestException('Finalized tasks cannot be unpublished.');
+
+    existingTask.is_published = false;
+    existingTask.published_at = null;
+    existingTask.updated_at = new Date();
+    existingTask.updated_by = existingTask.creator.name;
+
+    const updatedTask = await this.taskRepository.save(existingTask);
+
+    // Add event to master history
+    await this.masterHistoryService.createMasterHistory({
+      tableName: 'tasks',
+      pkName: 'task_id',
+      pkValue: updatedTask.task_id,
+      transactionType: MasterHistoryTransactionType.UNPUBLISH,
+      description: getMasterHistoryDescription(
+        MasterHistoryTransactionType.UNPUBLISH,
+        'task',
+        existingTask,
+        undefined,
+      ),
+      dataBefore: existingTask,
+      dataAfter: updatedTask,
+      createdBy: userId,
+    });
+
+    const response: BaseResponseDto = {
+      status: 200,
+      isSuccess: true,
+      message: getResponseMessage({
+        entity: 'task',
+        action: 'unpublish',
+      }),
+    };
+
+    return response;
+  }
+
+  async finalizeTask(id: string, userId: string) {
+    const existingTask = await this.findTaskOrThrow(id);
+
+    if (!existingTask.is_published)
+      throw new BadRequestException(
+        'Task must be published before finalization.',
+      );
+
+    if (existingTask.is_finalized)
+      throw new BadRequestException('Task is already finalized.');
+
+    existingTask.is_finalized = true;
+    existingTask.finalized_at = new Date();
+    existingTask.updated_at = new Date();
+    existingTask.updated_by = existingTask.creator.name;
+
+    const updatedTask = await this.taskRepository.save(existingTask);
+
+    // Add event to master history
+    await this.masterHistoryService.createMasterHistory({
+      tableName: 'tasks',
+      pkName: 'task_id',
+      pkValue: updatedTask.task_id,
+      transactionType: MasterHistoryTransactionType.FINALIZE,
+      description: getMasterHistoryDescription(
+        MasterHistoryTransactionType.FINALIZE,
+        'task',
+        existingTask,
+        undefined,
+      ),
+      dataBefore: existingTask,
+      dataAfter: updatedTask,
+      createdBy: userId,
+    });
+
+    const response: BaseResponseDto = {
+      status: 200,
+      isSuccess: true,
+      message: getResponseMessage({
+        entity: 'task',
+        action: 'finalize',
       }),
     };
 

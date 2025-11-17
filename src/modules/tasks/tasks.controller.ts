@@ -121,4 +121,26 @@ export class TaskController {
     const userId = req.user?.id || null;
     return this.taskService.deleteTask(id, userId);
   }
+
+  // ======================
+  // STATUS MANAGEMENT
+  // ======================
+
+  @Put(':id/publish')
+  @UseGuards(OptionalJwtAuthGuard)
+  async publishTask(@Param('id') id: string, @Req() req: any) {
+    return this.taskService.publishTask(id, req.user?.id || null);
+  }
+
+  @Put(':id/unpublish')
+  @UseGuards(OptionalJwtAuthGuard)
+  async unpublishTask(@Param('id') id: string, @Req() req: any) {
+    return this.taskService.unpublishTask(id, req.user?.id || null);
+  }
+
+  @Put(':id/finalize')
+  @UseGuards(OptionalJwtAuthGuard)
+  async finalizeTask(@Param('id') id: string, @Req() req: any) {
+    return this.taskService.finalizeTask(id, req.user?.id || null);
+  }
 }

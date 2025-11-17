@@ -9,4 +9,5 @@ export class TaskOverviewResponseDto {
   questionCount: number;
   difficulty: string;
   assignedClassCount: number;
+  status: string;
 }

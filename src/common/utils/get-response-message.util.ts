@@ -12,6 +12,9 @@ type ActionType =
   | 'create'
   | 'update'
   | 'delete'
+  | 'publish'
+  | 'unpublish'
+  | 'finalize'
   | 'fetch'
   | 'assign'
   | 'unassign';
@@ -37,6 +40,9 @@ export function getResponseMessage({
       create: `${entityName} created successfully.`,
       update: `${entityName} updated successfully.`,
       delete: `${entityName} deleted successfully.`,
+      publish: `${entityName} published successfully.`,
+      unpublish: `${entityName} unpublished successfully.`,
+      finalize: `${entityName} finalized successfully.`,
       fetch: `${entityName} fetched successfully.`,
       assign: `${entityName} assigned successfully.`,
       unassign: `${entityName} unassigned successfully.`,

@@ -24,6 +24,15 @@ export function getMasterHistoryDescription(
     case MasterHistoryTransactionType.DELETE:
       return `You deleted the ${entityName} "${oldData?.name || oldData?.title || 'item'}".`;
 
+    case MasterHistoryTransactionType.PUBLISH:
+      return `You published the ${entityName} "${oldData?.name || oldData?.title || 'item'}".`;
+
+    case MasterHistoryTransactionType.UNPUBLISH:
+      return `You unpublished the ${entityName} "${oldData?.name || oldData?.title || 'item'}".`;
+
+    case MasterHistoryTransactionType.FINALIZE:
+      return `You finalized the ${entityName} "${oldData?.name || oldData?.title || 'item'}".`;
+
     default:
       return `You performed an action on ${entityName}.`;
   }

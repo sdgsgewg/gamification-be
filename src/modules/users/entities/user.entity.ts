@@ -6,6 +6,7 @@ import { PasswordReset } from 'src/modules/password_resets/entities/password-res
 import { Role } from 'src/modules/roles/entities/role.entity';
 import { TaskAttempt } from 'src/modules/task-attempts/entities/task-attempt.entity';
 import { TaskSubmission } from 'src/modules/task-submissions/entities/task-submission.entity';
+import { Task } from 'src/modules/tasks/entities/task.entity';
 import { UserSession } from 'src/modules/user-sessions/entities/user-sessions.entity';
 import {
   Entity,
@@ -82,6 +83,9 @@ export class User {
 
   @OneToMany(() => ClassStudent, (cs) => cs.student)
   classStudents: ClassStudent[];
+
+  @OneToMany(() => Task, (t) => t.creator)
+  tasks: Task[];
 
   @OneToMany(() => TaskAttempt, (ta) => ta.student)
   taskAttempts: TaskAttempt[];
