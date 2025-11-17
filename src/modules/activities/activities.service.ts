@@ -48,6 +48,8 @@ export class ActivityService {
       userId,
     } = filterDto;
 
+    // const now = new Date();
+
     const qb = this.taskRepository
       .createQueryBuilder('task')
       .leftJoin('task.subject', 'subject')
@@ -72,6 +74,10 @@ export class ActivityService {
       .where('taskType.scope IN (:...scopes)', {
         scopes: [TaskTypeScope.ACTIVITY, TaskTypeScope.GLOBAL],
       })
+      .andWhere('task.is_published = :isPublished', { isPublished: true })
+      .andWhere('task.is_finalized = :isFinalized', { isFinalized: false })
+      // .andWhere('task.start_time <= :now', { now })
+      // .andWhere('task.end_time >= :now', { now })
       .groupBy('task.task_id')
       .addGroupBy('taskType.name')
       .addGroupBy('subject.name');
