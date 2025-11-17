@@ -1,3 +1,5 @@
+import { TaskAttemptStatus } from 'src/modules/task-attempts/enums/task-attempt-status.enum';
+
 export class StudentClassTaskResponseDto {
   title: string;
   slug: string;
@@ -5,5 +7,7 @@ export class StudentClassTaskResponseDto {
   type: string;
   subject: string;
   questionCount: number;
+  answeredCount: number;
   deadline?: string;
+  status: TaskAttemptStatus;
 }

@@ -70,6 +70,8 @@ export class TaskAttemptService {
       throw new NotFoundException(`No user with id ${userId}`);
     }
 
+    console.log("Filter DTO:", filterDto);
+
     const where: any = {
       student_id: userId,
     };
@@ -116,7 +118,7 @@ export class TaskAttemptService {
       },
     });
 
-    if (!attempts.length) {
+    if (attempts.length === 0) {
       throw new NotFoundException(
         `No attempt found for user with id ${userId}`,
       );
@@ -156,7 +158,6 @@ export class TaskAttemptService {
   ): GroupedTaskAttemptResponseDto[] {
     const grouped = attempts.reduce(
       (acc, attempt) => {
-        const { title, image } = attempt.task;
         const { task_attempt_id, status, last_accessed_at, completed_at } =
           attempt;
 
@@ -182,14 +183,19 @@ export class TaskAttemptService {
 
         acc[dateKey].attempts.push({
           id: task_attempt_id,
-          title,
-          image: image !== '' ? image : null,
+          title: attempt.task?.title ?? 'Unknown Task',
+          image:
+            attempt.task?.image && attempt.task.image !== ''
+              ? attempt.task.image
+              : null,
           status,
-          classSlug: attempt.class.slug,
-          taskSlug: attempt.task.slug,
-          deadline: getDate(attempt.task.end_time),
+          classSlug: attempt.class?.slug ?? null,
+          taskSlug: attempt.task?.slug ?? null,
+          deadline: attempt.task?.end_time
+            ? getDate(attempt.task.end_time)
+            : null,
           lastAccessedTime: getTime(last_accessed_at),
-          submittedTime: attempt.taskSubmission
+          submittedTime: attempt.taskSubmission?.created_at
             ? getTime(attempt.taskSubmission.created_at)
             : null,
           completedTime: completed_at ? getTime(completed_at) : null,

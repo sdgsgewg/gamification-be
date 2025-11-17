@@ -41,13 +41,18 @@ export class ClassTaskController {
   @Get('classes/:classSlug/tasks/student')
   async getStudentClassTasks(
     @Param('classSlug') classSlug: string,
+    @Req() req: any,
     @Query() filterDto: FilterClassTaskDto,
   ) {
     if (!classSlug) {
       throw new BadRequestException('Class slug is required');
     }
-
-    return this.classTaskService.findStudentClassTasks(classSlug, filterDto);
+    const userId = req.user?.id || null;
+    return this.classTaskService.findStudentClassTasks(
+      classSlug,
+      userId,
+      filterDto,
+    );
   }
 
   /**

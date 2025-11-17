@@ -166,53 +166,68 @@ export class ClassTaskService {
    */
   async findStudentClassTasks(
     classSlug: string,
+    userId: string,
     filterDto: FilterClassTaskDto,
   ): Promise<StudentClassTaskResponseDto[]> {
-    // Ambil class berdasarkan slug
-    const qb = this.classRepository
-      .createQueryBuilder('class')
-      .where('class.slug = :slug', { slug: classSlug });
-
-    const classData = await qb.getOne();
+    // Ambil class
+    const classData = await this.classRepository.findOne({
+      where: { slug: classSlug },
+    });
 
     if (!classData) {
       throw new NotFoundException(`Class with slug ${classSlug} not found`);
     }
 
-    const { class_id } = classData;
+    // Ambil semua class_tasks untuk class tersebut
+    const classTasks = await this.classTaskRepository
+      .createQueryBuilder('ct')
+      .leftJoinAndSelect('ct.task', 'task')
+      .leftJoinAndSelect('task.taskType', 'taskType')
+      .leftJoinAndSelect('task.subject', 'subject')
+      .leftJoinAndSelect('task.taskQuestions', 'taskQuestions')
+      .where('ct.class_id = :classId', { classId: classData.class_id })
+      .orderBy('task.created_at', 'DESC')
+      .getMany();
 
-    // Ambil task untuk class tersebut
-    const classTasks = await this.classTaskRepository.find({
-      where: { class: { class_id } },
-      relations: {
-        task: {
-          taskType: true,
-          subject: true,
-          taskQuestions: true,
-        },
-      },
-      order: {
-        task: {
-          created_at: 'DESC',
-          taskQuestions: {
-            order: 'ASC',
-          },
-        },
-      },
+    if (!classTasks.length) return [];
+
+    // Ambil semua attempts siswa untuk task di kelas ini
+    const taskIds = classTasks.map((ct) => ct.task_id);
+    const attempts = await this.taskAttemptRepository.find({
+      where: { task_id: In(taskIds), student_id: userId },
     });
 
-    // Mapping ke DTO
-    const tasks: StudentClassTaskResponseDto[] = classTasks.map((ct) => ({
-      title: ct.task.title,
-      slug: ct.task.slug,
-      image: ct.task.image != '' ? ct.task.image : null,
-      type: ct.task.taskType?.name ?? '-',
-      subject: ct.task.subject?.name ?? '-',
-      questionCount: Number(ct.task.taskQuestions?.length) ?? 0,
-      deadline: getDateTime(ct.end_time) ?? null,
-    }));
+    // Mapping task_id -> latest attempt (by completed_at)
+    const attemptsMap = new Map<string, TaskAttempt>();
+    for (const a of attempts) {
+      const existing = attemptsMap.get(a.task_id);
+      if (
+        !existing ||
+        (a.completed_at &&
+          (!existing.completed_at || a.completed_at > existing.completed_at))
+      ) {
+        attemptsMap.set(a.task_id, a);
+      }
+    }
 
-    return tasks;
+    // Mapping ke DTO
+    const tasksDto: StudentClassTaskResponseDto[] = classTasks.map((ct) => {
+      const attempt = attemptsMap.get(ct.task_id);
+
+      return {
+        title: ct.task.title,
+        slug: ct.task.slug,
+        image: ct.task.image && ct.task.image !== '' ? ct.task.image : null,
+        type: ct.task.taskType?.name ?? '-',
+        subject: ct.task.subject?.name ?? '-',
+        questionCount: ct.task.taskQuestions?.length ?? 0,
+        answeredCount: attempt?.answered_question_count ?? 0,
+        deadline: ct.end_time ? getDateTime(ct.end_time) : null,
+        status: attempt?.status ?? TaskAttemptStatus.NOT_STARTED,
+      };
+    });
+
+    return tasksDto;
   }
 
   /**
@@ -337,6 +352,7 @@ export class ClassTaskService {
         task: { slug: taskSlug },
       },
       relations: {
+        class: { teacher: true },
         task: {
           subject: true,
           material: true,
