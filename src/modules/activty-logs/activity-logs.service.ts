@@ -6,6 +6,7 @@ import { CreateActivityLogDto } from './dto/requests/create-activity-log.dto';
 import { BaseResponseDto } from 'src/common/responses/base-response.dto';
 import { ActivityLogOverviewResponseDto } from './dto/responses/activity-log-overview-response.dto';
 import { getDate } from 'src/common/utils/date-modifier.util';
+import { ActivityLogEventType } from './enums/activity-log-event-type';
 
 @Injectable()
 export class ActivityLogService {
@@ -27,6 +28,33 @@ export class ActivityLogService {
       order: {
         created_at: 'DESC',
       },
+    });
+
+    const activityLogOverviews: ActivityLogOverviewResponseDto[] =
+      activityLogs.map((al) => ({
+        id: al.id,
+        description: al.description,
+        createdAt: getDate(al.created_at),
+      }));
+
+    return activityLogOverviews;
+  }
+
+  async findRecentSubmissions(
+    userId: string,
+  ): Promise<ActivityLogOverviewResponseDto[]> {
+    const activityLogs = await this.activityLogRepository.find({
+      where: {
+        user_id: userId,
+        event_type: ActivityLogEventType.TASK_SUBMITTED,
+      },
+      relations: {
+        user: true,
+      },
+      order: {
+        created_at: 'DESC',
+      },
+      take: 5,
     });
 
     const activityLogOverviews: ActivityLogOverviewResponseDto[] =

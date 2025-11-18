@@ -1,4 +1,5 @@
 import { IsNotEmpty, IsOptional } from 'class-validator';
+import { TaskTypeScope } from '../../enums/task-type-scope.enum';
 
 export class CreateTaskTypeDto {
   @IsNotEmpty()
@@ -8,7 +9,7 @@ export class CreateTaskTypeDto {
   description?: string;
 
   @IsNotEmpty()
-  scope: string;
+  scope: TaskTypeScope;
 
   @IsNotEmpty()
   hasDeadline: string;

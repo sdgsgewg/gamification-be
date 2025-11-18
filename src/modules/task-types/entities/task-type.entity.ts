@@ -1,5 +1,6 @@
 import { Task } from 'src/modules/tasks/entities/task.entity';
 import { Entity, Column, PrimaryGeneratedColumn, OneToMany } from 'typeorm';
+import { TaskTypeScope } from '../enums/task-type-scope.enum';
 
 @Entity('task_types')
 export class TaskType {
@@ -16,7 +17,7 @@ export class TaskType {
   description: string;
 
   @Column({ type: 'varchar' })
-  scope: string;
+  scope: TaskTypeScope;
 
   @Column({ type: 'boolean' })
   has_deadline: boolean;

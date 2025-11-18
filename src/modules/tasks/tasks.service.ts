@@ -172,8 +172,9 @@ export class TaskService {
           : null,
         taskType: taskWithRelations.taskType
           ? {
-              taskTypeId: taskWithRelations.taskType.task_type_id,
+              id: taskWithRelations.taskType.task_type_id,
               name: taskWithRelations.taskType.name,
+              scope: taskWithRelations.taskType.scope,
             }
           : null,
         taskGradeIds: taskWithRelations.taskGrades

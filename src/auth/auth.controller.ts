@@ -22,7 +22,6 @@ import { AuthGuard } from '@nestjs/passport';
 import { BaseResponseDto } from 'src/common/responses/base-response.dto';
 import { DetailResponseDto } from 'src/common/responses/detail-response.dto';
 import { LoginDetailResponseDto } from './dto/responses/login-detail-response';
-import { JwtAuthGuard } from './jwt-auth.guard';
 
 @Controller('/auth')
 export class AuthController {
@@ -125,12 +124,16 @@ export class AuthController {
   }
 
   @Post('/refresh')
-  async refreshToken(@Req() req: Request, @Res() res: Response) {
-    const token = req.cookies['refresh_token'];
+  async refreshToken(
+    @Body() body: any,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    const token = body.refreshToken;
     const userAgent = req.headers['user-agent'] || 'unknown';
 
     if (!token) {
-      console.warn('No refresh token cookie found');
+      console.warn('No refresh token provided in body');
       throw new UnauthorizedException('No refresh token');
     }
 
@@ -138,6 +141,7 @@ export class AuthController {
       token,
       userAgent,
     );
+
     if (!session || session.is_revoked) {
       console.warn('Invalid session:', {
         token,
@@ -151,14 +155,12 @@ export class AuthController {
     try {
       const payload = this.jwtService.verify(token, {
         secret: process.env.JWT_SECRET,
-        clockTolerance: 30, // 30 detik toleransi perbedaan waktu
-        ignoreExpiration: false, // Pastikan false di production
+        clockTolerance: 30,
       });
 
-      // Generate new token dengan secret yang sama
       const newAccessToken = this.jwtService.sign(
         {
-          id: payload.id || payload.uid, // fallback kalau field-nya uid
+          id: payload.id || payload.uid,
           email: payload.email,
           role: payload.role || 'user',
         },

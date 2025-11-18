@@ -1,4 +1,11 @@
+import { TaskTypeScope } from 'src/modules/task-types/enums/task-type-scope.enum';
 import { TaskStatus } from '../../enums/task-status.enum';
+
+export class TaskType {
+  id: string;
+  name: string;
+  scope: TaskTypeScope;
+}
 
 export class TaskDetail {
   title: string;
@@ -7,7 +14,7 @@ export class TaskDetail {
   image?: string;
   subject: { subjectId: string; name: string };
   material?: { materialId: string; name: string };
-  taskType: { taskTypeId: string; name: string };
+  taskType: TaskType;
   taskGradeIds: string[];
   taskGrade: string;
   questionCount: number;

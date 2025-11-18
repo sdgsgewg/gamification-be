@@ -13,4 +13,12 @@ export class ActivityLogController {
     const userId = req.user?.id || null;
     return this.activityLogService.findUserActivityLogs(userId);
   }
+
+  @Get('submissions')
+  @UseGuards(JwtAuthGuard)
+  async getRecentSubmissions(@Req() req: any) {
+    // Ambil userId dari request (kalau user login)
+    const userId = req.user?.id || null;
+    return this.activityLogService.findRecentSubmissions(userId);
+  }
 }
