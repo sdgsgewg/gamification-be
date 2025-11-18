@@ -22,6 +22,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { BaseResponseDto } from 'src/common/responses/base-response.dto';
 import { DetailResponseDto } from 'src/common/responses/detail-response.dto';
 import { LoginDetailResponseDto } from './dto/responses/login-detail-response';
+import { JwtAuthGuard } from './jwt-auth.guard';
 
 @Controller('/auth')
 export class AuthController {
@@ -185,6 +186,7 @@ export class AuthController {
   }
 
   @Post('/logout')
+  @UseGuards(JwtAuthGuard)
   async logout(@Req() req: Request) {
     const token = req.body.refreshToken;
 
