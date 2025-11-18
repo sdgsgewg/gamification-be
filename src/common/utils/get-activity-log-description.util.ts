@@ -26,7 +26,7 @@ export function getActivityLogDescription(
 
     case ActivityLogEventType.TASK_GRADED:
       return role === UserRole.STUDENT
-        ? `Your task "${data?.task.title || 'Unnamed Task'}" from class "${data?.class?.name || 'Unnamed Class'}" has been graded and you earned ${data?.xpGained} XP.`
+        ? `Your task "${data?.task.title || 'Unnamed Task'}" from class "${data?.class?.name || 'Unnamed Class'}" has been graded and you earned ${data?.xp_gained} XP.`
         : role === UserRole.TEACHER
           ? `You have graded ${data?.student?.name || 'a student'}'s submission from class "${data?.class?.name || 'Unnamed Class'}" for "${data?.task.title || 'Unnamed Task'}".`
           : '';

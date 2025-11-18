@@ -491,6 +491,7 @@ export class TaskSubmissionService {
         taskAttempt: {
           taskAnswerLogs: true,
           student: true,
+          class: true,
           task: {
             taskQuestions: true,
           },
