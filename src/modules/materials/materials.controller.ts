@@ -18,7 +18,7 @@ import { FilterMaterialDto } from './dto/requests/filter-material.dto';
 import { CreateMaterialDto } from './dto/requests/create-material.dto';
 import { UpdateMaterialDto } from './dto/requests/update-material.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { OptionalJwtAuthGuard } from 'src/auth/optional-jwt-auth.guard';
+import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 
 @Controller('/materials')
 export class MaterialController {
@@ -38,7 +38,7 @@ export class MaterialController {
   }
 
   @Post()
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('imageFile'))
   async create(
     @UploadedFile() file: Express.Multer.File,
@@ -54,7 +54,7 @@ export class MaterialController {
   }
 
   @Put(':id')
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('imageFile'))
   async update(
     @Param('id') id: string,
@@ -71,7 +71,7 @@ export class MaterialController {
   }
 
   @Delete(':id')
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   async delete(@Param('id') id: string, @Req() req: any) {
     // Ambil userId dari request (kalau user login)
     const userId = req.user?.id || null;

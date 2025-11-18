@@ -18,7 +18,7 @@ import { FilterSubjectDto } from './dto/requests/filter-subject.dto';
 import { CreateSubjectDto } from './dto/requests/create-subject.dto';
 import { UpdateSubjectDto } from './dto/requests/update-subject.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { OptionalJwtAuthGuard } from 'src/auth/optional-jwt-auth.guard';
+import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 
 @Controller('/subjects')
 export class SubjectController {
@@ -38,7 +38,7 @@ export class SubjectController {
   }
 
   @Post()
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('imageFile'))
   async create(
     @UploadedFile() file: Express.Multer.File,
@@ -54,7 +54,7 @@ export class SubjectController {
   }
 
   @Put(':id')
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('imageFile'))
   async update(
     @Param('id') id: string,
@@ -71,7 +71,7 @@ export class SubjectController {
   }
 
   @Delete(':id')
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   async delete(@Param('id') id: string, @Req() req: any) {
     // Ambil userId dari request (kalau user login)
     const userId = req.user?.id || null;

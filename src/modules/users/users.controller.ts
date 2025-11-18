@@ -51,6 +51,7 @@ export class UserController {
   }
 
   @Get('recent-activities')
+   @UseGuards(JwtAuthGuard)
   async getUserRecentActivities(@Req() req: any) {
     // Ambil userId dari request (kalau user login)
     const userId = req.user?.id || null;

@@ -15,7 +15,7 @@ import { TaskTypeService } from './task-types.service';
 import { FilterTaskTypeDto } from './dto/requests/filter-task-type.dto';
 import { CreateTaskTypeDto } from './dto/requests/create-task-type.dto';
 import { UpdateTaskTypeDto } from './dto/requests/update-task-type.dto';
-import { OptionalJwtAuthGuard } from 'src/auth/optional-jwt-auth.guard';
+import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 
 @Controller('/task-types')
 export class TaskTypeController {
@@ -43,7 +43,7 @@ export class TaskTypeController {
   }
 
   @Post()
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   async create(@Body() dto: CreateTaskTypeDto, @Req() req: any) {
     // Ambil userId dari request (kalau user login)
     const userId = req.user?.id || null;
@@ -51,7 +51,7 @@ export class TaskTypeController {
   }
 
   @Put(':id')
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   async update(
     @Param('id') id: string,
     @Body() dto: UpdateTaskTypeDto,
@@ -63,7 +63,7 @@ export class TaskTypeController {
   }
 
   @Delete(':id')
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   async delete(@Param('id') id: string, @Req() req: any) {
     // Ambil userId dari request (kalau user login)
     const userId = req.user?.id || null;

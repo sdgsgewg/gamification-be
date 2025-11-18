@@ -10,11 +10,11 @@ import {
   Body,
 } from '@nestjs/common';
 import { FilterClassTaskDto } from './dto/requests/filter-class-task.dto';
-import { OptionalJwtAuthGuard } from 'src/auth/optional-jwt-auth.guard';
 import { ClassTaskService } from './class-tasks.service';
 import { ShareTaskIntoClassesDto } from './dto/requests/share-task-into-classes-request.dto';
 import { FilterClassDto } from '../classes/dto/requests/filter-class.dto';
 import { FilterTaskAttemptDto } from '../task-attempts/dto/requests/filter-task-attempt.dto';
+import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 
 @Controller('class-tasks')
 export class ClassTaskController {
@@ -25,7 +25,7 @@ export class ClassTaskController {
    * Mendapatkan daftar tugas (task) dari semua kelas
    */
   @Get('')
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   async getTasksFromAllClasses(
     @Req() req: any,
     @Query() filterDto: FilterTaskAttemptDto,
@@ -76,7 +76,7 @@ export class ClassTaskController {
    * Mendapatkan detail satu task (tanpa pertanyaan)
    */
   @Get('classes/:classSlug/tasks/:taskSlug')
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   async getClassTaskDetail(
     @Param('classSlug') classSlug: string,
     @Param('taskSlug') taskSlug: string,
@@ -99,7 +99,7 @@ export class ClassTaskController {
    * Mendapatkan detail task + pertanyaan (jika user login, sertakan jawaban terakhir)
    */
   @Get('classes/:classSlug/tasks/:taskSlug/attempt')
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   async getClassTaskWithQuestions(
     @Param('classSlug') classSlug: string,
     @Param('taskSlug') taskSlug: string,
@@ -122,7 +122,7 @@ export class ClassTaskController {
    * Mendapatkan ringkasan attempt terakhir yang sudah completed
    */
   @Get('classes/:classSlug/tasks/:taskSlug/summary')
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   async getClassTaskSummary(
     @Param('classSlug') classSlug: string,
     @Param('taskSlug') taskSlug: string,
@@ -146,7 +146,7 @@ export class ClassTaskController {
    * Mendapatkan daftar kelak yang dapat dibagikan untuk satu tugas
    */
   @Get('available-classes/:taskId')
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   async getAvailableClasses(
     @Param('taskId') id: string,
     @Query() filterDto: FilterClassDto,

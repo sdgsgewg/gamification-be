@@ -18,7 +18,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { CreateClassDto } from './dto/requests/create-class.dto';
 import { UpdateClassDto } from './dto/requests/update-class.dto';
 import { FilterClassMemberDto } from './dto/requests/filter-class-member.dto';
-import { OptionalJwtAuthGuard } from 'src/auth/optional-jwt-auth.guard';
+import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 
 @Controller('/classes')
 export class ClassController {
@@ -30,7 +30,7 @@ export class ClassController {
   }
 
   @Get('user')
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   async getUserClasses(@Query() filterDto: FilterClassDto, @Req() req: any) {
     // Ambil userId dari request (kalau user login)
     const userId = req.user?.id || null;
@@ -39,7 +39,7 @@ export class ClassController {
   }
 
   @Get('not-joined')
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   async getNotJoinedClasses(
     @Query() filterDto: FilterClassDto,
     @Req() req: any,
