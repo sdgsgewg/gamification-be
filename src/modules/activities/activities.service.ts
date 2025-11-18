@@ -48,8 +48,6 @@ export class ActivityService {
       userId,
     } = filterDto;
 
-    // const now = new Date();
-
     const qb = this.taskRepository
       .createQueryBuilder('task')
       .leftJoin('task.subject', 'subject')

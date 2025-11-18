@@ -10,6 +10,7 @@ import {
 import { ActivityService } from './activities.service';
 import { FilterActivityDto } from './dto/requests/filter-activity.dto';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from 'src/auth/optional-jwt-auth.guard';
 
 @Controller('/activities')
 export class ActivityController {
@@ -21,16 +22,13 @@ export class ActivityController {
   }
 
   @Get(':slug')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(OptionalJwtAuthGuard)
   async getActivityDetail(@Param('slug') slug: string, @Req() req: any) {
     if (!slug) {
       throw new BadRequestException('Activity slug is required');
     }
-
     // Ambil userId dari request (kalau user login)
     const userId = req.user?.id || null;
-    console.log('User:', JSON.stringify(req.user));
-    console.log('User ID:', userId);
     return this.activityService.findActivityBySlug(slug, userId);
   }
 
