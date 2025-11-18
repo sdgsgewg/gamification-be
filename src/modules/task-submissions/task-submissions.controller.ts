@@ -11,8 +11,9 @@ import {
 } from '@nestjs/common';
 import { UpdateTaskSubmissionDto } from './dto/requests/update-task-submission.dto';
 import { TaskSubmissionService } from './task-submissions.service';
-import { OptionalJwtAuthGuard } from 'src/auth/optional-jwt-auth.guard';
+
 import { FilterTaskSubmissionDto } from './dto/requests/filter-task-submission.dto';
+import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 
 @Controller('/task-submissions')
 export class TaskSubmissionController {
@@ -23,17 +24,14 @@ export class TaskSubmissionController {
    * Mendapatkan daftar pengumpulan tugas dari seluruh kelas milik guru
    */
   @Get('')
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   async getAllTaskSubmissions(
     @Req() req: any,
     @Query() filterDto: FilterTaskSubmissionDto,
   ) {
     // Ambil userId dari request (kalau user login)
     const userId = req.user?.id || null;
-    return this.taskSubmissionService.findAllTaskSubmissions(
-      userId,
-      filterDto,
-    );
+    return this.taskSubmissionService.findAllTaskSubmissions(userId, filterDto);
   }
 
   /**
@@ -82,7 +80,7 @@ export class TaskSubmissionController {
    * Melakukan update pada task submission
    */
   @Put(':id')
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   async update(
     @Param('id') id: string,
     @Req() req: any,

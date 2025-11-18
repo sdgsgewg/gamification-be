@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { ActivityService } from './activities.service';
 import { FilterActivityDto } from './dto/requests/filter-activity.dto';
-import { OptionalJwtAuthGuard } from 'src/auth/optional-jwt-auth.guard';
+import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 
 @Controller('/activities')
 export class ActivityController {
@@ -21,7 +21,7 @@ export class ActivityController {
   }
 
   @Get(':slug')
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   async getActivityDetail(@Param('slug') slug: string, @Req() req: any) {
     if (!slug) {
       throw new BadRequestException('Activity slug is required');
@@ -29,12 +29,13 @@ export class ActivityController {
 
     // Ambil userId dari request (kalau user login)
     const userId = req.user?.id || null;
-
+    console.log('User:', JSON.stringify(req.user));
+    console.log('User ID:', userId);
     return this.activityService.findActivityBySlug(slug, userId);
   }
 
   @Get('attempt/:slug')
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   async getActivityWithQuestions(@Param('slug') slug: string, @Req() req: any) {
     if (!slug) {
       throw new BadRequestException('Activity slug is required');
@@ -47,8 +48,11 @@ export class ActivityController {
   }
 
   @Get('summary/:slug')
-  @UseGuards(OptionalJwtAuthGuard)
-  async getActivitySummaryFromAttempt(@Param('slug') slug: string, @Req() req: any) {
+  @UseGuards(JwtAuthGuard)
+  async getActivitySummaryFromAttempt(
+    @Param('slug') slug: string,
+    @Req() req: any,
+  ) {
     if (!slug) {
       throw new BadRequestException('Activity slug is required');
     }

@@ -70,8 +70,6 @@ export class TaskAttemptService {
       throw new NotFoundException(`No user with id ${userId}`);
     }
 
-    console.log("Filter DTO:", filterDto);
-
     const where: any = {
       student_id: userId,
     };

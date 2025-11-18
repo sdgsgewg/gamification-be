@@ -14,13 +14,13 @@ export class OptionalJwtAuthGuard extends AuthGuard('jwt') {
       }
       return true;
     } catch (_error) {
-      // ✅ gunakan prefix _ agar lint tidak complain
+      // gunakan prefix _ agar lint tidak complain
       return true;
     }
   }
 
   handleRequest(_err: any, user: any, _info: any) {
-    // ✅ sama di sini
+    // sama di sini
     return user || null;
   }
 }
