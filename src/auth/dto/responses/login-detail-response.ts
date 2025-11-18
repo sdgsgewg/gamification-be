@@ -2,7 +2,7 @@ import { UserDetailResponseDto } from 'src/modules/users/dto/responses/user-deta
 
 export class LoginDetailResponseDto {
   accessToken: string;
-  refreshToken?: string;
+  refreshToken: string;
   user: UserDetailResponseDto;
   remember: boolean;
   cookieMaxAge?: number;

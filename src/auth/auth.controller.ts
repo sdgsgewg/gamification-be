@@ -22,10 +22,6 @@ import { AuthGuard } from '@nestjs/passport';
 import { BaseResponseDto } from 'src/common/responses/base-response.dto';
 import { DetailResponseDto } from 'src/common/responses/detail-response.dto';
 import { LoginDetailResponseDto } from './dto/responses/login-detail-response';
-import {
-  clearRefreshTokenCookie,
-  setRefreshTokenCookie,
-} from 'src/common/utils/cookie.util';
 
 @Controller('/auth')
 export class AuthController {
@@ -54,11 +50,7 @@ export class AuthController {
   }
 
   @Post('/login')
-  async login(
-    @Body() body: LoginDto,
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
-  ) {
+  async login(@Body() body: LoginDto, @Req() req: Request) {
     const result = await this.authService.login(body);
 
     const { accessToken, refreshToken, user } = result.data;
