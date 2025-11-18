@@ -186,9 +186,8 @@ export class AuthController {
   }
 
   @Post('/logout')
-  @UseGuards(JwtAuthGuard)
-  async logout(@Req() req: Request) {
-    const token = req.body.refreshToken;
+  async logout(@Body() body: any) {
+    const token = body.refreshToken;
 
     if (token) {
       await this.userSessionService.deleteSession(token);
