@@ -22,7 +22,10 @@ import { AuthGuard } from '@nestjs/passport';
 import { BaseResponseDto } from 'src/common/responses/base-response.dto';
 import { DetailResponseDto } from 'src/common/responses/detail-response.dto';
 import { LoginDetailResponseDto } from './dto/responses/login-detail-response';
-import { clearRefreshTokenCookie, setRefreshTokenCookie } from 'src/common/utils/cookie.util';
+import {
+  clearRefreshTokenCookie,
+  setRefreshTokenCookie,
+} from 'src/common/utils/cookie.util';
 
 @Controller('/auth')
 export class AuthController {
@@ -75,15 +78,13 @@ export class AuthController {
       ? this.convertExpiryToMs(process.env.REFRESH_TOKEN_EXPIRY)
       : this.convertExpiryToMs('1d'); // 30 hari / 1 hari
 
-    // Set refresh token as HTTP-only cookie
-    setRefreshTokenCookie(res, refreshToken, cookieMaxAge);
-
     const response: DetailResponseDto<LoginDetailResponseDto> = {
       status: 200,
       isSuccess: true,
       message: 'Login successful',
       data: {
         accessToken,
+        refreshToken,
         user,
         remember,
         cookieMaxAge,
@@ -192,15 +193,12 @@ export class AuthController {
   }
 
   @Post('/logout')
-  async logout(@Req() req: Request, @Res() res: Response) {
-    const token = req.cookies['refresh_token'];
+  async logout(@Req() req: Request) {
+    const token = req.body.refreshToken;
 
     if (token) {
       await this.userSessionService.deleteSession(token);
     }
-
-    // Clear cookie
-    clearRefreshTokenCookie(res);
 
     const response: BaseResponseDto = {
       status: 200,
