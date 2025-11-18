@@ -5,9 +5,9 @@ import { User } from '../users/entities/user.entity';
 import { GlobalLeaderboardResponseDto } from './dto/responses/global-leaderboard-responses.dto';
 import { UserRole } from '../roles/enums/user-role.enum';
 import { ClassStudentsLeaderboardResponseDto } from './dto/responses/class-students-leaderboard.-response.dto';
-import { ClassLeaderboardResponseDto } from './dto/responses/class-leaderboard-response.dto';
 import { Class } from '../classes/entities/class.entity';
 import { TaskAttempt } from '../task-attempts/entities/task-attempt.entity';
+import { LeaderboardResponseDto } from './dto/responses/leaderboard-response.dto';
 
 @Injectable()
 export class LeaderboardService {
@@ -24,19 +24,23 @@ export class LeaderboardService {
    * Find leaderboard for all users based on their performance in the activity page
    */
   async findGlobalLeaderboard(): Promise<GlobalLeaderboardResponseDto[]> {
-    // Ambil semua user dengan role "student" + relasi taskAttempts
-    const users = await this.userRepository.find({
-      relations: ['taskAttempts', 'role'],
-      where: {
-        role: { name: UserRole.STUDENT },
-      },
-    });
+    // Ambil semua user dengan role "student"
+    const users = await this.userRepository
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.role', 'role')
+      .leftJoinAndSelect(
+        'user.taskAttempts',
+        'taskAttempt',
+        'taskAttempt.class_id IS NULL',
+      )
+      .where('role.name = :roleName', { roleName: UserRole.STUDENT })
+      .getMany();
 
     if (!users || users.length === 0) {
       throw new NotFoundException('No student users found for leaderboard');
     }
 
-    // Hitung total poin untuk tiap user
+    // Hitung total poin untuk tiap user (hanya taskAttempts class_id == NULL)
     const leaderboard = users.map((user) => {
       const totalPoints = user.taskAttempts?.reduce(
         (sum, attempt) => sum + (attempt.points || 0),
@@ -111,7 +115,7 @@ export class LeaderboardService {
   /**
    * Find leaderboard for all classes registered into the system
    */
-  async findClassLeaderboard(): Promise<ClassLeaderboardResponseDto[]> {
+  async findClassLeaderboard(): Promise<LeaderboardResponseDto[]> {
     const results = await this.classRepository
       .createQueryBuilder('class')
       .leftJoin('class.taskAttempts', 'attempt')
@@ -120,6 +124,27 @@ export class LeaderboardService {
       .addSelect('class.image', 'image')
       .addSelect('COALESCE(SUM(attempt.points), 0)', 'point')
       .groupBy('class.class_id')
+      .orderBy('point', 'DESC')
+      .limit(50)
+      .getRawMany();
+
+    return results;
+  }
+
+  /**
+   * Find leaderboard for all students that is obtained from classes
+   */
+  async findStudentLeaderboard(): Promise<LeaderboardResponseDto[]> {
+    const results = await this.userRepository
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.role', 'role')
+      .leftJoin('user.taskAttempts', 'attempt')
+      .select('user.user_id', 'id')
+      .addSelect('user.name', 'name')
+      .addSelect('user.image', 'image')
+      .addSelect('COALESCE(SUM(attempt.points), 0)', 'point')
+      .where('role.name = :roleName', { roleName: UserRole.STUDENT })
+      .groupBy('user.user_id')
       .orderBy('point', 'DESC')
       .limit(50)
       .getRawMany();

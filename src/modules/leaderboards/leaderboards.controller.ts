@@ -24,6 +24,15 @@ export class LeaderboardController {
   }
 
   /**
+   * GET /leaderboards/students
+   * Leaderboard antar siswa (akumulasi poin siswa dari semua kelas)
+   */
+  @Get('students')
+  async getStudentLeaderboard() {
+    return this.leaderboardService.findStudentLeaderboard();
+  }
+
+  /**
    * GET /leaderboards/classes/:classId/students
    * Leaderboard siswa dalam satu kelas
    */

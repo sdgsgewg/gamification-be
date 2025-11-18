@@ -1,4 +1,4 @@
-export class ClassLeaderboardResponseDto {
+export class LeaderboardResponseDto {
   id: string;
   name: string;
   image?: string;
