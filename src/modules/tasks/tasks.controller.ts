@@ -18,15 +18,18 @@ import { FilterTaskDto } from './dto/requests/filter-task.dto';
 import { CreateTaskDto } from './dto/requests/create-task.dto';
 import { UpdateTaskDto } from './dto/requests/update-task.dto';
 import { AnyFilesInterceptor } from '@nestjs/platform-express';
-import { OptionalJwtAuthGuard } from 'src/auth/optional-jwt-auth.guard';
+import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 
 @Controller('/tasks')
 export class TaskController {
   constructor(private readonly taskService: TaskService) {}
 
   @Get('')
-  async getAllTasks(@Query() filterDto: FilterTaskDto) {
-    return this.taskService.findAllTasks(filterDto);
+  @UseGuards(JwtAuthGuard)
+  async getAllTasks(@Req() req: any, @Query() filterDto: FilterTaskDto) {
+    // Ambil userId dari request (kalau user login)
+    const userId = req.user?.id || null;
+    return this.taskService.findAllTasks(userId, filterDto);
   }
 
   @Get(':slug')
@@ -38,7 +41,7 @@ export class TaskController {
   }
 
   @Post()
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   @UseInterceptors(AnyFilesInterceptor())
   async create(
     @UploadedFiles() files: Express.Multer.File[],
@@ -75,7 +78,7 @@ export class TaskController {
   }
 
   @Put(':id')
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   @UseInterceptors(AnyFilesInterceptor())
   async update(
     @Param('id') id: string,
@@ -115,7 +118,7 @@ export class TaskController {
   }
 
   @Delete(':id')
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   async delete(@Param('id') id: string, @Req() req: any) {
     // Ambil userId dari request (kalau user login)
     const userId = req.user?.id || null;
@@ -127,19 +130,19 @@ export class TaskController {
   // ======================
 
   @Put(':id/publish')
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   async publishTask(@Param('id') id: string, @Req() req: any) {
     return this.taskService.publishTask(id, req.user?.id || null);
   }
 
   @Put(':id/unpublish')
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   async unpublishTask(@Param('id') id: string, @Req() req: any) {
     return this.taskService.unpublishTask(id, req.user?.id || null);
   }
 
   @Put(':id/finalize')
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   async finalizeTask(@Param('id') id: string, @Req() req: any) {
     return this.taskService.finalizeTask(id, req.user?.id || null);
   }

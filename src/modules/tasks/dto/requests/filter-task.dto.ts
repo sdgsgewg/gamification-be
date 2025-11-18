@@ -25,10 +25,6 @@ export class FilterTaskDto {
   gradeIds?: string[];
 
   @IsOptional()
-  @IsString()
-  creatorId?: string;
-
-  @IsOptional()
   @IsIn(['createdAt', 'updatedAt', 'title'])
   orderBy?: 'createdAt' | 'updatedAt' | 'title';
 

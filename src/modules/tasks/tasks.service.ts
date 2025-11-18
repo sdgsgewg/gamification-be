@@ -45,6 +45,7 @@ export class TaskService {
   ) {}
 
   async findAllTasks(
+    userId: string,
     filterDto: FilterTaskDto,
   ): Promise<TaskOverviewResponseDto[]> {
     const qb = this.taskRepository
@@ -77,6 +78,9 @@ export class TaskService {
           .from(ClassTask, 'ct')
           .where('ct.task_id = task.task_id');
       }, 'assignedClassCount')
+      .where('task.creator_id = :creatorId', {
+        creatorId: userId,
+      })
       .groupBy('task.task_id')
       .addGroupBy('task.title')
       .addGroupBy('task.difficulty')
@@ -108,11 +112,6 @@ export class TaskService {
     if (filterDto.gradeIds?.length) {
       qb.andWhere('taskGrade.grade_id IN (:...gradeIds)', {
         gradeIds: filterDto.gradeIds,
-      });
-    }
-    if (filterDto.creatorId) {
-      qb.andWhere('task.creator_id = :creatorId', {
-        creatorId: filterDto.creatorId,
       });
     }
 
