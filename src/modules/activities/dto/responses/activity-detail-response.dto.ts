@@ -1,33 +1,7 @@
-import { TaskAttemptStatus } from 'src/modules/task-attempts/enums/task-attempt-status.enum';
+import { CurrentAttemptResponseDto } from 'src/modules/task-attempts/dto/responses/current-attempt-response.dto';
+import { RecentAttemptResponseDto } from 'src/modules/task-attempts/dto/responses/recent-attempt-response.dto';
 
-export class ActivityType {
-  id: string;
-  name: string;
-  isRepeatable: boolean;
-}
-
-export class CurrentAttempt {
-  answeredCount?: number;
-  startedAt?: string;
-  lastAccessedAt?: string;
-  status?: TaskAttemptStatus;
-}
-
-export class RecentAttempt {
-  startedAt?: string;
-  lastAccessedAt?: string;
-  completedAt?: string;
-  status?: TaskAttemptStatus;
-}
-
-export class ActivityDuration {
-  startTime?: Date;
-  endTime?: Date;
-  duration?: string;
-}
-
-export class ActivityDetailResponseDto {
-  id: string;
+export class TaskDetail {
   title: string;
   slug: string;
   description?: string;
@@ -39,7 +13,24 @@ export class ActivityDetailResponseDto {
   difficulty: string;
   createdBy: string;
   type: ActivityType;
-  currAttempt?: CurrentAttempt;
-  recentAttempt?: RecentAttempt;
+}
+
+export class ActivityType {
+  id: string;
+  name: string;
+  isRepeatable: boolean;
+}
+
+export class ActivityDuration {
+  startTime?: Date;
+  endTime?: Date;
+  duration?: string;
+}
+
+export class ActivityDetailResponseDto {
+  id: string;
+  taskDetail: TaskDetail;
   duration?: ActivityDuration;
+  currAttempt?: CurrentAttemptResponseDto;
+  recentAttempts?: RecentAttemptResponseDto[];
 }

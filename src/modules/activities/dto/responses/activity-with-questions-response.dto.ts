@@ -1,28 +1,4 @@
-export class AnswerLog {
-  answerLogId: string | null;
-  text: string | null;
-  image: string | null;
-  optionId: string | null;
-  isCorrect: boolean | null;
-}
-
-export class QuestionOption {
-  optionId: string;
-  text: string;
-  isCorrect: boolean;
-  isSelected: boolean;
-}
-
-export class Question {
-  questionId: string;
-  text: string;
-  point: number;
-  type: string;
-  timeLimit?: number;
-  image?: string;
-  options?: QuestionOption[];
-  userAnswer?: AnswerLog;
-}
+import { QuestionResponseDto } from 'src/modules/task-questions/dto/responses/question-response.dto';
 
 export class ActivityWithQuestionsResponseDto {
   id: string;
@@ -30,5 +6,5 @@ export class ActivityWithQuestionsResponseDto {
   startTime?: Date;
   endTime?: Date;
   duration?: string;
-  questions: Question[];
+  questions: QuestionResponseDto[];
 }

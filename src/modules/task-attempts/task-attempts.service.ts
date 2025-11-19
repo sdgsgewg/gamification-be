@@ -420,6 +420,7 @@ export class TaskAttemptService {
     }
 
     const data: UpsertTaskAttemptResponseDto = {
+      id: savedTaskAttempt.task_attempt_id,
       leveledUp,
       levelChangeSummary,
     };

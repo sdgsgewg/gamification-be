@@ -13,21 +13,21 @@ import {
 } from 'src/common/utils/date-modifier.util';
 import {
   ClassTaskDetailResponseDto,
-  CurrentAttempt,
+  TaskDetail,
   TaskDuration,
-  TaskType,
 } from './dto/responses/class-task-detail-response.dto';
-import {
-  ClassTaskWithQuestionsResponseDto,
-  Question,
-  QuestionOption,
-} from './dto/responses/class-task-with-questions-response.dto';
+import { ClassTaskWithQuestionsResponseDto } from './dto/responses/class-task-with-questions-response.dto';
 import { TaskAttempt } from '../task-attempts/entities/task-attempt.entity';
-import { TaskAttemptStatus } from '../task-attempts/enums/task-attempt-status.enum';
+import {
+  TaskAttemptStatus,
+  TaskAttemptStatusLabels,
+} from '../task-attempts/enums/task-attempt-status.enum';
 import { Task } from '../tasks/entities/task.entity';
 import { TaskAnswerLog } from '../task-answer-logs/entities/task-answer-log.entity';
 import {
-  AnswerLog,
+  ClassTaskAttemptProgress,
+  ClassTaskGradingProgress,
+  ClassTaskStats,
   ClassTaskSummaryResponseDto,
 } from './dto/responses/class-task-summary-response.dto';
 import { TaskDifficultyLabels } from '../tasks/enums/task-difficulty.enum';
@@ -41,6 +41,11 @@ import { GroupedTaskAttemptResponseDto } from '../task-attempts/dto/responses/gr
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { TaskAttemptOverviewResponseDto } from '../task-attempts/dto/responses/task-attempt-overview.dto';
+import { QuestionResponseDto } from '../task-questions/dto/responses/question-response.dto';
+import { QuestionOptionResponseDto } from '../task-question-options/dto/responses/question-option-response.dto';
+import { AnswerLogResponseDto } from '../task-answer-logs/dto/responses/answer-log-response.dto';
+import { RecentAttemptResponseDto } from '../task-attempts/dto/responses/recent-attempt-response.dto';
+import { CurrentAttemptResponseDto } from '../task-attempts/dto/responses/current-attempt-response.dto';
 
 @Injectable()
 export class ClassTaskService {
@@ -371,15 +376,14 @@ export class ClassTaskService {
     const task = classTask.task;
 
     // Default metadata
-    let currAttemptMeta: CurrentAttempt = {
+    let currAttemptMeta: CurrentAttemptResponseDto = {
       answeredCount: 0,
       startedAt: null,
       lastAccessedAt: null,
       status: TaskAttemptStatus.NOT_STARTED,
     };
 
-    // let recentAttemptMeta: TaskAttempt | null = null;
-    let recentAttempt: TaskAttempt | null = null;
+    let recentAttemptsMeta: RecentAttemptResponseDto[] = [];
 
     // Jika userId ada → ambil attempt
     if (userId) {
@@ -404,7 +408,7 @@ export class ClassTaskService {
       }
 
       // Attempt terakhir yang sudah selesai
-      recentAttempt = await this.taskAttemptRepository.findOne({
+      const recentAttempts = await this.taskAttemptRepository.find({
         where: {
           student_id: userId,
           task_id: task.task_id,
@@ -415,53 +419,33 @@ export class ClassTaskService {
           ]),
         },
         relations: {
-          task: {
-            taskQuestions: {
-              taskQuestionOptions: true,
-            },
-          },
-          taskAnswerLogs: {
-            // include question relation if your TaskAnswerLog has it (ref in example)
-            question: true,
-          },
-          taskSubmission: {
-            grader: true,
-          },
-        },
-        order: {
-          completed_at: 'DESC',
-          task: {
-            taskQuestions: {
-              order: 'ASC',
-              taskQuestionOptions: {
-                order: 'ASC',
-              },
-            },
-          },
-          taskAnswerLogs: {
-            created_at: 'ASC',
-          },
+          taskSubmission: true,
         },
       });
 
-      // if (recentAttempt) {
-      //   recentAttemptMeta = recentAttempt;
-      // }
+      recentAttemptsMeta = recentAttempts.map((a) => ({
+        id: a.task_attempt_id,
+        startedAt: getDateTime(a.started_at) ?? null,
+        submittedAt: getDateTime(a.taskSubmission.created_at) ?? null,
+        completedAt: getDateTime(a.completed_at),
+        duration: getTimePeriod(a.started_at, a.taskSubmission.created_at),
+        status:
+          (a.status as TaskAttemptStatus) ?? TaskAttemptStatus.NOT_STARTED,
+      }));
     }
 
     // Mapping ke DTO final
     return this.mapClassTaskDetailResponse(
       classTask,
       currAttemptMeta,
-      // recentAttemptMeta,
-      recentAttempt,
+      recentAttemptsMeta,
     );
   }
 
   private mapClassTaskDetailResponse(
     classTask: ClassTask,
-    currAttemptMeta: CurrentAttempt,
-    recentAttempt: TaskAttempt | null,
+    currAttemptMeta: CurrentAttemptResponseDto,
+    recentAttemptsMeta: RecentAttemptResponseDto[],
   ): ClassTaskDetailResponseDto {
     const task = classTask.task;
     const {
@@ -481,7 +465,32 @@ export class ClassTaskService {
       created_by,
     } = task;
 
-    const currAttempt: CurrentAttempt | null =
+    const taskDetail: TaskDetail = {
+      title,
+      slug,
+      description: description ?? null,
+      image: image ?? null,
+      subject: subject ? { id: subject.subject_id, name: subject.name } : null,
+      material: material
+        ? { id: material.material_id, name: material.name }
+        : null,
+      grade:
+        taskGrades?.length > 0
+          ? taskGrades
+              .map((g) => g.grade?.name?.replace('Kelas ', ''))
+              .join(', ')
+          : null,
+      difficulty: TaskDifficultyLabels[difficulty] ?? 'Unknown',
+      questionCount: taskQuestions?.length || 0,
+      createdBy: created_by ?? 'Unknown',
+      type: {
+        id: taskType.task_type_id,
+        name: taskType.name,
+        isRepeatable: taskType.is_repeatable,
+      },
+    };
+
+    const currAttempt: CurrentAttemptResponseDto | null =
       currAttemptMeta?.status === TaskAttemptStatus.ON_PROGRESS
         ? currAttemptMeta
         : null;
@@ -497,112 +506,10 @@ export class ClassTaskService {
     // ===========================
     return {
       id: task_id,
-      teacherName: classTask.class.teacher?.name ?? 'Unknown',
-      className: classTask.class.name,
-      taskDetail: {
-        title,
-        slug,
-        description: description ?? null,
-        image: image ?? null,
-        subject: subject
-          ? { id: subject.subject_id, name: subject.name }
-          : null,
-        material: material
-          ? { id: material.material_id, name: material.name }
-          : null,
-        grade:
-          taskGrades?.length > 0
-            ? taskGrades
-                .map((g) => g.grade?.name?.replace('Kelas ', ''))
-                .join(', ')
-            : null,
-        difficulty: TaskDifficultyLabels[difficulty] ?? 'Unknown',
-        questionCount: taskQuestions?.length || 0,
-        createdBy: created_by ?? 'Unknown',
-        type: {
-          id: taskType.task_type_id,
-          name: taskType.name,
-          isRepeatable: taskType.is_repeatable,
-        },
-      },
-
-      // ===========================
-      //  SUMMARY (ONLY IF SUBMITTED)
-      // ===========================
-      summary: recentAttempt?.taskSubmission
-        ? {
-            pointGained: recentAttempt.points ?? 0,
-            totalPoints: taskQuestions.reduce(
-              (sum, q) => sum + (q.point ?? 0),
-              0,
-            ),
-            score: recentAttempt.taskSubmission.score ?? null,
-            xpGained: recentAttempt.xp_gained ?? 0,
-            feedback: recentAttempt.taskSubmission.feedback ?? null,
-          }
-        : null,
-
-      // ===========================
-      //  CURRENT ATTEMPT
-      // ===========================
-      currAttempt: currAttempt ?? null,
-
-      // ===========================
-      //  RECENT ATTEMPT
-      // ===========================
-      recentAttempt: recentAttempt
-        ? {
-            startedAt: getDateTime(recentAttempt.started_at),
-            lastAccessedAt: getDateTime(recentAttempt.last_accessed_at),
-            submittedAt: getDateTime(
-              recentAttempt.taskSubmission?.created_at ?? null,
-            ),
-            completedAt: getDateTime(recentAttempt.completed_at),
-            status: recentAttempt.status as TaskAttemptStatus,
-          }
-        : null,
-
-      // ===========================
-      //  DURATION
-      // ===========================
+      taskDetail,
       duration,
-
-      // ===========================
-      //  QUESTIONS + USER ANSWERS
-      // ===========================
-      questions:
-        recentAttempt && recentAttempt.taskAnswerLogs
-          ? taskQuestions.map((q) => {
-              const userAnswer = recentAttempt.taskAnswerLogs.find(
-                (log) => log.question_id === q.task_question_id,
-              );
-
-              return {
-                questionId: q.task_question_id,
-                text: q.text,
-                point: q.point,
-                type: q.type,
-                timeLimit: q.time_limit ?? null,
-                image: q.image ?? null,
-                options: q.taskQuestionOptions?.map((o) => ({
-                  optionId: o.task_question_option_id,
-                  text: o.text,
-                  isCorrect: o.is_correct,
-                  isSelected:
-                    userAnswer?.option_id === o.task_question_option_id,
-                })),
-                userAnswer: userAnswer
-                  ? {
-                      answerLogId: userAnswer.task_answer_log_id,
-                      text: userAnswer.answer_text,
-                      image: userAnswer.image,
-                      optionId: userAnswer.option_id,
-                      isCorrect: userAnswer.is_correct,
-                    }
-                  : null,
-              };
-            })
-          : [],
+      currAttempt: currAttempt ?? null,
+      recentAttempts: recentAttemptsMeta.length > 0 ? recentAttemptsMeta : [],
     };
   }
 
@@ -737,33 +644,23 @@ export class ClassTaskService {
    * Find class task by slug and include summary ()
    */
   async findClassTaskSummaryFromAttempt(
-    classSlug: string,
-    taskSlug: string,
-    userId?: string,
+    attemptId: string,
   ): Promise<ClassTaskSummaryResponseDto> {
-    // 1) Validasi class existence
-    const classEntity = await this.classRepository.findOne({
-      where: { slug: classSlug },
-    });
-
-    if (!classEntity) {
-      throw new NotFoundException(`Class with slug ${classSlug} not found`);
-    }
-
-    // 2) Cari attempt yang completed untuk user, taskSlug dan class
     const attempt = await this.taskAttemptRepository.findOne({
       where: {
-        student_id: userId,
-        status: TaskAttemptStatus.SUBMITTED,
-        task: { slug: taskSlug },
-        class_id: classEntity.class_id,
+        task_attempt_id: attemptId,
+        status: In([TaskAttemptStatus.SUBMITTED, TaskAttemptStatus.COMPLETED]),
       },
       relations: {
+        class: {
+          teacher: true,
+        },
         task: {
           taskQuestions: {
             taskQuestionOptions: true,
           },
         },
+        taskSubmission: true,
         taskAnswerLogs: {
           // include question relation if your TaskAnswerLog has it (ref in example)
           question: true,
@@ -787,7 +684,7 @@ export class ClassTaskService {
 
     if (!attempt) {
       throw new NotFoundException(
-        `No completed attempt found for user ${userId} on task ${taskSlug}`,
+        `No completed attempt found for attempt with id ${attemptId}`,
       );
     }
 
@@ -797,17 +694,53 @@ export class ClassTaskService {
   private mapClassTaskSummaryFromAttempt(
     attempt: TaskAttempt,
   ): ClassTaskSummaryResponseDto {
-    const { title, image, description } = attempt.task;
-    const { points, xp_gained, completed_at, task, taskAnswerLogs } = attempt;
+    const { title, image, description, taskQuestions } = attempt.task;
+    const {
+      points,
+      xp_gained,
+      started_at,
+      status,
+      task,
+      taskAnswerLogs,
+      taskSubmission,
+    } = attempt;
 
-    const questions: Question[] =
+    const totalPoints = taskQuestions.reduce((acc, q) => acc + q.point, 0);
+
+    const score = Math.round((points / totalPoints) * 100);
+
+    const stats: ClassTaskStats = {
+      pointGained: points,
+      totalPoints,
+      score,
+      xpGained: xp_gained,
+    };
+
+    const attemptProgress: ClassTaskAttemptProgress = {
+      startedAt: getDateTime(started_at),
+      submittedAt: getDateTime(taskSubmission.created_at),
+      duration: getTimePeriod(started_at, taskSubmission.created_at),
+      status: TaskAttemptStatusLabels[status],
+    };
+
+    const gradingProgress: ClassTaskGradingProgress = {
+      startGradedAt: getDateTime(taskSubmission.start_graded_at),
+      lastGradedAt: getDateTime(taskSubmission.last_graded_at),
+      finishGradedAt: getDateTime(taskSubmission.finish_graded_at),
+      duration: getTimePeriod(
+        taskSubmission.start_graded_at,
+        taskSubmission.finish_graded_at,
+      ),
+      status: TaskAttemptStatusLabels[taskSubmission.status],
+    };
+
+    const questions: QuestionResponseDto[] =
       task.taskQuestions?.map((q) => {
-        // find user answer log for this question (match by question id)
         const userAnswer = taskAnswerLogs?.find(
           (log) => log.question_id === q.task_question_id,
         );
 
-        const options: QuestionOption[] =
+        const options: QuestionOptionResponseDto[] =
           q.taskQuestionOptions?.map((o) => ({
             optionId: o.task_question_option_id,
             text: o.text,
@@ -815,7 +748,7 @@ export class ClassTaskService {
             isSelected: userAnswer?.option_id === o.task_question_option_id,
           })) || [];
 
-        const answerLog: AnswerLog | null = userAnswer
+        const answerLog: AnswerLogResponseDto | null = userAnswer
           ? {
               answerLogId: userAnswer.task_answer_log_id ?? null,
               text: userAnswer.answer_text ?? null,
@@ -825,6 +758,8 @@ export class ClassTaskService {
                 typeof userAnswer.is_correct === 'boolean'
                   ? userAnswer.is_correct
                   : null,
+              pointAwarded: userAnswer.point_awarded ?? null,
+              teacherNotes: userAnswer.teacher_notes ?? null,
             }
           : null;
 
@@ -844,9 +779,11 @@ export class ClassTaskService {
       title,
       image,
       description,
-      point: points ?? 0,
-      xpGained: xp_gained ?? 0,
-      completedAt: getDateTime(completed_at),
+      teacherName: attempt.class.teacher?.name ?? 'Unknown',
+      className: attempt.class.name,
+      stats,
+      attemptProgress,
+      gradingProgress,
       questions,
     };
   }

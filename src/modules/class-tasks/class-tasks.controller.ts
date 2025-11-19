@@ -118,27 +118,16 @@ export class ClassTaskController {
   }
 
   /**
-   * [GET] /classes/:classSlug/tasks/:taskSlug/summary
+   * [GET] /attempts/:id/summary
    * Mendapatkan ringkasan attempt terakhir yang sudah completed
    */
-  @Get('classes/:classSlug/tasks/:taskSlug/summary')
-  @UseGuards(JwtAuthGuard)
-  async getClassTaskSummary(
-    @Param('classSlug') classSlug: string,
-    @Param('taskSlug') taskSlug: string,
-    @Req() req: any,
-  ) {
-    if (!classSlug || !taskSlug) {
-      throw new BadRequestException('Class slug and Task slug are required');
+  @Get('attempts/:id/summary')
+  // @UseGuards(JwtAuthGuard)
+  async getClassTaskSummary(@Param('id') attemptId: string) {
+    if (!attemptId) {
+      throw new BadRequestException('Attempt id is required');
     }
-
-    const userId = req.user?.id || null;
-
-    return this.classTaskService.findClassTaskSummaryFromAttempt(
-      classSlug,
-      taskSlug,
-      userId,
-    );
+    return this.classTaskService.findClassTaskSummaryFromAttempt(attemptId);
   }
 
   /**

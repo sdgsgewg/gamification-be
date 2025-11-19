@@ -1,35 +1,25 @@
-export class AnswerLog {
-  answerLogId: string | null;
-  text: string | null;
-  image: string | null;
-  optionId: string | null;
-  isCorrect: boolean | null;
+import { QuestionResponseDto } from 'src/modules/task-questions/dto/responses/question-response.dto';
+
+export class ActivityStats {
+  pointGained: number;
+  totalPoints: number;
+  score: number;
+  xpGained: number;
 }
 
-export class QuestionOption {
-  optionId: string;
-  text: string;
-  isCorrect: boolean;
-  isSelected: boolean;
-}
-
-export class Question {
-  questionId: string;
-  text: string;
-  point: number;
-  type: string;
-  timeLimit?: number;
-  image?: string;
-  options?: QuestionOption[];
-  userAnswer?: AnswerLog;
+export class ActivityProgress {
+  startedAt: string;
+  completedAt: string;
+  duration: string;
+  status: string;
 }
 
 export class ActivitySummaryResponseDto {
   title: string;
   image: string;
   description: string;
-  point: number;
-  xpGained: number;
-  completedAt: string;
-  questions: Question[];
+  createdBy: string;
+  stats: ActivityStats;
+  progress: ActivityProgress;
+  questions: QuestionResponseDto[];
 }

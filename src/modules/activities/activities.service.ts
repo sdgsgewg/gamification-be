@@ -1,14 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Not, Repository, SelectQueryBuilder } from 'typeorm';
+import { IsNull, Not, Repository, SelectQueryBuilder } from 'typeorm';
 import { FilterActivityDto } from './dto/requests/filter-activity.dto';
 import { Task } from '../tasks/entities/task.entity';
 import { TaskAttempt } from '../task-attempts/entities/task-attempt.entity';
 import { ActivityOverviewResponseDto } from './dto/responses/activity-overview-response.dto';
 import {
-  CurrentAttempt,
-  RecentAttempt,
   ActivityDetailResponseDto,
+  TaskDetail,
 } from './dto/responses/activity-detail-response.dto';
 import {
   getDateTime,
@@ -16,10 +15,19 @@ import {
 } from 'src/common/utils/date-modifier.util';
 import { ActivityWithQuestionsResponseDto } from './dto/responses/activity-with-questions-response.dto';
 import { TaskAnswerLog } from '../task-answer-logs/entities/task-answer-log.entity';
-import { ActivitySummaryResponseDto } from './dto/responses/activity-summary-response.dto';
+import {
+  ActivityProgress,
+  ActivityStats,
+  ActivitySummaryResponseDto,
+} from './dto/responses/activity-summary-response.dto';
 import { TaskTypeScope } from '../task-types/enums/task-type-scope.enum';
-import { TaskAttemptStatus } from '../task-attempts/enums/task-attempt-status.enum';
+import {
+  TaskAttemptStatus,
+  TaskAttemptStatusLabels,
+} from '../task-attempts/enums/task-attempt-status.enum';
 import { TaskDifficultyLabels } from '../tasks/enums/task-difficulty.enum';
+import { RecentAttemptResponseDto } from '../task-attempts/dto/responses/recent-attempt-response.dto';
+import { CurrentAttemptResponseDto } from '../task-attempts/dto/responses/current-attempt-response.dto';
 
 @Injectable()
 export class ActivityService {
@@ -265,7 +273,7 @@ export class ActivityService {
   // 🔍 DETAIL FETCH
   // ==========================
   async findActivityBySlug(slug: string, userId?: string) {
-    // Ambil task dulu (selalu dari tabel tasks)
+    // Ambil task (selalu dari tabel tasks)
     const task = await this.taskRepository.findOne({
       where: { slug },
       relations: {
@@ -282,24 +290,20 @@ export class ActivityService {
       throw new NotFoundException(`Activity with slug ${slug} not found`);
 
     // Default metadata
-    let currAttemptMeta: CurrentAttempt = {
+    let currAttemptMeta: CurrentAttemptResponseDto = {
       answeredCount: 0,
       startedAt: null,
       lastAccessedAt: null,
       status: TaskAttemptStatus.NOT_STARTED,
     };
 
-    let recentAttemptMeta: RecentAttempt = {
-      startedAt: null,
-      lastAccessedAt: null,
-      completedAt: null,
-      status: TaskAttemptStatus.NOT_STARTED,
-    };
+    let recentAttemptsMeta: RecentAttemptResponseDto[] = [];
 
     // Kalau userId ada → cari attempt user
     if (userId) {
+      // Current attempt
       const currAttempt = await this.taskAttemptRepository.findOne({
-        where: { student_id: userId, task: { slug } },
+        where: { student_id: userId, task: { slug }, class_id: IsNull() },
         order: { last_accessed_at: 'DESC' },
       });
 
@@ -314,39 +318,39 @@ export class ActivityService {
         };
       }
 
-      const recentAttempt = await this.taskAttemptRepository.findOne({
+      // All recent completed attempts → multiple
+      const recentAttempts = await this.taskAttemptRepository.find({
         where: {
           student_id: userId,
           task: { slug },
           status: TaskAttemptStatus.COMPLETED,
+          class_id: IsNull(),
         },
-        order: { completed_at: 'DESC' },
+        order: { completed_at: 'ASC' },
       });
 
-      if (recentAttempt) {
-        recentAttemptMeta = {
-          startedAt: getDateTime(recentAttempt.started_at) ?? null,
-          lastAccessedAt: getDateTime(recentAttempt.last_accessed_at) ?? null,
-          completedAt: getDateTime(recentAttempt.completed_at),
-          status:
-            (recentAttempt.status as TaskAttemptStatus) ??
-            TaskAttemptStatus.NOT_STARTED,
-        };
-      }
+      recentAttemptsMeta = recentAttempts.map((a) => ({
+        id: a.task_attempt_id,
+        startedAt: getDateTime(a.started_at) ?? null,
+        completedAt: getDateTime(a.completed_at),
+        duration: getTimePeriod(a.started_at, a.completed_at),
+        status:
+          (a.status as TaskAttemptStatus) ?? TaskAttemptStatus.NOT_STARTED,
+      }));
     }
 
     // Mapping ke DTO final
     return this.mapActivityBySlugResponse(
       task,
       currAttemptMeta,
-      recentAttemptMeta,
+      recentAttemptsMeta,
     );
   }
 
   private mapActivityBySlugResponse(
     task: Task,
-    currAttemptMeta: CurrentAttempt,
-    recentAttemptMeta: RecentAttempt,
+    currAttemptMeta: CurrentAttemptResponseDto,
+    recentAttemptsMeta: RecentAttemptResponseDto[],
   ): ActivityDetailResponseDto {
     const {
       task_id,
@@ -364,8 +368,8 @@ export class ActivityService {
       end_time,
     } = task;
 
-    return {
-      id: task_id,
+    // Task Detail
+    const taskDetail: TaskDetail = {
       title: title,
       slug: slug,
       description: description ?? null,
@@ -388,6 +392,16 @@ export class ActivityService {
         name: taskType.name,
         isRepeatable: taskType.is_repeatable,
       },
+    };
+
+    return {
+      id: task_id,
+      taskDetail,
+      duration: {
+        startTime: start_time ?? null,
+        endTime: end_time ?? null,
+        duration: getTimePeriod(start_time, end_time),
+      },
       currAttempt:
         currAttemptMeta.status === TaskAttemptStatus.ON_PROGRESS
           ? {
@@ -397,19 +411,7 @@ export class ActivityService {
               status: currAttemptMeta.status,
             }
           : null,
-      recentAttempt: recentAttemptMeta.completedAt
-        ? {
-            startedAt: recentAttemptMeta.startedAt,
-            lastAccessedAt: recentAttemptMeta.lastAccessedAt,
-            completedAt: recentAttemptMeta.completedAt,
-            status: recentAttemptMeta.status,
-          }
-        : null,
-      duration: {
-        startTime: start_time ?? null,
-        endTime: end_time ?? null,
-        duration: getTimePeriod(start_time, end_time),
-      },
+      recentAttempts: recentAttemptsMeta.length > 0 ? recentAttemptsMeta : [],
     };
   }
 
@@ -515,12 +517,10 @@ export class ActivityService {
     return data;
   }
 
-  async findActivitySummaryFromAttempt(taskSlug: string, userId: string) {
+  async findActivitySummaryFromAttempt(attemptId: string) {
     const attempt = await this.taskAttemptRepository.findOne({
       where: {
-        student_id: userId,
-        status: TaskAttemptStatus.COMPLETED,
-        task: { slug: taskSlug },
+        task_attempt_id: attemptId,
       },
       relations: {
         task: {
@@ -549,9 +549,7 @@ export class ActivityService {
     });
 
     if (!attempt) {
-      throw new NotFoundException(
-        `No attempt found for user ${userId} on task ${taskSlug}`,
-      );
+      throw new NotFoundException(`No attempt found with id ${attemptId}`);
     }
 
     return this.mapActivitySummaryFromAttempt(attempt);
@@ -560,8 +558,35 @@ export class ActivityService {
   private mapActivitySummaryFromAttempt(
     attempt: TaskAttempt,
   ): ActivitySummaryResponseDto {
-    const { title, image, description } = attempt.task;
-    const { points, xp_gained, completed_at, task, taskAnswerLogs } = attempt;
+    const { title, image, description, created_by, taskQuestions } =
+      attempt.task;
+    const {
+      points,
+      xp_gained,
+      started_at,
+      completed_at,
+      status,
+      task,
+      taskAnswerLogs,
+    } = attempt;
+
+    const totalPoints = taskQuestions.reduce((acc, q) => acc + q.point, 0);
+
+    const score = Math.round((points / totalPoints) * 100);
+
+    const stats: ActivityStats = {
+      pointGained: points,
+      totalPoints,
+      score,
+      xpGained: xp_gained,
+    };
+
+    const progress: ActivityProgress = {
+      startedAt: getDateTime(started_at),
+      completedAt: getDateTime(completed_at),
+      duration: getTimePeriod(started_at, completed_at),
+      status: TaskAttemptStatusLabels[status],
+    };
 
     const questions =
       task.taskQuestions?.map((q) => {
@@ -598,9 +623,9 @@ export class ActivityService {
       title,
       image,
       description,
-      point: points,
-      xpGained: xp_gained,
-      completedAt: getDateTime(completed_at),
+      createdBy: created_by,
+      stats,
+      progress,
       questions,
     };
   }

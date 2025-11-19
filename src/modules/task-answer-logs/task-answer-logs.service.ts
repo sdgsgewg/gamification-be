@@ -95,11 +95,13 @@ export class TaskAnswerLogService {
     const questionType = question.type as QuestionType;
 
     const isCorrect = await this.resolveIsCorrect(questionType, dto.optionId);
+
+    const point = isCorrect ? question.point : 0;
     const pointAwarded = [QuestionType.FILL_BLANK, QuestionType.ESSAY].includes(
       question.type as QuestionType,
     )
       ? null
-      : question.point;
+      : point;
 
     let imageUrl = existingLog?.image || '';
 

@@ -1,4 +1,5 @@
 export class UpsertTaskAttemptResponseDto {
+  id: string;
   leveledUp: boolean;
   levelChangeSummary?: {
     previousLevel: number;

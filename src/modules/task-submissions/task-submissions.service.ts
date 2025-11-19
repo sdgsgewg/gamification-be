@@ -23,7 +23,11 @@ import { FilterTaskSubmissionDto } from './dto/requests/filter-task-submission.d
 import { GroupedTaskSubmissionResponseDto } from './dto/responses/grouped-task-submission-response.dto';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
-import { getDateTime, getTime } from 'src/common/utils/date-modifier.util';
+import {
+  getDateTime,
+  getTime,
+  getTimePeriod,
+} from 'src/common/utils/date-modifier.util';
 import {
   SubmissionProgress,
   SubmissionSummary,
@@ -313,6 +317,9 @@ export class TaskSubmissionService {
       startGradedAt: start_graded_at ? getDateTime(start_graded_at) : null,
       lastGradedAt: last_graded_at ? getDateTime(last_graded_at) : null,
       finishGradedAt: finish_graded_at ? getDateTime(finish_graded_at) : null,
+      duration: finish_graded_at
+        ? getTimePeriod(start_graded_at, finish_graded_at)
+        : null,
       status: TaskSubmissionStatusLabels[status],
     };
 
@@ -346,6 +353,8 @@ export class TaskSubmissionService {
                 image: userAnswer.image,
                 optionId: userAnswer.option_id,
                 isCorrect: userAnswer.is_correct,
+                pointAwarded: userAnswer.point_awarded,
+                teacherNotes: userAnswer.teacher_notes,
               }
             : null,
         };

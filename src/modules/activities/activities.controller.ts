@@ -32,7 +32,7 @@ export class ActivityController {
     return this.activityService.findActivityBySlug(slug, userId);
   }
 
-  @Get('attempt/:slug')
+  @Get(':slug/attempt')
   @UseGuards(JwtAuthGuard)
   async getActivityWithQuestions(@Param('slug') slug: string, @Req() req: any) {
     if (!slug) {
@@ -45,19 +45,12 @@ export class ActivityController {
     return this.activityService.findActivityWithQuestions(slug, userId);
   }
 
-  @Get('summary/:slug')
+  @Get('attempts/:id/summary')
   @UseGuards(JwtAuthGuard)
-  async getActivitySummaryFromAttempt(
-    @Param('slug') slug: string,
-    @Req() req: any,
-  ) {
-    if (!slug) {
-      throw new BadRequestException('Activity slug is required');
+  async getActivitySummaryFromAttempt(@Param('id') attemptId: string) {
+    if (!attemptId) {
+      throw new BadRequestException('Attempt id is required');
     }
-
-    // Ambil userId dari request (kalau user login)
-    const userId = req.user?.id || null;
-
-    return this.activityService.findActivitySummaryFromAttempt(slug, userId);
+    return this.activityService.findActivitySummaryFromAttempt(attemptId);
   }
 }

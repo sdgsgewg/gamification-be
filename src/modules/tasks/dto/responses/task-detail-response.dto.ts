@@ -1,5 +1,6 @@
 import { TaskTypeScope } from 'src/modules/task-types/enums/task-type-scope.enum';
 import { TaskStatus } from '../../enums/task-status.enum';
+import { QuestionResponseDto } from 'src/modules/task-questions/dto/responses/question-response.dto';
 
 export class TaskType {
   id: string;
@@ -45,27 +46,11 @@ export class TaskHistory {
   updatedBy?: string;
 }
 
-export class TaskQuestionOption {
-  optionId: string;
-  text: string;
-  isCorrect: boolean;
-}
-
-export class TaskQuestion {
-  questionId: string;
-  text: string;
-  point: number;
-  type: string;
-  timeLimit?: number;
-  image?: string;
-  options?: TaskQuestionOption[];
-}
-
 export class TaskDetailResponseDto {
   id: string;
   taskDetail: TaskDetail;
   assignedClasses?: AssignedClassInfo[];
   duration?: TaskDuration;
   history: TaskHistory;
-  questions: TaskQuestion[];
+  questions: QuestionResponseDto[];
 }
