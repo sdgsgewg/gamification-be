@@ -22,7 +22,7 @@ export function getActivityLogDescription(
           : '';
 
     case ActivityLogEventType.TASK_COMPLETED:
-      return `You completed the task "${data?.task.title || 'Unnamed Task'}" and earned ${data?.xpGained} XP.`;
+      return `You completed the task "${data?.task.title || 'Unnamed Task'}" and earned ${data?.xp_gained} XP.`;
 
     case ActivityLogEventType.TASK_GRADED:
       return role === UserRole.STUDENT
