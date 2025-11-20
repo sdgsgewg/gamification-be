@@ -128,7 +128,7 @@ export class ClassService {
       id: c.classId,
       name: c.name,
       slug: c.slug,
-      image: c.image ?? null,
+      image: c.image && c.image !== '' ? c.image : null,
       grade: c.classGrade,
     }));
 
