@@ -19,7 +19,6 @@ import {
   getDateTimeWithName,
   getTimePeriod,
 } from 'src/common/utils/date-modifier.util';
-import { TaskGrade } from 'src/modules/task-grades/entities/task-grade.entity';
 import { FileUploadService } from 'src/common/services/file-upload.service';
 import { SlugHelper } from 'src/common/helpers/slug.helper';
 import { TaskQuestionService } from '../task-questions/task-questions.service';
@@ -31,14 +30,14 @@ import { getMasterHistoryDescription } from 'src/common/utils/get-master-history
 import { ClassTask } from '../class-tasks/entities/class-task.entity';
 import { getResponseMessage } from 'src/common/utils/get-response-message.util';
 import { TaskStatus } from './enums/task-status.enum';
+import { TaskGradeService } from '../task-grades/task-grades.service';
 
 @Injectable()
 export class TaskService {
   constructor(
     @InjectRepository(Task)
     private readonly taskRepository: Repository<Task>,
-    @InjectRepository(TaskGrade)
-    private readonly taskGradeRepository: Repository<TaskGrade>,
+    private readonly taskGradeService: TaskGradeService,
     private readonly taskQuestionService: TaskQuestionService,
     private readonly fileUploadService: FileUploadService,
     private readonly masterHistoryService: MasterHistoryService,
@@ -178,7 +177,7 @@ export class TaskService {
             }
           : null,
         taskGradeIds: taskWithRelations.taskGrades
-          ? taskWithRelations.taskGrades.map((tg) => tg.grade_id)
+          ? taskWithRelations.taskGrades.map((tg) => tg.gradeId)
           : [],
         taskGrade:
           taskWithRelations.taskGrades &&
@@ -366,14 +365,10 @@ export class TaskService {
 
     // Simpan ke task_grades
     if (dto.gradeIds && dto.gradeIds.length > 0) {
-      const grades = dto.gradeIds.map((gradeId) =>
-        this.taskGradeRepository.create({
-          task_id: savedTask.task_id,
-          grade_id: gradeId,
-          created_at: new Date(),
-        }),
+      await this.taskGradeService.createTaskGrades(
+        savedTask.task_id,
+        dto.gradeIds,
       );
-      await this.taskGradeRepository.save(grades);
     }
 
     // simpan ke task_questions (otomatis include options)
@@ -443,32 +438,6 @@ export class TaskService {
     return task;
   }
 
-  private async syncTaskGrades(taskId: string, gradeIds: string[]) {
-    const existingGrades = await this.taskGradeRepository.find({
-      where: { task_id: taskId },
-    });
-
-    const existingGradeIds = existingGrades.map((g) => g.grade_id);
-    const newGradeIds = gradeIds || [];
-
-    // Hapus yang tidak ada di DTO
-    const toDelete = existingGrades.filter(
-      (g) => !newGradeIds.includes(g.grade_id),
-    );
-    if (toDelete.length > 0) {
-      await this.taskGradeRepository.remove(toDelete);
-    }
-
-    // Tambah yang baru
-    const toInsert = newGradeIds.filter((id) => !existingGradeIds.includes(id));
-    if (toInsert.length > 0) {
-      const newRecords = toInsert.map((gradeId) =>
-        this.taskGradeRepository.create({ task_id: taskId, grade_id: gradeId }),
-      );
-      await this.taskGradeRepository.save(newRecords);
-    }
-  }
-
   async updateTask(
     id: string,
     userId: string,
@@ -507,6 +476,22 @@ export class TaskService {
 
     const slug = slugify(dto.title);
 
+    // Cek apakah slug duplicate
+    const isDuplicate = await SlugHelper.checkDuplicateSlug(
+      this.taskRepository,
+      slug,
+      'task_id',
+      id,
+    );
+
+    if (isDuplicate) {
+      return new BaseResponseDto(
+        400,
+        false,
+        `Task with title "${dto.title}" has been registered`,
+      );
+    }
+
     existingTask.title = dto.title;
     existingTask.slug = slug;
     existingTask.description = dto.description;
@@ -523,11 +508,13 @@ export class TaskService {
 
     const updatedTask = await this.taskRepository.save(existingTask);
 
+    const { task_id } = updatedTask;
+
     // Sinkronisasi relasi
     if (dto.gradeIds) {
-      await this.syncTaskGrades(updatedTask.task_id, dto.gradeIds);
+      await this.taskGradeService.syncTaskGrades(task_id, dto.gradeIds);
     } else {
-      await this.taskGradeRepository.delete({ task_id: updatedTask.task_id });
+      await this.taskGradeService.deleteTaskGrades(task_id);
     }
 
     if (dto.questions) {
@@ -611,7 +598,7 @@ export class TaskService {
     await this.taskQuestionService.deleteTaskQuestion(id);
 
     // Hapus data di task_grades
-    await this.taskGradeRepository.delete({ task_id: id });
+    await this.taskGradeService.deleteTaskGrades(id);
 
     // Hapus task
     await this.taskRepository.delete(id);

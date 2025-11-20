@@ -15,22 +15,28 @@ import { FilterClassDto } from './dto/requests/filter-class.dto';
 import { ClassOverviewResponseDto } from './dto/responses/class-overview-response.dto';
 import { UserService } from '../users/users.service';
 import { ClassDetailResponseDto } from './dto/responses/class-detail-response.dto';
-import { ClassStudent } from '../class-students/entities/class-student.entity';
 import { CreateClassDto } from './dto/requests/create-class.dto';
 import { UpdateClassDto } from './dto/requests/update-class.dto';
 import { ClassMemberResponseDto } from './dto/responses/class-member-response.dto';
 import { FilterClassMemberDto } from './dto/requests/filter-class-member.dto';
 import { UserRole } from '../roles/enums/user-role.enum';
 import { getResponseMessage } from 'src/common/utils/get-response-message.util';
+import { ClassStudentService } from '../class-students/class-students.service';
+import { ClassStudentOverviewResponseDto } from '../class-students/dto/responses/class-student-overview-reponse.dto';
+import { MasterHistoryService } from '../master-history/master-history.service';
+import { MasterHistoryTransactionType } from '../master-history/enums/master-history-transaction-type';
+import { getMasterHistoryDescription } from 'src/common/utils/get-master-history-description.util';
+import { ClassGradeService } from '../class-grades/class-grades.service';
 
 @Injectable()
 export class ClassService {
   constructor(
     @InjectRepository(Class)
     private readonly classRepository: Repository<Class>,
-    @InjectRepository(ClassStudent)
-    private readonly classStudentRepository: Repository<ClassStudent>,
+    private readonly classGradeService: ClassGradeService,
+    private readonly classStudentService: ClassStudentService,
     private readonly userService: UserService,
+    private readonly masterHistoryService: MasterHistoryService,
     private readonly fileUploadService: FileUploadService,
   ) {}
 
@@ -64,7 +70,10 @@ export class ClassService {
     }
 
     // Siapkan QueryBuilder berdasarkan role
-    const qb = this.classRepository.createQueryBuilder('class');
+    const qb = this.classRepository
+      .createQueryBuilder('class')
+      .leftJoin('class.classGrades', 'classGrade')
+      .leftJoin('classGrade.grade', 'grade');
 
     if (user.role.name === UserRole.STUDENT) {
       // Untuk student → ambil class dari class_students
@@ -82,10 +91,26 @@ export class ClassService {
       );
     }
 
+    // Select and group by
+    qb.select([
+      'class.class_id AS "classId"',
+      'class.name AS "name"',
+      'class.slug AS "slug"',
+      'class.image AS "image"',
+      `STRING_AGG(DISTINCT REPLACE(grade.name, 'Kelas ', ''), ', ') AS "classGrade"`,
+    ])
+      .groupBy('class.class_id')
+      .addGroupBy('class.name');
+
     // Filter pencarian (opsional)
     if (filterDto.searchText) {
       qb.andWhere('class.name ILIKE :searchText', {
         searchText: `%${filterDto.searchText}%`,
+      });
+    }
+    if (filterDto.gradeIds?.length) {
+      qb.andWhere('classGrade.grade_id IN (:...gradeIds)', {
+        gradeIds: filterDto.gradeIds,
       });
     }
 
@@ -94,14 +119,6 @@ export class ClassService {
     const orderState = filterDto.orderState ?? 'DESC';
     const dbColumn = getDbColumn(Class, orderBy as keyof Class);
     qb.orderBy(`class.${dbColumn}`, orderState);
-
-    // Select kolom yang dibutuhkan saja
-    qb.select([
-      'class.class_id AS "classId"',
-      'class.name AS "name"',
-      'class.slug AS "slug"',
-      'class.image AS "image"',
-    ]);
 
     // Eksekusi query
     const rawClasses = await qb.getRawMany();
@@ -112,6 +129,7 @@ export class ClassService {
       name: c.name,
       slug: c.slug,
       image: c.image ?? null,
+      grade: c.classGrade,
     }));
 
     return classOverviews;
@@ -135,14 +153,29 @@ export class ClassService {
     }
 
     //  Siapkan QueryBuilder untuk ambil kelas yang belum diikuti student
-    const qb = this.classRepository.createQueryBuilder('class').where(
-      `class.class_id NOT IN (
+    const qb = this.classRepository
+      .createQueryBuilder('class')
+      .leftJoin('class.classGrades', 'classGrade')
+      .leftJoin('classGrade.grade', 'grade')
+      .where(
+        `class.class_id NOT IN (
         SELECT cs.class_id
         FROM class_students cs
         WHERE cs.student_id = :userId
       )`,
-      { userId },
-    );
+        { userId },
+      );
+
+    // Select + group by
+    qb.select([
+      'class.class_id AS "classId"',
+      'class.name AS "name"',
+      'class.slug AS "slug"',
+      'class.image AS "image"',
+      `STRING_AGG(DISTINCT REPLACE(grade.name, 'Kelas ', ''), ', ') AS "classGrade"`,
+    ])
+      .groupBy('class.class_id')
+      .addGroupBy('class.name');
 
     // Filter pencarian (opsional)
     if (filterDto.searchText) {
@@ -150,17 +183,14 @@ export class ClassService {
         searchText: `%${filterDto.searchText}%`,
       });
     }
+    if (filterDto.gradeIds?.length) {
+      qb.andWhere('classGrade.grade_id IN (:...gradeIds)', {
+        gradeIds: filterDto.gradeIds,
+      });
+    }
 
     // Urutkan hasil (default: createdAt DESC)
     qb.orderBy('class.created_at', 'DESC');
-
-    // Select kolom yang dibutuhkan
-    qb.select([
-      'class.class_id AS "classId"',
-      'class.name AS "name"',
-      'class.slug AS "slug"',
-      'class.image AS "image"',
-    ]);
 
     //  Eksekusi query
     const rawClasses = await qb.getRawMany();
@@ -171,6 +201,7 @@ export class ClassService {
       name: c.name,
       slug: c.slug,
       image: c.image || null,
+      grade: c.classGrade,
     }));
 
     return classOverviews;
@@ -219,11 +250,10 @@ export class ClassService {
 
     const { class_id, teacher } = classData;
 
-    // (Optional) Ambil member (teacher + students)
-    const classStudents = await this.classStudentRepository.find({
-      where: { class: { class_id } },
-      relations: ['student'],
-    });
+    // Ambil member (teacher + students)
+
+    const classStudents: ClassStudentOverviewResponseDto[] =
+      await this.classStudentService.findClassStudents(class_id);
 
     const member: ClassMemberResponseDto = {
       teacher: [
@@ -232,9 +262,9 @@ export class ClassService {
           image: teacher?.image && teacher?.image !== '' ? teacher.image : null,
         },
       ],
-      students: classStudents.map((cs) => ({
-        name: cs.student.name,
-        image: cs.student.image !== '' ? cs.student.image : null,
+      students: classStudents.map((student) => ({
+        name: student.name,
+        image: student.image !== '' ? student.image : null,
       })),
     };
 
@@ -242,6 +272,7 @@ export class ClassService {
   }
 
   async createClass(
+    userId: string,
     dto: CreateClassDto,
     imageFile?: Express.Multer.File,
   ): Promise<BaseResponseDto> {
@@ -264,7 +295,7 @@ export class ClassService {
 
     let imageUrl = '';
 
-    // Buat subject baru
+    // Buat class baru
     const newClass = this.classRepository.create({
       name: dto.name,
       slug,
@@ -296,6 +327,30 @@ export class ClassService {
       savedClass.image = imageUrl;
     }
 
+    // Simpan ke class_grades
+    if (dto.gradeIds && dto.gradeIds.length > 0) {
+      await this.classGradeService.createClassGrades(
+        savedClass.class_id,
+        dto.gradeIds,
+      );
+    }
+
+    // Add event to master history
+    await this.masterHistoryService.createMasterHistory({
+      tableName: 'classes',
+      pkName: 'class_id',
+      pkValue: savedClass.class_id,
+      transactionType: MasterHistoryTransactionType.INSERT,
+      description: getMasterHistoryDescription(
+        MasterHistoryTransactionType.INSERT,
+        'class',
+        undefined,
+        savedClass,
+      ),
+      dataAfter: savedClass,
+      createdBy: userId,
+    });
+
     const response: BaseResponseDto = {
       status: 200,
       isSuccess: true,
@@ -324,6 +379,7 @@ export class ClassService {
 
   async updateClass(
     id: string,
+    userId: string,
     dto: UpdateClassDto,
     imageFile?: Express.Multer.File,
   ): Promise<BaseResponseDto> {
@@ -383,7 +439,33 @@ export class ClassService {
     existingClass.updated_by = dto.updatedBy;
 
     // Simpan perubahan utama kelas
-    await this.classRepository.save(existingClass);
+    const updatedClass = await this.classRepository.save(existingClass);
+
+    const { class_id } = updatedClass;
+
+    // Sinkronisasi relasi
+    if (dto.gradeIds) {
+      await this.classGradeService.syncClassGrades(class_id, dto.gradeIds);
+    } else {
+      await this.classGradeService.deleteClassGrades(class_id);
+    }
+
+    // Add event to master history
+    await this.masterHistoryService.createMasterHistory({
+      tableName: 'classes',
+      pkName: 'class_id',
+      pkValue: updatedClass.class_id,
+      transactionType: MasterHistoryTransactionType.UPDATE,
+      description: getMasterHistoryDescription(
+        MasterHistoryTransactionType.UPDATE,
+        'class',
+        existingClass,
+        updatedClass,
+      ),
+      dataBefore: existingClass,
+      dataAfter: updatedClass,
+      createdBy: userId,
+    });
 
     const response: BaseResponseDto = {
       status: 200,

@@ -3,5 +3,6 @@ export class ClassOverviewResponseDto {
   name: string;
   slug: string;
   image?: string;
+  grade?: string;
   studentCount?: number;
 }

@@ -3,25 +3,25 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Class } from '../classes/entities/class.entity';
 import { ClassTask } from '../class-tasks/entities/class-task.entity';
 import { TaskAttempt } from '../task-attempts/entities/task-attempt.entity';
-import { TaskAnswerLog } from '../task-answer-logs/entities/task-answer-log.entity';
-import { ClassTaskController } from './class-tasks.controller';
-import { ClassTaskService } from './class-tasks.service';
-import { Task } from '../tasks/entities/task.entity';
+import { ClassStudent } from './entities/class-student.entity';
 import { ActivityLogModule } from '../activty-logs/activity-logs.module';
+import { ClassStudentController } from './class-students.controller';
+import { ClassStudentService } from './class-students.service';
+import { TaskSubmission } from '../task-submissions/entities/task-submission.entity';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([
-      ClassTask,
+      ClassStudent,
       Class,
-      Task,
+      ClassTask,
       TaskAttempt,
-      TaskAnswerLog,
+      TaskSubmission,
     ]),
     ActivityLogModule,
   ],
-  controllers: [ClassTaskController],
-  providers: [ClassTaskService],
-  exports: [ClassTaskService],
+  controllers: [ClassStudentController],
+  providers: [ClassStudentService],
+  exports: [ClassStudentService],
 })
-export class ClassTaskModule {}
+export class ClassStudentModule {}

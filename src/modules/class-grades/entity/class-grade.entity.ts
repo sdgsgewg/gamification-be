@@ -1,5 +1,5 @@
+import { Class } from 'src/modules/classes/entities/class.entity';
 import { Grade } from 'src/modules/grades/entities/grade.entity';
-import { Task } from 'src/modules/tasks/entities/task.entity';
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -8,8 +8,8 @@ import {
   ManyToOne,
 } from 'typeorm';
 
-@Entity('task_grades')
-export class TaskGrade {
+@Entity('class_grades')
+export class ClassGrade {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
@@ -20,15 +20,15 @@ export class TaskGrade {
   })
   createdAt: Date;
 
-  @Column({ name: 'task_id', type: 'uuid' })
-  taskId: string;
+  @Column({ name: 'class_id', type: 'uuid' })
+  classId: string;
 
   @Column({ name: 'grade_id', type: 'uuid' })
   gradeId: string;
 
-  @ManyToOne(() => Task)
-  @JoinColumn({ name: 'task_id' })
-  task: Task;
+  @ManyToOne(() => Class)
+  @JoinColumn({ name: 'class_id' })
+  class: Class;
 
   @ManyToOne(() => Grade)
   @JoinColumn({ name: 'grade_id' })

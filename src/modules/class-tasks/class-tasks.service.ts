@@ -46,6 +46,10 @@ import { QuestionOptionResponseDto } from '../task-question-options/dto/response
 import { AnswerLogResponseDto } from '../task-answer-logs/dto/responses/answer-log-response.dto';
 import { RecentAttemptResponseDto } from '../task-attempts/dto/responses/recent-attempt-response.dto';
 import { CurrentAttemptResponseDto } from '../task-attempts/dto/responses/current-attempt-response.dto';
+import { ActivityLogService } from '../activty-logs/activity-logs.service';
+import { ActivityLogEventType } from '../activty-logs/enums/activity-log-event-type';
+import { getActivityLogDescription } from 'src/common/utils/get-activity-log-description.util';
+import { UserRole } from '../roles/enums/user-role.enum';
 
 @Injectable()
 export class ClassTaskService {
@@ -60,10 +64,11 @@ export class ClassTaskService {
     private readonly taskAttemptRepository: Repository<TaskAttempt>,
     @InjectRepository(TaskAnswerLog)
     private readonly taskAnswerLogRepository: Repository<TaskAnswerLog>,
+    private readonly activityLogService: ActivityLogService,
   ) {}
 
   /**
-   * Find tasks from all classes
+   * Find tasks from all classes (grouped by date)
    */
   async findTasksFromAllClasses(
     userId: string,
@@ -164,6 +169,77 @@ export class ClassTaskService {
     );
 
     return Object.values(grouped);
+  }
+
+  /**
+   * Find tasks from all classes
+   */
+  async findTasksFromAllClassesList(
+    userId: string,
+    filterDto: FilterTaskAttemptDto,
+  ): Promise<TaskAttemptOverviewResponseDto[]> {
+    // Ambil semua class task dengan relasi task dan class
+    const classTasks = await this.classTaskRepository.find({
+      relations: {
+        task: true,
+        class: true,
+      },
+      order: {
+        end_time: 'DESC',
+      },
+    });
+
+    if (!classTasks.length) {
+      throw new NotFoundException(`No class tasks found`);
+    }
+
+    // Ambil semua task attempt user
+    const attempts = await this.taskAttemptRepository.find({
+      where: { student_id: userId },
+      relations: { task: true, class: true },
+    });
+
+    // Gabungkan classTask + attempt
+    const combined = classTasks.map((ct) => {
+      const matchingAttempt = attempts.find(
+        (a) => a.task_id === ct.task_id && a.class_id === ct.class_id,
+      );
+
+      return {
+        classTask: ct,
+        attempt: matchingAttempt ?? null,
+      };
+    });
+
+    // Filter status jika ada
+    let filtered = combined;
+    if (filterDto.status) {
+      filtered = filtered.filter((item) =>
+        item.attempt
+          ? item.attempt.status === filterDto.status
+          : filterDto.status === TaskAttemptStatus.NOT_STARTED,
+      );
+    }
+
+    // Mapping ke flat DTO
+    const result: TaskAttemptOverviewResponseDto[] = filtered.map(
+      ({ classTask, attempt }) => {
+        const task = classTask.task;
+        const classEntity = classTask.class;
+
+        return {
+          id: attempt?.task_attempt_id ?? null,
+          title: task.title,
+          image: task.image || null,
+          status: attempt?.status ?? TaskAttemptStatus.NOT_STARTED,
+          classSlug: classEntity.slug,
+          taskSlug: task.slug,
+          deadline: getDate(classTask.end_time),
+        };
+      },
+    );
+
+    return result;
   }
 
   /**
@@ -837,10 +913,11 @@ export class ClassTaskService {
    */
   async shareTaskIntoClasses(
     dto: ShareTaskIntoClassesDto,
+    userId: string,
   ): Promise<BaseResponseDto> {
     const { taskId, classIds, startTime, endTime } = dto;
 
-    if (!classIds || classIds.length === 0) {
+    if (!classIds?.length) {
       return {
         status: 400,
         isSuccess: false,
@@ -848,6 +925,7 @@ export class ClassTaskService {
       };
     }
 
+    // Load task with needed fields
     const task = await this.taskRepository.findOne({
       where: { task_id: taskId },
     });
@@ -863,6 +941,7 @@ export class ClassTaskService {
     const finalStartTime = startTime ?? task.start_time ?? null;
     const finalEndTime = endTime ?? task.end_time ?? null;
 
+    // Simpan class tasks
     const newClassTasks = classIds.map((classId) =>
       this.classTaskRepository.create({
         class_id: classId,
@@ -872,12 +951,10 @@ export class ClassTaskService {
       }),
     );
 
-    // Simpan semua sekaligus
     await this.classTaskRepository.save(newClassTasks);
 
-    // Buat task attempt untuk siswa di kelas
+    // Loop class satu per satu
     for (const classId of classIds) {
-      // ambil semua student di kelas tersebut
       const classEntity = await this.classRepository.findOne({
         where: { class_id: classId },
         relations: {
@@ -887,33 +964,45 @@ export class ClassTaskService {
         },
       });
 
-      if (
-        !classEntity ||
-        !classEntity.classStudents ||
-        classEntity.classStudents.length === 0
-      )
-        continue;
+      // Create activity log
+      if (classEntity) {
+        const description = getActivityLogDescription(
+          ActivityLogEventType.SHARE_TASK,
+          'class task',
+          { task, class: classEntity },
+          UserRole.TEACHER,
+        );
 
-      // siapkan task attempts
-      const taskAttempts = classEntity.classStudents.map((cs) =>
-        this.taskAttemptRepository.create({
-          task_id: taskId,
-          student_id: cs.student.user_id,
-          class_id: classId,
-          status: TaskAttemptStatus.NOT_STARTED,
-        }),
-      );
+        await this.activityLogService.createActivityLog({
+          userId,
+          eventType: ActivityLogEventType.SHARE_TASK,
+          description,
+          metadata: {
+            task_id: task.task_id,
+            class_id: classEntity.class_id,
+          },
+        });
+      }
 
-      // simpan sekaligus biar efisien
-      await this.taskAttemptRepository.save(taskAttempts);
+      // Create task attempts
+      if (classEntity?.classStudents?.length) {
+        const taskAttempts = classEntity.classStudents.map((cs) =>
+          this.taskAttemptRepository.create({
+            task_id: taskId,
+            student_id: cs.student.user_id,
+            class_id: classId,
+            status: TaskAttemptStatus.NOT_STARTED,
+          }),
+        );
+
+        await this.taskAttemptRepository.save(taskAttempts);
+      }
     }
 
-    const response: BaseResponseDto = {
+    return {
       status: 200,
       isSuccess: true,
       message: 'Task has been shared into selected classes.',
     };
-
-    return response;
   }
 }

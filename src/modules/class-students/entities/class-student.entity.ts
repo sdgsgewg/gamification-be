@@ -13,11 +13,8 @@ export class ClassStudent {
   @PrimaryGeneratedColumn('uuid')
   class_student_id: string;
 
-  @Column({ type: 'timestamptz' })
-  join_date: Date;
-
   @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
-  created_at: string;
+  created_at: Date;
 
   @Column({ type: 'uuid' })
   class_id: string;

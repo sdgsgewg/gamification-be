@@ -6,7 +6,7 @@ export class TaskAttemptOverviewResponseDto {
   classSlug?: string;
   taskSlug?: string;
   deadline: string;
-  lastAccessedTime: string;
+  lastAccessedTime?: string;
   submittedTime?: string;
   completedTime?: string;
 }

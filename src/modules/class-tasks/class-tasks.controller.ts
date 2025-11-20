@@ -22,7 +22,7 @@ export class ClassTaskController {
 
   /**
    * [GET] /class-tasks
-   * Mendapatkan daftar tugas (task) dari semua kelas
+   * Mendapatkan daftar tugas (task) dari semua kelas dan grouped by date
    */
   @Get('')
   @UseGuards(JwtAuthGuard)
@@ -32,6 +32,20 @@ export class ClassTaskController {
   ) {
     const userId = req.user?.id || null;
     return this.classTaskService.findTasksFromAllClasses(userId, filterDto);
+  }
+
+  /**
+   * [GET] /class-tasks/list
+   * Mendapatkan daftar tugas (task) dari semua kelas
+   */
+  @Get('list')
+  @UseGuards(JwtAuthGuard)
+  async getTasksFromAllClassesList(
+    @Req() req: any,
+    @Query() filterDto: FilterTaskAttemptDto,
+  ) {
+    const userId = req.user?.id || null;
+    return this.classTaskService.findTasksFromAllClassesList(userId, filterDto);
   }
 
   /**
@@ -150,7 +164,12 @@ export class ClassTaskController {
    * Membagikan tugas ke kelas yang sudah dipilih
    */
   @Post()
-  async shareTaskIntoClasses(@Body() dto: ShareTaskIntoClassesDto) {
-    return this.classTaskService.shareTaskIntoClasses(dto);
+  @UseGuards(JwtAuthGuard)
+  async shareTaskIntoClasses(
+    @Body() dto: ShareTaskIntoClassesDto,
+    @Req() req: any,
+  ) {
+    const userId = req.user?.id || null;
+    return this.classTaskService.shareTaskIntoClasses(dto, userId);
   }
 }

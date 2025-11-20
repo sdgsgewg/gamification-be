@@ -5,6 +5,9 @@ export class CreateClassDto {
   name: string;
 
   @IsNotEmpty()
+  gradeIds: string[];
+
+  @IsNotEmpty()
   createdBy: string;
 
   @IsNotEmpty()

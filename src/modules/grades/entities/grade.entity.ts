@@ -1,3 +1,4 @@
+import { ClassGrade } from 'src/modules/class-grades/entity/class-grade.entity';
 import { MaterialGrade } from 'src/modules/material-grades/entities/material-grade.entity';
 import { TaskGrade } from 'src/modules/task-grades/entities/task-grade.entity';
 import { User } from 'src/modules/users/entities/user.entity';
@@ -22,4 +23,7 @@ export class Grade {
 
   @OneToMany(() => TaskGrade, (tg) => tg.grade)
   taskGrades: TaskGrade[];
+
+  @OneToMany(() => ClassGrade, (cg) => cg.grade)
+  classGrades: ClassGrade[];
 }

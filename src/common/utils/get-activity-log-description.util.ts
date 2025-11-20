@@ -31,6 +31,15 @@ export function getActivityLogDescription(
           ? `You have graded ${data?.student?.name || 'a student'}'s submission from class "${data?.class?.name || 'Unnamed Class'}" for "${data?.task.title || 'Unnamed Task'}".`
           : '';
 
+    case ActivityLogEventType.SHARE_TASK:
+      return `You have shared the task "${data?.task.title || 'Unnamed Task'}" into class "${data?.class.name || 'Unnamed Class'}".`;
+
+    case ActivityLogEventType.JOIN_CLASS:
+      return `You have joined class "${data?.class?.name || 'Unnamed Class'}".`;
+
+    case ActivityLogEventType.LEAVE_CLASS:
+      return `You have leaved class "${data?.class?.name || 'Unnamed Class'}".`;
+
     case ActivityLogEventType.LOGIN:
       return `You logged in to the system.`;
 

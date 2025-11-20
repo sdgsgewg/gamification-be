@@ -30,6 +30,8 @@ import { TaskGradeModule } from './modules/task-grades/task-grades.module';
 import { PasswordResetModule } from './modules/password_resets/password-resets.module';
 import { UserSessionModule } from './modules/user-sessions/user-sessions.module';
 import { CommonModule } from './common/common.module';
+import { ClassStudentModule } from './modules/class-students/class-students.module';
+import { ClassGradeModule } from './modules/class-grades/class-grades.module';
 
 @Module({
   imports: [
@@ -71,6 +73,8 @@ import { CommonModule } from './common/common.module';
     TaskAnswerLogModule,
     LeaderboardModule,
     ClassModule,
+    ClassGradeModule,
+    ClassStudentModule,
     ClassTaskModule,
     TaskSubmissionModule,
     MasterHistoryModule,

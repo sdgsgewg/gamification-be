@@ -1,10 +1,13 @@
-import { IsNotEmpty, IsOptional, ValidateIf } from 'class-validator';
+import { IsOptional, ValidateIf } from 'class-validator';
 
 export class UpdateClassDto {
-  @IsNotEmpty()
+  @IsOptional()
   name: string;
 
-  @IsNotEmpty()
+  @IsOptional()
+  gradeIds: string[];
+
+  @IsOptional()
   updatedBy: string;
 
   @IsOptional()

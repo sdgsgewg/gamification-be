@@ -1,3 +1,4 @@
+import { ClassGrade } from 'src/modules/class-grades/entity/class-grade.entity';
 import { ClassStudent } from 'src/modules/class-students/entities/class-student.entity';
 import { ClassTask } from 'src/modules/class-tasks/entities/class-task.entity';
 import { TaskAttempt } from 'src/modules/task-attempts/entities/task-attempt.entity';
@@ -46,6 +47,9 @@ export class Class {
   @ManyToOne(() => User)
   @JoinColumn({ name: 'teacher_id' })
   teacher: User;
+
+  @OneToMany(() => ClassGrade, (cg) => cg.class)
+  classGrades: ClassGrade[];
 
   @OneToMany(() => ClassStudent, (cs) => cs.class)
   classStudents: ClassStudent[];

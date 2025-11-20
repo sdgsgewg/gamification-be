@@ -70,23 +70,31 @@ export class ClassController {
   }
 
   @Post()
+  @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('imageFile'))
   async create(
     @UploadedFile() file: Express.Multer.File,
     @Body('data') rawData: string,
+    @Req() req: any,
   ) {
     const dto: CreateClassDto = JSON.parse(rawData);
-    return this.classService.createClass(dto, file);
+    // Ambil userId dari request (kalau user login)
+    const userId = req.user?.id || null;
+    return this.classService.createClass(userId, dto, file);
   }
 
   @Put(':id')
+  @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('imageFile'))
   async update(
     @Param('id') id: string,
     @UploadedFile() file: Express.Multer.File,
     @Body('data') rawData: string,
+    @Req() req: any,
   ) {
     const dto: UpdateClassDto = JSON.parse(rawData);
-    return this.classService.updateClass(id, dto, file);
+    // Ambil userId dari request (kalau user login)
+    const userId = req.user?.id || null;
+    return this.classService.updateClass(id, userId, dto, file);
   }
 }
