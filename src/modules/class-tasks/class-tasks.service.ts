@@ -50,6 +50,10 @@ import { ActivityLogService } from '../activty-logs/activity-logs.service';
 import { ActivityLogEventType } from '../activty-logs/enums/activity-log-event-type';
 import { getActivityLogDescription } from 'src/common/utils/get-activity-log-description.util';
 import { UserRole } from '../roles/enums/user-role.enum';
+import {
+  ClassResponse,
+  ClassTaskOverviewResponseDto,
+} from './dto/responses/class-task-overview-response.dto';
 
 @Injectable()
 export class ClassTaskService {
@@ -177,7 +181,7 @@ export class ClassTaskService {
   async findTasksFromAllClassesList(
     userId: string,
     filterDto: FilterTaskAttemptDto,
-  ): Promise<TaskAttemptOverviewResponseDto[]> {
+  ): Promise<ClassTaskOverviewResponseDto[]> {
     // Ambil semua class task dengan relasi task dan class
     const classTasks = await this.classTaskRepository.find({
       relations: {
@@ -222,17 +226,23 @@ export class ClassTaskService {
     }
 
     // Mapping ke flat DTO
-    const result: TaskAttemptOverviewResponseDto[] = filtered.map(
+    const result: ClassTaskOverviewResponseDto[] = filtered.map(
       ({ classTask, attempt }) => {
         const task = classTask.task;
         const classEntity = classTask.class;
+
+        const classData: ClassResponse = {
+          id: classEntity.class_id,
+          name: classEntity.name,
+          slug: classEntity.slug,
+        };
 
         return {
           id: attempt?.task_attempt_id ?? null,
           title: task.title,
           image: task.image || null,
           status: attempt?.status ?? TaskAttemptStatus.NOT_STARTED,
-          classSlug: classEntity.slug,
+          class: classData,
           taskSlug: task.slug,
           deadline: getDate(classTask.end_time),
         };
@@ -997,6 +1007,13 @@ export class ClassTaskService {
 
         await this.taskAttemptRepository.save(taskAttempts);
       }
+    }
+
+    // Update status task menjadi PUBLISHED
+    if (!task.is_published || !task.published_at) {
+      task.is_published = true;
+      task.published_at = new Date();
+      await this.taskRepository.save(task);
     }
 
     return {

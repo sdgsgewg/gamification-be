@@ -7,6 +7,7 @@ import { BaseResponseDto } from 'src/common/responses/base-response.dto';
 import { ActivityLogOverviewResponseDto } from './dto/responses/activity-log-overview-response.dto';
 import { getDate } from 'src/common/utils/date-modifier.util';
 import { ActivityLogEventType } from './enums/activity-log-event-type';
+import { UserRole } from '../roles/enums/user-role.enum';
 
 @Injectable()
 export class ActivityLogService {
@@ -17,18 +18,22 @@ export class ActivityLogService {
 
   async findUserActivityLogs(
     userId: string,
+    role?: string,
   ): Promise<ActivityLogOverviewResponseDto[]> {
-    const activityLogs = await this.activityLogRepository.find({
-      where: {
-        user_id: userId,
-      },
-      relations: {
-        user: true,
-      },
-      order: {
-        created_at: 'DESC',
-      },
-    });
+    const qb = this.activityLogRepository
+      .createQueryBuilder('al')
+      .leftJoinAndSelect('al.user', 'user')
+      .where('al.user_id = :userId', { userId });
+
+    if (role === UserRole.TEACHER) {
+      qb.andWhere('al.event_type != :eventType', {
+        eventType: ActivityLogEventType.TASK_SUBMITTED,
+      });
+    }
+
+    qb.orderBy('al.created_at', 'DESC');
+
+    const activityLogs = await qb.getMany();
 
     const activityLogOverviews: ActivityLogOverviewResponseDto[] =
       activityLogs.map((al) => ({

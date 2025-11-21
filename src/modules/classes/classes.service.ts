@@ -211,6 +211,8 @@ export class ClassService {
     // Ambil class berdasarkan slug
     const qb = this.classRepository
       .createQueryBuilder('class')
+      .leftJoinAndSelect('class.classGrades', 'classGrade')
+      .leftJoinAndSelect('classGrade.grade', 'grade')
       .where('class.slug = :slug', { slug: classSlug });
 
     const classData = await qb.getOne();
@@ -219,7 +221,7 @@ export class ClassService {
       throw new NotFoundException(`Class with slug ${classSlug} not found`);
     }
 
-    const { class_id, name, slug, description, image } = classData;
+    const { class_id, name, slug, description, classGrades, image } = classData;
 
     // Build DTO
     const classDetail: ClassDetailResponseDto = {
@@ -227,6 +229,12 @@ export class ClassService {
       name,
       slug,
       description,
+      gradeIds: classGrades ? classGrades.map((cg) => cg.gradeId) : [],
+      grade: classGrades
+        ? classGrades
+            .map((cg) => cg.grade.name.replace('Kelas ', ''))
+            .join(', ')
+        : null,
       image: image !== '' ? image : null,
     };
 

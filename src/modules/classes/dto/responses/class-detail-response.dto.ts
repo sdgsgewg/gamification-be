@@ -3,5 +3,7 @@ export class ClassDetailResponseDto {
   name: string;
   slug: string;
   description: string;
+  gradeIds: string[];
+  grade: string;
   image?: string;
 }

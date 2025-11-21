@@ -19,6 +19,7 @@ import { PasswordResetService } from 'src/modules/password_resets/password-reset
 import { LoginDetailResponseDto } from './dto/responses/login-detail-response';
 // import { UserOverviewResponseDto } from 'src/modules/users/dto/responses/user-overview-response.dto';
 import { UserDetailResponseDto } from 'src/modules/users/dto/responses/user-detail-response.dto';
+import { UpdateUserDto } from 'src/modules/users/dto/requests/update-user.dto';
 
 @Injectable()
 export class AuthService {
@@ -101,7 +102,13 @@ export class AuthService {
   ): Promise<BaseResponseDto> {
     const { name, username, gradeId } = dto;
 
-    await this.userService.updateProfile(userId, name, username, gradeId);
+    const payload: UpdateUserDto = {
+      name,
+      username,
+      gradeId,
+    };
+
+    await this.userService.updateProfile(userId, payload);
 
     return {
       status: 200,
@@ -124,6 +131,7 @@ export class AuthService {
 
       // Check password using bcrypt
       const isMatch = await bcrypt.compare(password, existingUser.password);
+
       if (!isMatch)
         throw new UnauthorizedException('Invalid email or password');
 

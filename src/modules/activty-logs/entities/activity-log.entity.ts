@@ -13,7 +13,7 @@ export class ActivityLog {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'uuid', nullable: true })
+  @Column({ type: 'uuid' })
   user_id: string;
 
   @Column({ type: 'varchar' })

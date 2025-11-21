@@ -18,6 +18,11 @@ import { UserRecentActivityResponse } from './dto/responses/user-recent-activity
 import { MasterHistoryService } from '../master-history/master-history.service';
 import { ActivityLogService } from '../activty-logs/activity-logs.service';
 import { UserRole } from '../roles/enums/user-role.enum';
+import { BaseResponseDto } from 'src/common/responses/base-response.dto';
+import { FileUploadService } from 'src/common/services/file-upload.service';
+import { UpdateUserDto } from './dto/requests/update-user.dto';
+import { MasterHistoryTransactionType } from '../master-history/enums/master-history-transaction-type';
+import { getMasterHistoryDescription } from 'src/common/utils/get-master-history-description.util';
 
 @Injectable()
 export class UserService {
@@ -27,6 +32,7 @@ export class UserService {
     private readonly roleService: RoleService,
     private readonly masterHistoryService: MasterHistoryService,
     private readonly activityLogService: ActivityLogService,
+    private readonly fileUploadService: FileUploadService,
   ) {}
 
   async findAllUsers(
@@ -94,8 +100,11 @@ export class UserService {
       password: userWithRelations.password,
       gender: userWithRelations.gender,
       phone: userWithRelations.phone,
-      dob: `${getDateTime(userWithRelations.dob)}`,
-      image: userWithRelations.image ?? null,
+      dob: userWithRelations.dob ?? null,
+      image:
+        userWithRelations.image && userWithRelations.image !== ''
+          ? userWithRelations.image
+          : null,
       role: userWithRelations.role
         ? {
             roleId: userWithRelations.role.role_id,
@@ -238,27 +247,85 @@ export class UserService {
 
   async updateProfile(
     userId: string,
-    name: string,
-    username: string,
-    gradeId?: string,
-  ): Promise<void> {
+    dto: UpdateUserDto,
+    imageFile?: Express.Multer.File,
+  ): Promise<BaseResponseDto> {
     // Pastikan username unik (cek user lain)
-    const existingUser = await this.userRepository.findOne({
-      where: { username },
+    const existingUserByUsername = await this.userRepository.findOne({
+      where: { username: dto.username },
     });
 
-    if (existingUser && existingUser.user_id !== userId) {
-      throw new BadRequestException('Username sudah digunakan');
+    if (existingUserByUsername && existingUserByUsername.user_id !== userId) {
+      return new BaseResponseDto(
+        400,
+        false,
+        `User with username "${dto.username}" is already registered.`,
+      );
     }
 
-    await this.userRepository.update(
-      { user_id: userId },
-      {
-        name,
-        username,
-        grade_id: gradeId ?? null,
-      },
-    );
+    const existingUser = await this.userRepository.findOne({
+      where: { user_id: userId },
+    });
+
+    let imageUrl = existingUser.image;
+
+    // Jika ada file baru, upload dan hapus file lama jika ada
+    if (imageFile) {
+      // Hapus file lama jika ada
+      if (existingUser.image) {
+        await this.fileUploadService.deleteImage(existingUser.image, 'users');
+      }
+
+      // Convert Multer file to DTO
+      const fileDto = this.fileUploadService.convertMulterFileToDto(imageFile);
+
+      // Upload file baru
+      const uploadResult = await this.fileUploadService.uploadImage(
+        fileDto,
+        existingUser.user_id,
+        'users',
+        false,
+      );
+
+      imageUrl = uploadResult.url;
+    }
+
+    // Update properti yang ada
+    existingUser.name = dto.name;
+    existingUser.username = dto.username;
+    existingUser.gender = dto.gender;
+    existingUser.phone = dto.phone;
+    existingUser.dob = dto.dob ?? null;
+    existingUser.image = imageUrl;
+    existingUser.updateAt = new Date();
+
+    // Simpan perubahan utama user
+    const updatedUser = await this.userRepository.save(existingUser);
+
+    // Add event to master history
+    await this.masterHistoryService.createMasterHistory({
+      tableName: 'users',
+      pkName: 'user_id',
+      pkValue: updatedUser.user_id,
+      transactionType: MasterHistoryTransactionType.UPDATE,
+      description: getMasterHistoryDescription(
+        MasterHistoryTransactionType.UPDATE,
+        'user',
+        existingUser,
+        updatedUser,
+      ),
+      dataBefore: existingUser,
+      dataAfter: updatedUser,
+      createdBy: userId,
+    });
+
+    const response: BaseResponseDto = {
+      status: 200,
+      isSuccess: true,
+      message: 'Profile has been updated!',
+    };
+
+    return response;
   }
 
   async updateLevelAndXp(userId: string, xpGained: number): Promise<void> {
@@ -281,10 +348,23 @@ export class UserService {
   async findUserRecentActivities(
     userId: string,
   ): Promise<UserRecentActivityResponse[]> {
+    const user = await this.userRepository.findOne({
+      where: { user_id: userId },
+      relations: {
+        role: true,
+      },
+    });
+
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+
     const userMasterHistories =
       await this.masterHistoryService.findUserMasterHistory(userId);
-    const userActivityLogs =
-      await this.activityLogService.findUserActivityLogs(userId);
+    const userActivityLogs = await this.activityLogService.findUserActivityLogs(
+      userId,
+      user.role.name,
+    );
 
     const userRecentActivities = userMasterHistories.concat(userActivityLogs);
 

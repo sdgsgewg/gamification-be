@@ -6,7 +6,7 @@ export class UserDetailResponseDto {
   password: string;
   gender: string;
   phone: string;
-  dob: string;
+  dob: Date;
   image: string;
   role: { roleId: string; name: string };
   grade: { gradeId: string; name: string };

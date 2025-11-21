@@ -70,7 +70,7 @@ export function getTimePeriod(startTime: Date, endTime: Date): string {
 }
 
 /**
- * Output: `Admin 1 (3 November 2025 (13:29 WIB))`
+ * Output: `Admin 1 (3 November 2025 (13:29))`
  */
 export function getDateTimeWithName(date: Date, name?: string): string {
   if (!date) return '';
@@ -97,7 +97,7 @@ export function getDateTimeWithName(date: Date, name?: string): string {
   const hours = date.getHours().toString().padStart(2, '0');
   const minutes = date.getMinutes().toString().padStart(2, '0');
 
-  return `${name} (${day} ${month} ${year}, ${hours}:${minutes} WIB)`;
+  return `${name} (${day} ${month} ${year}, ${hours}:${minutes})`;
 }
 
 /**

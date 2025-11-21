@@ -52,14 +52,21 @@ export class User {
   @Column({ type: 'timestamptz', nullable: true })
   email_verified_at: Date;
 
-  @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
-  created_at: Date;
-
   @Column({ type: 'int4', nullable: true })
   level: number;
 
   @Column({ type: 'int4', nullable: true })
   xp: number;
+
+  @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
+  created_at: Date;
+
+  @Column({
+    name: 'updated_at',
+    type: 'timestamptz',
+    nullable: true,
+  })
+  updateAt: Date;
 
   @Column({ type: 'uuid' })
   role_id: string;

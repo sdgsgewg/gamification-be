@@ -25,8 +25,8 @@ export class SubjectService {
   constructor(
     @InjectRepository(Subject)
     private readonly subjectRepository: Repository<Subject>,
-    private readonly fileUploadService: FileUploadService,
     private readonly masterHistoryService: MasterHistoryService,
+    private readonly fileUploadService: FileUploadService,
   ) {}
 
   async findAllSubjects(
@@ -270,7 +270,7 @@ export class SubjectService {
       return new DetailResponseDto<SubjectDetailResponseDto>(
         400,
         false,
-        `Mata pelajaran dengan nama "${dto.name}" sudah terdaftar`,
+        `Subject with name "${dto.name}" is already registered.`,
       );
     }
 
