@@ -208,7 +208,7 @@ export class TaskAttemptService {
     return Object.values(grouped);
   }
 
-  async findMostPopularTask(): Promise<MostPopularTaskResponseDto> {
+  async findMostPopularTask(): Promise<MostPopularTaskResponseDto[]> {
     const qb = this.taskAttemptRepository
       .createQueryBuilder('attempt')
       .leftJoin('attempt.task', 'task')
@@ -227,20 +227,22 @@ export class TaskAttemptService {
       })
       .groupBy('task.task_id')
       .orderBy('"attemptCount"', 'DESC')
-      .limit(1);
+      .limit(5);
 
-    const result = await qb.getRawOne();
+    const result = await qb.getRawMany();
 
     if (!result) {
       return null;
     }
 
-    return {
-      id: result.taskId,
-      title: result.title,
-      attemptCount: Number(result.attemptCount),
-      createdBy: result.createdBy,
-    };
+    const data = result.map((item) => ({
+      id: item.taskId,
+      title: item.title,
+      attemptCount: Number(item.attemptCount),
+      createdBy: item.createdBy,
+    }));
+
+    return data;
   }
 
   async findTaskAttemptById(attemptId: string) {
