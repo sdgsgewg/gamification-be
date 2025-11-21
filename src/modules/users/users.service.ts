@@ -23,12 +23,17 @@ import { FileUploadService } from 'src/common/services/file-upload.service';
 import { UpdateUserDto } from './dto/requests/update-user.dto';
 import { MasterHistoryTransactionType } from '../master-history/enums/master-history-transaction-type';
 import { getMasterHistoryDescription } from 'src/common/utils/get-master-history-description.util';
+import { UserSession } from '../user-sessions/entities/user-sessions.entity';
+import { UserLastLoginResponseDto } from './dto/responses/user-last-login-response.dto';
+import { UserRoleCountResponseDto } from './dto/responses/user-role-count-response.dto';
 
 @Injectable()
 export class UserService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(UserSession)
+    private readonly userSessionRepository: Repository<UserSession>,
     private readonly roleService: RoleService,
     private readonly masterHistoryService: MasterHistoryService,
     private readonly activityLogService: ActivityLogService,
@@ -91,6 +96,28 @@ export class UserService {
     return userOverviews;
   }
 
+  async findUserRoleCounts(): Promise<UserRoleCountResponseDto> {
+    const qb = this.userRepository
+      .createQueryBuilder('user')
+      .leftJoin('user.role', 'role');
+
+    const raw = await qb
+      .select([
+        'COUNT(*) AS "totalUsers"',
+        `COUNT(CASE WHEN role.name = '${UserRole.ADMIN}' THEN 1 END) AS "totalAdmins"`,
+        `COUNT(CASE WHEN role.name = '${UserRole.TEACHER}' THEN 1 END) AS "totalTeachers"`,
+        `COUNT(CASE WHEN role.name = '${UserRole.STUDENT}' THEN 1 END) AS "totalStudents"`,
+      ])
+      .getRawOne();
+
+    return {
+      totalUsers: Number(raw.totalUsers),
+      totalAdmins: Number(raw.totalAdmins),
+      totalTeachers: Number(raw.totalTeachers),
+      totalStudents: Number(raw.totalStudents),
+    };
+  }
+
   private getUserDetailData(userWithRelations: User): UserDetailResponseDto {
     const data: UserDetailResponseDto = {
       userId: userWithRelations.user_id,
@@ -151,6 +178,23 @@ export class UserService {
     }
 
     return this.getUserDetailData(user);
+  }
+
+  async findUserLastLogin(userId: string): Promise<UserLastLoginResponseDto> {
+    const lastSession = await this.userSessionRepository.findOne({
+      where: { user_id: userId },
+      order: { created_at: 'DESC' },
+    });
+
+    const { user_id, device_info, created_at } = lastSession;
+
+    const data: UserLastLoginResponseDto = {
+      id: user_id,
+      deviceInfo: device_info,
+      lastLoginAt: getDateTime(created_at),
+    };
+
+    return data;
   }
 
   async findUserStats(userId: string): Promise<UserStatsResponseDto> {

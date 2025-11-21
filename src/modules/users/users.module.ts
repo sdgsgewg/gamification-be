@@ -9,10 +9,11 @@ import { UserService } from './users.service';
 import { RoleModule } from '../roles/roles.module';
 import { MasterHistoryModule } from '../master-history/master-history.module';
 import { ActivityLogModule } from '../activty-logs/activity-logs.module';
+import { UserSession } from '../user-sessions/entities/user-sessions.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Role, Grade]),
+    TypeOrmModule.forFeature([User, Role, Grade, UserSession]),
     RoleModule,
     MasterHistoryModule,
     ActivityLogModule,

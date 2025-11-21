@@ -1,5 +1,6 @@
 import { Transform } from 'class-transformer';
 import { IsIn, IsOptional, IsString } from 'class-validator';
+import { TaskStatus } from '../../enums/task-status.enum';
 
 export class FilterTaskDto {
   @IsOptional()
@@ -23,6 +24,10 @@ export class FilterTaskDto {
     Array.isArray(value) ? value : value ? [value] : [],
   )
   gradeIds?: string[];
+
+  @IsOptional()
+  @IsString()
+  status?: TaskStatus;
 
   @IsOptional()
   @IsIn(['createdAt', 'updatedAt', 'title'])

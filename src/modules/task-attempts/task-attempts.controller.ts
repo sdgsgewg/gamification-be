@@ -31,6 +31,12 @@ export class TaskAttemptController {
     return this.taskAttemptService.findAllTaskAttemptsByUser(userId, filterDto);
   }
 
+  @Get('popular')
+  @UseGuards(JwtAuthGuard)
+  async getMostPopularTask() {
+    return this.taskAttemptService.findMostPopularTask();
+  }
+
   @Get(':id')
   async getTaskAttemptDetail(@Param('id') id: string) {
     if (!id) {

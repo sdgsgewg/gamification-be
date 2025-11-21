@@ -54,6 +54,38 @@ export class ClassStudentService {
   }
 
   /**
+   * Find teacher total students
+   */
+  async findTeacherTotalStudents(
+    teacherId: string,
+  ): Promise<ClassStudentOverviewResponseDto[]> {
+    const qb = this.classStudentRepository
+      .createQueryBuilder('cs')
+      .innerJoin('cs.class', 'class')
+      .innerJoin('class.teacher', 'teacher')
+      .innerJoin('cs.student', 'student')
+      .where('teacher.user_id = :teacherId', { teacherId })
+      .select([
+        'student.user_id AS id',
+        'student.name AS name',
+        'student.image AS image',
+      ])
+      .distinct(true);
+
+    const results = await qb.getRawMany();
+
+    const data: ClassStudentOverviewResponseDto[] = results.map(
+      (cs: ClassStudent) => ({
+        id: cs.student_id,
+        name: cs.student.name,
+        image: cs.student.image,
+      }),
+    );
+
+    return data;
+  }
+
+  /**
    * Join class
    */
   async joinClass(dto: JoinClassDto, userId: string): Promise<BaseResponseDto> {

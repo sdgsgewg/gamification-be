@@ -43,6 +43,7 @@ import { getActivityLogDescription } from 'src/common/utils/get-activity-log-des
 import { ActivityLogEventType } from '../activty-logs/enums/activity-log-event-type';
 import { UserRole } from '../roles/enums/user-role.enum';
 import { getResponseMessage } from 'src/common/utils/get-response-message.util';
+import { MostPopularTaskResponseDto } from './dto/responses/most-popular-task-response.dto';
 
 @Injectable()
 export class TaskAttemptService {
@@ -205,6 +206,41 @@ export class TaskAttemptService {
     );
 
     return Object.values(grouped);
+  }
+
+  async findMostPopularTask(): Promise<MostPopularTaskResponseDto> {
+    const qb = this.taskAttemptRepository
+      .createQueryBuilder('attempt')
+      .leftJoin('attempt.task', 'task')
+      .select([
+        'task.task_id AS "taskId"',
+        'task.title AS "title"',
+        'COUNT(attempt.task_attempt_id) AS "attemptCount"',
+        'task.created_by AS "createdBy"',
+      ])
+      .where('attempt.status IN (:...validStatuses)', {
+        validStatuses: [
+          TaskAttemptStatus.ON_PROGRESS,
+          TaskAttemptStatus.SUBMITTED,
+          TaskAttemptStatus.COMPLETED,
+        ],
+      })
+      .groupBy('task.task_id')
+      .orderBy('"attemptCount"', 'DESC')
+      .limit(1);
+
+    const result = await qb.getRawOne();
+
+    if (!result) {
+      return null;
+    }
+
+    return {
+      id: result.taskId,
+      title: result.title,
+      attemptCount: Number(result.attemptCount),
+      createdBy: result.createdBy,
+    };
   }
 
   async findTaskAttemptById(attemptId: string) {

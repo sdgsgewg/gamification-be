@@ -113,6 +113,19 @@ export class TaskService {
         gradeIds: filterDto.gradeIds,
       });
     }
+    if (filterDto.status) {
+      if (filterDto.status === TaskStatus.FINALIZED) {
+        qb.andWhere('task.is_finalized IS NOT NULL');
+      } else if (filterDto.status === TaskStatus.PUBLISHED) {
+        qb.andWhere('task.is_finalized IS NULL').andWhere(
+          'task.is_published IS NOT NULL',
+        );
+      } else if (filterDto.status === TaskStatus.DRAFT) {
+        qb.andWhere('task.is_finalized IS NULL').andWhere(
+          'task.is_published IS NULL',
+        );
+      }
+    }
 
     // Order by
     const orderBy = filterDto.orderBy ?? 'createdAt';

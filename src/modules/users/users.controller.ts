@@ -26,15 +26,28 @@ export class UserController {
     return this.userService.findAllUsers(filterDto);
   }
 
+  @Get('statistics')
   @UseGuards(JwtAuthGuard)
+  async getUserRoleCounts() {
+    return this.userService.findUserRoleCounts();
+  }
+
   @Get('me')
+  @UseGuards(JwtAuthGuard)
   async getLoggedInUser(@Req() req) {
     const userId = req.user?.id || null;
     return this.userService.findUserBy('id', userId);
   }
 
+  @Get('me/last-login')
   @UseGuards(JwtAuthGuard)
-  @Get('stats')
+  async getUserLastLogin(@Req() req) {
+    const userId = req.user?.id || null;
+    return this.userService.findUserLastLogin(userId);
+  }
+
+  @Get('me/stats')
+  @UseGuards(JwtAuthGuard)
   async getUserStats(@Req() req) {
     const userId = req.user?.id || null;
     return this.userService.findUserStats(userId);

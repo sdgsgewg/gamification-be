@@ -6,6 +6,7 @@ import {
   Body,
   Delete,
   Param,
+  Get,
 } from '@nestjs/common';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { ClassStudentService } from './class-students.service';
@@ -14,6 +15,18 @@ import { JoinClassDto } from './dto/requests/join-class-request.dto';
 @Controller('class-students')
 export class ClassStudentController {
   constructor(private readonly classStudentService: ClassStudentService) {}
+
+  /**
+   * [GET] /class-students
+   * Join ke dalam kelas yang sudah dipilih
+   */
+  @Get('/teacher/me/total-students')
+  @UseGuards(JwtAuthGuard)
+  async getTeacherTotalStudents(@Req() req: any) {
+    // Ambil userId dari request (kalau user login)
+    const userId = req.user?.id || null;
+    return this.classStudentService.findTeacherTotalStudents(userId);
+  }
 
   /**
    * [POST] /class-students
