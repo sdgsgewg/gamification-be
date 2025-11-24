@@ -85,7 +85,14 @@ export class AuthService {
       const existingUser = await this.userService.findUserBy('email', email);
 
       if (existingUser) {
-        throw new BadRequestException('Email is already registered');
+        const response: DetailResponseDto<UserDetailResponseDto> = {
+          status: 400,
+          isSuccess: false,
+          message: 'Email is already registered',
+          data: existingUser,
+        };
+
+        return response;
       }
 
       const hashedPassword = await bcrypt.hash(password, 10);
