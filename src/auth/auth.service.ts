@@ -37,7 +37,7 @@ export class AuthService {
       const existingUser = await this.userService.findUserBy('email', email);
 
       if (existingUser) {
-        throw new BadRequestException('Email sudah terdaftar');
+        throw new BadRequestException('Email is already registered');
       }
 
       const hashedPassword = await bcrypt.hash(password, 10);
@@ -57,18 +57,22 @@ export class AuthService {
         },
       );
 
-      await this.mailerService.sendEmailVerification(email, token);
+      try {
+        await this.mailerService.sendEmailVerification(email, token);
+      } catch (err) {
+        console.error('Email failed to send:', err);
+        // Jangan throw, biarkan register tetap success
+      }
 
       const response: BaseResponseDto = {
         status: 200,
         isSuccess: true,
-        message: 'Akun berhasil dibuat. Silakan verifikasi email.',
+        message: 'Account successfully created. Please verify your email.',
       };
 
       return response;
     } catch (error) {
       console.error('Register service error:', error);
-      throw error; // Let NestJS handle the HTTP response
     }
   }
 
@@ -213,12 +217,20 @@ export class AuthService {
     }
 
     // Kirim email reset
-    await this.mailerService.sendResetPasswordEmail(existingUser.email, token);
+    try {
+      await this.mailerService.sendResetPasswordEmail(
+        existingUser.email,
+        token,
+      );
+    } catch (err) {
+      console.error('Email failed to send:', err);
+      // Jangan throw, biarkan register tetap success
+    }
 
     return {
       status: 200,
       isSuccess: true,
-      message: 'Tautan reset telah dikirim.',
+      message: 'A reset link has been sent.',
     };
   }
 
@@ -235,7 +247,7 @@ export class AuthService {
       return {
         status: 401,
         isSuccess: false,
-        message: 'Token tidak valid atau sudah kadaluarsa.',
+        message: 'The token is invalid or has expired.',
       };
     }
 
@@ -246,7 +258,7 @@ export class AuthService {
       return {
         status: 401,
         isSuccess: false,
-        message: 'Token sudah kadaluarsa.',
+        message: 'Token has expired.',
       };
     }
 
@@ -265,7 +277,7 @@ export class AuthService {
         return {
           status: 404,
           isSuccess: false,
-          message: 'User tidak ditemukan.',
+          message: 'User not found.',
         };
       }
 
@@ -283,11 +295,11 @@ export class AuthService {
       return {
         status: 200,
         isSuccess: true,
-        message: 'Password berhasil diperbarui.',
+        message: 'Password has been updated.',
       };
     } catch (error) {
       console.error('Gagal reset password:', error);
-      throw new Error('Terjadi kesalahan saat memperbarui password.');
+      throw new Error('An error occurred while updating the password.');
     }
   }
 }

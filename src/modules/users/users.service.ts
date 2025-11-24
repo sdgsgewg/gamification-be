@@ -352,12 +352,7 @@ export class UserService {
       pkName: 'user_id',
       pkValue: updatedUser.user_id,
       transactionType: MasterHistoryTransactionType.UPDATE,
-      description: getMasterHistoryDescription(
-        MasterHistoryTransactionType.UPDATE,
-        'user',
-        existingUser,
-        updatedUser,
-      ),
+      description: `You updated your profile.`,
       dataBefore: existingUser,
       dataAfter: updatedUser,
       createdBy: userId,
