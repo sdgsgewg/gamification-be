@@ -30,7 +30,55 @@ export class AuthService {
     private readonly mailerService: MailerService,
   ) {}
 
-  async register(dto: CreateUserDto): Promise<BaseResponseDto> {
+  // async register(dto: CreateUserDto): Promise<BaseResponseDto> {
+  //   const { email, password, roleId } = dto;
+
+  //   try {
+  //     const existingUser = await this.userService.findUserBy('email', email);
+
+  //     if (existingUser) {
+  //       throw new BadRequestException('Email is already registered');
+  //     }
+
+  //     const hashedPassword = await bcrypt.hash(password, 10);
+
+  //     const savedUser = await this.userService.createUser({
+  //       email,
+  //       password: hashedPassword,
+  //       roleId,
+  //     });
+
+  //     // Kirim email verifikasi
+  //     const token = this.jwtService.sign(
+  //       { uid: savedUser.userId },
+  //       {
+  //         secret: process.env.JWT_SECRET,
+  //         expiresIn: process.env.EMAIL_VERIFICATION_EXPIRY ?? '1h',
+  //       },
+  //     );
+
+  //     try {
+  //       await this.mailerService.sendEmailVerification(email, token);
+  //     } catch (err) {
+  //       console.error('Email failed to send:', err);
+  //       // Jangan throw, biarkan register tetap success
+  //     }
+
+  //     const response: BaseResponseDto = {
+  //       status: 200,
+  //       isSuccess: true,
+  //       message: 'Account successfully created. Please verify your email.',
+  //     };
+
+  //     return response;
+  //   } catch (error) {
+  //     console.error('Register service error:', error);
+  //   }
+  // }
+
+  async register(
+    dto: CreateUserDto,
+  ): Promise<DetailResponseDto<UserDetailResponseDto>> {
     const { email, password, roleId } = dto;
 
     try {
@@ -49,25 +97,26 @@ export class AuthService {
       });
 
       // Kirim email verifikasi
-      const token = this.jwtService.sign(
-        { uid: savedUser.userId },
-        {
-          secret: process.env.JWT_SECRET,
-          expiresIn: process.env.EMAIL_VERIFICATION_EXPIRY ?? '1h',
-        },
-      );
+      // const token = this.jwtService.sign(
+      //   { uid: savedUser.userId },
+      //   {
+      //     secret: process.env.JWT_SECRET,
+      //     expiresIn: process.env.EMAIL_VERIFICATION_EXPIRY ?? '1h',
+      //   },
+      // );
 
-      try {
-        await this.mailerService.sendEmailVerification(email, token);
-      } catch (err) {
-        console.error('Email failed to send:', err);
-        // Jangan throw, biarkan register tetap success
-      }
+      // try {
+      //   await this.mailerService.sendEmailVerification(email, token);
+      // } catch (err) {
+      //   console.error('Email failed to send:', err);
+      //   // Jangan throw, biarkan register tetap success
+      // }
 
-      const response: BaseResponseDto = {
+      const response: DetailResponseDto<UserDetailResponseDto> = {
         status: 200,
         isSuccess: true,
         message: 'Account successfully created. Please verify your email.',
+        data: savedUser,
       };
 
       return response;
