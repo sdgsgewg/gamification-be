@@ -103,26 +103,10 @@ export class AuthService {
         roleId,
       });
 
-      // Kirim email verifikasi
-      // const token = this.jwtService.sign(
-      //   { uid: savedUser.userId },
-      //   {
-      //     secret: process.env.JWT_SECRET,
-      //     expiresIn: process.env.EMAIL_VERIFICATION_EXPIRY ?? '1h',
-      //   },
-      // );
-
-      // try {
-      //   await this.mailerService.sendEmailVerification(email, token);
-      // } catch (err) {
-      //   console.error('Email failed to send:', err);
-      //   // Jangan throw, biarkan register tetap success
-      // }
-
       const response: DetailResponseDto<UserDetailResponseDto> = {
         status: 200,
         isSuccess: true,
-        message: 'Account successfully created. Please verify your email.',
+        message: 'Account successfully created. Please complete your profile.',
         data: savedUser,
       };
 
@@ -145,14 +129,14 @@ export class AuthService {
       const response: DetailResponseDto<string> = {
         status: 200,
         isSuccess: true,
-        message: 'Email berhasil diverifikasi',
+        message: 'Email successfully verified',
         data: userId,
       };
 
       return response;
     } catch (e) {
       console.error(e);
-      throw new BadRequestException('Token tidak valid atau kadaluwarsa');
+      throw new BadRequestException('The token is invalid or expired');
     }
   }
 
@@ -173,7 +157,7 @@ export class AuthService {
     return {
       status: 200,
       isSuccess: true,
-      message: 'Data profil berhasil disimpan',
+      message: 'Profile data saved successfully',
     };
   }
 
