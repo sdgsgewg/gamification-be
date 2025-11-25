@@ -1,35 +1,18 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Controller, Get, Param, Query } from '@nestjs/common';
 import { LeaderboardService } from './leaderboards.service';
+import { FilterStudentLeaderboardDto } from './dto/requests/filter-student-leaderboard.dto';
 
 @Controller('leaderboards')
 export class LeaderboardController {
   constructor(private readonly leaderboardService: LeaderboardService) {}
 
   /**
-   * GET /leaderboards/global
-   * Leaderboard global untuk semua siswa
-   */
-  @Get('global')
-  async getGlobalLeaderboard() {
-    return this.leaderboardService.findGlobalLeaderboard();
-  }
-
-  /**
-   * GET /leaderboards/classes
-   * Leaderboard antar kelas (akumulasi poin kelas)
-   */
-  @Get('classes')
-  async getClassLeaderboard() {
-    return this.leaderboardService.findClassLeaderboard();
-  }
-
-  /**
    * GET /leaderboards/students
-   * Leaderboard antar siswa (akumulasi poin siswa dari semua kelas)
+   * Leaderboard antar siswa (akumulasi poin siswa)
    */
   @Get('students')
-  async getStudentLeaderboard() {
-    return this.leaderboardService.findStudentLeaderboard();
+  async getStudentLeaderboard(@Query() filterDto: FilterStudentLeaderboardDto) {
+    return this.leaderboardService.findStudentLeaderboard(filterDto);
   }
 
   /**
@@ -39,5 +22,14 @@ export class LeaderboardController {
   @Get('classes/:classId/students')
   async getClassStudentsLeaderboard(@Param('classId') classId: string) {
     return this.leaderboardService.findClassStudentsLeaderboard(classId);
+  }
+
+  /**
+   * GET /leaderboards/classes
+   * Leaderboard antar kelas (akumulasi poin kelas)
+   */
+  @Get('classes')
+  async getClassLeaderboard() {
+    return this.leaderboardService.findClassLeaderboard();
   }
 }

@@ -2,12 +2,13 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../users/entities/user.entity';
-import { GlobalLeaderboardResponseDto } from './dto/responses/global-leaderboard-responses.dto';
 import { UserRole } from '../roles/enums/user-role.enum';
-import { ClassStudentsLeaderboardResponseDto } from './dto/responses/class-students-leaderboard.-response.dto';
 import { Class } from '../classes/entities/class.entity';
 import { TaskAttempt } from '../task-attempts/entities/task-attempt.entity';
-import { LeaderboardResponseDto } from './dto/responses/leaderboard-response.dto';
+import { StudentLeaderboardResponseDto } from './dto/responses/student-leaderboard-response.dto';
+import { FilterStudentLeaderboardDto } from './dto/requests/filter-student-leaderboard.dto';
+import { LeaderboardScope } from './dto/enums/leaderboard-scope.enum';
+import { ClassLeaderboardResponseDto } from './dto/responses/class-leaderboard-response.dto';
 
 @Injectable()
 export class LeaderboardService {
@@ -21,58 +22,75 @@ export class LeaderboardService {
   ) {}
 
   /**
-   * Find leaderboard for all users based on their performance in the activity page
+   * Find leaderboard for all students based on scope:
+   * - GLOBAL   -> activity + class
+   * - ACTIVITY -> only attempts where class_id IS NULL
+   * - CLASS    -> only attempts where class_id IS NOT NULL
    */
-  async findGlobalLeaderboard(): Promise<GlobalLeaderboardResponseDto[]> {
-    // Ambil semua user dengan role "student"
-    const users = await this.userRepository
-      .createQueryBuilder('user')
-      .leftJoinAndSelect('user.role', 'role')
-      .leftJoinAndSelect(
-        'user.taskAttempts',
-        'taskAttempt',
-        'taskAttempt.class_id IS NULL',
-      )
-      .where('role.name = :roleName', { roleName: UserRole.STUDENT })
-      .getMany();
+  async findStudentLeaderboard(
+    filterDto: FilterStudentLeaderboardDto,
+  ): Promise<StudentLeaderboardResponseDto[]> {
+    const scope = filterDto.scope || LeaderboardScope.GLOBAL;
+    const orderBy = filterDto.orderBy || 'name';
+    const orderState = filterDto.orderState || 'ASC';
 
-    if (!users || users.length === 0) {
-      throw new NotFoundException('No student users found for leaderboard');
+    const query = this.userRepository
+      .createQueryBuilder('user')
+      .leftJoin('user.role', 'role')
+      .leftJoin('user.taskAttempts', 'attempt')
+      .select('user.user_id', 'id')
+      .addSelect('user.name', 'name')
+      .addSelect('user.username', 'username')
+      .addSelect('user.image', 'image')
+      .addSelect('user.level', 'level')
+      .addSelect('user.xp', 'xp')
+      .addSelect('COALESCE(SUM(attempt.points), 0)', 'point')
+      .where('role.name = :roleName', { roleName: UserRole.STUDENT });
+
+    // Apply scope filter
+    if (scope === LeaderboardScope.ACTIVITY) {
+      query.andWhere('attempt.class_id IS NULL');
+    } else if (scope === LeaderboardScope.CLASS) {
+      query.andWhere('attempt.class_id IS NOT NULL');
     }
 
-    // Hitung total poin untuk tiap user (hanya taskAttempts class_id == NULL)
-    const leaderboard = users.map((user) => {
-      const totalPoints = user.taskAttempts?.reduce(
-        (sum, attempt) => sum + (attempt.points || 0),
-        0,
-      );
+    query.groupBy('user.user_id');
 
-      return {
-        id: user.user_id,
+    // ORDERING
+    if (orderBy === 'name') {
+      query.orderBy('user.name', orderState);
+    } else if (orderBy === 'xp') {
+      query.orderBy('user.xp', orderState);
+    } else if (orderBy === 'level') {
+      query.orderBy('user.level', orderState);
+    } else if (orderBy === 'point') {
+      query.orderBy('point', orderState);
+    }
+
+    // ALWAYS fallback order
+    query.addOrderBy('point', 'DESC');
+
+    const rawResults = await query.limit(50).getRawMany();
+
+    if (!rawResults.length) {
+      throw new NotFoundException('No student leaderboard data found');
+    }
+
+    // Add rank and map to DTO
+    const results: StudentLeaderboardResponseDto[] = rawResults.map(
+      (user, index) => ({
+        id: user.id,
+        rank: index + 1,
         name: user.name,
         username: user.username,
         image: user.image,
-        level: user.level || 0,
-        xp: user.xp || 0,
-        point: totalPoints || 0,
-      };
-    });
+        level: Number(user.level) || 0,
+        xp: Number(user.xp) || 0,
+        point: Number(user.point) || 0,
+      }),
+    );
 
-    // Urutkan berdasarkan poin dan XP tertinggi
-    leaderboard.sort((a, b) => {
-      if (b.point !== a.point) return b.point - a.point;
-      return b.xp - a.xp;
-    });
-
-    // Tambahkan rank (peringkat)
-    const rankedLeaderboard = leaderboard
-      .slice(0, 50) // limit ke top 50
-      .map((user, index) => ({
-        ...user,
-        rank: index + 1,
-      }));
-
-    return rankedLeaderboard;
+    return results;
   }
 
   /**
@@ -80,7 +98,7 @@ export class LeaderboardService {
    */
   async findClassStudentsLeaderboard(
     classId: string,
-  ): Promise<ClassStudentsLeaderboardResponseDto[]> {
+  ): Promise<StudentLeaderboardResponseDto[]> {
     const results = await this.taskAttemptRepository
       .createQueryBuilder('attempt')
       .leftJoin('attempt.student', 'student')
@@ -115,8 +133,8 @@ export class LeaderboardService {
   /**
    * Find leaderboard for all classes registered into the system
    */
-  async findClassLeaderboard(): Promise<LeaderboardResponseDto[]> {
-    const results = await this.classRepository
+  async findClassLeaderboard(): Promise<ClassLeaderboardResponseDto[]> {
+    const rawResults = await this.classRepository
       .createQueryBuilder('class')
       .leftJoin('class.taskAttempts', 'attempt')
       .select('class.class_id', 'id')
@@ -128,26 +146,16 @@ export class LeaderboardService {
       .limit(50)
       .getRawMany();
 
-    return results;
-  }
-
-  /**
-   * Find leaderboard for all students that is obtained from classes
-   */
-  async findStudentLeaderboard(): Promise<LeaderboardResponseDto[]> {
-    const results = await this.userRepository
-      .createQueryBuilder('user')
-      .leftJoinAndSelect('user.role', 'role')
-      .leftJoin('user.taskAttempts', 'attempt')
-      .select('user.user_id', 'id')
-      .addSelect('user.name', 'name')
-      .addSelect('user.image', 'image')
-      .addSelect('COALESCE(SUM(attempt.points), 0)', 'point')
-      .where('role.name = :roleName', { roleName: UserRole.STUDENT })
-      .groupBy('user.user_id')
-      .orderBy('point', 'DESC')
-      .limit(50)
-      .getRawMany();
+    // Mapping ke DTO + rank
+    const results: ClassLeaderboardResponseDto[] = rawResults.map(
+      (cls, index) => ({
+        id: cls.id,
+        rank: index + 1,
+        name: cls.name,
+        image: cls.image,
+        point: Number(cls.point) || 0,
+      }),
+    );
 
     return results;
   }
