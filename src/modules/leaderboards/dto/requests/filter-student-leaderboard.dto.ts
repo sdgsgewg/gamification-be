@@ -6,12 +6,4 @@ export class FilterStudentLeaderboardDto {
   @IsString()
   @IsIn(Object.values(LeaderboardScope))
   scope?: LeaderboardScope;
-
-  @IsOptional()
-  @IsIn(['name'])
-  orderBy?: 'name';
-
-  @IsOptional()
-  @IsIn(['ASC', 'DESC'])
-  orderState?: 'ASC' | 'DESC';
 }

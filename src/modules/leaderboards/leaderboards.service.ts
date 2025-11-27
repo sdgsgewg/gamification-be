@@ -31,8 +31,6 @@ export class LeaderboardService {
     filterDto: FilterStudentLeaderboardDto,
   ): Promise<StudentLeaderboardResponseDto[]> {
     const scope = filterDto.scope || LeaderboardScope.GLOBAL;
-    const orderBy = filterDto.orderBy || 'name';
-    const orderState = filterDto.orderState || 'ASC';
 
     const query = this.userRepository
       .createQueryBuilder('user')
@@ -57,18 +55,11 @@ export class LeaderboardService {
     query.groupBy('user.user_id');
 
     // ORDERING
-    if (orderBy === 'name') {
-      query.orderBy('user.name', orderState);
-    } else if (orderBy === 'xp') {
-      query.orderBy('user.xp', orderState);
-    } else if (orderBy === 'level') {
-      query.orderBy('user.level', orderState);
-    } else if (orderBy === 'point') {
-      query.orderBy('point', orderState);
-    }
-
-    // ALWAYS fallback order
-    query.addOrderBy('point', 'DESC');
+    query
+      .orderBy('point', 'DESC')
+      .addOrderBy('user.xp', 'DESC')
+      .addOrderBy('user.level', 'DESC')
+      .addOrderBy('user.name', 'DESC');
 
     const rawResults = await query.limit(50).getRawMany();
 
@@ -120,6 +111,8 @@ export class LeaderboardService {
       .addGroupBy('student.xp')
       .orderBy('point', 'DESC')
       .addOrderBy('xp', 'DESC')
+      .addOrderBy('level', 'DESC')
+      .addOrderBy('name', 'DESC')
       .limit(50)
       .getRawMany();
 
@@ -143,6 +136,7 @@ export class LeaderboardService {
       .addSelect('COALESCE(SUM(attempt.points), 0)', 'point')
       .groupBy('class.class_id')
       .orderBy('point', 'DESC')
+      .addOrderBy('name', 'DESC')
       .limit(50)
       .getRawMany();
 
