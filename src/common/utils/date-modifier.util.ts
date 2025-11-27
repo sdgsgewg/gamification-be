@@ -113,12 +113,8 @@ export function getTime(date: Date): string {
 
   // ubah jam ke format 12 jam, tapi biarkan 00 untuk jam 0
   let displayHours = hours % 12;
-  if (hours === 0)
-    displayHours = 0; // jam 0 (tengah malam)
-  else if (hours > 12) displayHours = hours - 12;
-  else if (hours === 12) displayHours = 12; // jam 12 siang
-
+  if (displayHours === 0) displayHours = 12;
   const hoursStr = displayHours.toString().padStart(2, '0');
 
-  return `${hoursStr}:${minutes} ${ampm}`;
+  return `${hoursStr }:${minutes} ${ampm}`;
 }

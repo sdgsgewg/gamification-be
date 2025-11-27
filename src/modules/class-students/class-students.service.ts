@@ -75,10 +75,10 @@ export class ClassStudentService {
     const results = await qb.getRawMany();
 
     const data: ClassStudentOverviewResponseDto[] = results.map(
-      (cs: ClassStudent) => ({
-        id: cs.student_id,
-        name: cs.student.name,
-        image: cs.student.image,
+      (cs) => ({
+        id: cs.id,
+        name: cs.name,
+        image: cs.image,
       }),
     );
 
