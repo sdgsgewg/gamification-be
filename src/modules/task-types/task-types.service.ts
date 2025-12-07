@@ -79,6 +79,7 @@ export class TaskTypeService {
         taskTypeId: tt.task_type_id,
         name: tt.name,
         slug: tt.slug,
+        description: tt.description,
         scope: capitalizeFirstLowerRest(tt.scope),
         hasDeadline: tt.has_deadline,
         isRepeatable: tt.is_repeatable,
