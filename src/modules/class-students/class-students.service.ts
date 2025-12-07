@@ -74,13 +74,11 @@ export class ClassStudentService {
 
     const results = await qb.getRawMany();
 
-    const data: ClassStudentOverviewResponseDto[] = results.map(
-      (cs) => ({
-        id: cs.id,
-        name: cs.name,
-        image: cs.image,
-      }),
-    );
+    const data: ClassStudentOverviewResponseDto[] = results.map((cs) => ({
+      id: cs.id,
+      name: cs.name,
+      image: cs.image,
+    }));
 
     return data;
   }
@@ -128,11 +126,20 @@ export class ClassStudentService {
       metadata: savedClassStudent,
     });
 
+    const now = new Date();
+    const TOLERANCE_HOURS = 24 * 60 * 60 * 1000;
+
     // Buat task attempt untuk siswa di kelas baru
     // Ambil semua task yang ada di dalam kelas
     const classTasks = await this.classTaskRepository.find({
       where: { class_id: classId },
       relations: { task: true },
+    });
+
+    // Filter hanya tugas yang deadline-nya masih valid
+    const validClassTasks = classTasks.filter((ct) => {
+      const deadline = new Date(ct.end_time);
+      return deadline.getTime() - now.getTime() > TOLERANCE_HOURS;
     });
 
     // Ambil semua attempt existing untuk user di class ini
@@ -145,7 +152,7 @@ export class ClassStudentService {
 
     const existingTaskIds = new Set(existingAttempts.map((a) => a.task_id));
 
-    for (const ct of classTasks) {
+    for (const ct of validClassTasks) {
       if (!existingTaskIds.has(ct.task_id)) {
         // Buat attempt baru hanya jika belum ada
         const taskAttempt = this.taskAttemptRepository.create({
