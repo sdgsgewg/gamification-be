@@ -200,20 +200,18 @@ export class ClassTaskService {
     // Ambil semua task attempt user
     const attempts = await this.taskAttemptRepository.find({
       where: { student_id: userId },
-      relations: { task: true, class: true },
+      relations: { student: true, task: true, class: true },
     });
 
     // Gabungkan classTask + attempt
-    const combined = classTasks.map((ct) => {
-      const matchingAttempt = attempts.find(
-        (a) => a.task_id === ct.task_id && a.class_id === ct.class_id,
-      );
-
-      return {
+    const combined = classTasks
+      .map((ct) => ({
         classTask: ct,
-        attempt: matchingAttempt ?? null,
-      };
-    });
+        attempt: attempts.find(
+          (a) => a.task_id === ct.task_id && a.class_id === ct.class_id,
+        ),
+      }))
+      .filter((item) => item.attempt);
 
     // Filter status jika ada
     let filtered = combined;
