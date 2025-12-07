@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule, getDataSourceToken } from '@nestjs/typeorm';
+import { ScheduleModule } from '@nestjs/schedule';
 import { DataSource } from 'typeorm';
 import { setDataSource } from './common/database/get-db-column.util';
 import { SupabaseModule } from './integrations/supabase/supabase.module';
@@ -32,6 +33,7 @@ import { UserSessionModule } from './modules/user-sessions/user-sessions.module'
 import { CommonModule } from './common/common.module';
 import { ClassStudentModule } from './modules/class-students/class-students.module';
 import { ClassGradeModule } from './modules/class-grades/class-grades.module';
+import { TaskStatusCronModule } from './schedules/task-status/task-status.cron.module';
 
 @Module({
   imports: [
@@ -53,6 +55,7 @@ import { ClassGradeModule } from './modules/class-grades/class-grades.module';
         synchronize: config.get<string>('NODE_ENV') !== 'production',
       }),
     }),
+    ScheduleModule.forRoot(),
     SupabaseModule,
     AuthModule,
     PasswordResetModule,
@@ -81,6 +84,10 @@ import { ClassGradeModule } from './modules/class-grades/class-grades.module';
     ActivityLogModule,
     CommonModule,
     // tambah module baru di sini
+
+    // bacgrounder/scheduler
+    TaskStatusCronModule,
+    // tambah scheduler baru di sini
   ],
   controllers: [AppController],
   providers: [
