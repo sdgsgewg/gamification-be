@@ -1,8 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Not } from 'typeorm';
-
+import { Repository, Not, In } from 'typeorm';
 import { TaskAttempt } from '../../modules/task-attempts/entities/task-attempt.entity';
 import { ClassTask } from '../../modules/class-tasks/entities/class-task.entity';
 import { TaskAttemptStatus } from '../../modules/task-attempts/enums/task-attempt-status.enum';
@@ -26,7 +25,13 @@ export class TaskStatusCronService {
     // Ambil semua attempts yang belum submitted
     const attempts = await this.attemptRepo.find({
       where: {
-        status: Not(TaskAttemptStatus.SUBMITTED),
+        status: Not(
+          In([
+            TaskAttemptStatus.SUBMITTED,
+            TaskAttemptStatus.PAST_DUE,
+            TaskAttemptStatus.COMPLETED,
+          ]),
+        ),
       },
     });
 

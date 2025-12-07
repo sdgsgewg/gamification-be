@@ -498,6 +498,7 @@ export class ClassTaskService {
           task_id: task.task_id,
           class_id: classEntity.class_id,
           status: In([
+            TaskAttemptStatus.PAST_DUE,
             TaskAttemptStatus.SUBMITTED,
             TaskAttemptStatus.COMPLETED,
           ]),
@@ -509,10 +510,14 @@ export class ClassTaskService {
 
       recentAttemptsMeta = recentAttempts.map((a) => ({
         id: a.task_attempt_id,
-        startedAt: getDateTime(a.started_at) ?? null,
-        submittedAt: getDateTime(a.taskSubmission.created_at) ?? null,
-        completedAt: getDateTime(a.completed_at),
-        duration: getTimePeriod(a.started_at, a.taskSubmission.created_at),
+        startedAt: getDateTime(a.started_at) ?? '-',
+        submittedAt: a.taskSubmission
+          ? getDateTime(a.taskSubmission.created_at)
+          : '-',
+        completedAt: a.completed_at ? getDateTime(a.completed_at) : '-',
+        duration: a.taskSubmission
+          ? getTimePeriod(a.started_at, a.taskSubmission.created_at)
+          : '-',
         status:
           (a.status as TaskAttemptStatus) ?? TaskAttemptStatus.NOT_STARTED,
       }));
@@ -544,13 +549,12 @@ export class ClassTaskService {
       taskGrades,
       difficulty,
       taskQuestions,
-      start_time,
-      end_time,
       created_by,
     } = task;
 
     const taskDetail: TaskDetail = {
       title,
+      subtitle: `From class '${classTask.class.name}'`,
       slug,
       description: description ?? null,
       image: image ?? null,
@@ -578,6 +582,8 @@ export class ClassTaskService {
       currAttemptMeta?.status === TaskAttemptStatus.ON_PROGRESS
         ? currAttemptMeta
         : null;
+
+    const { start_time, end_time } = classTask;
 
     const duration: TaskDuration = {
       startTime: start_time ?? null,

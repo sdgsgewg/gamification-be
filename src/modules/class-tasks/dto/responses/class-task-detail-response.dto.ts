@@ -3,6 +3,7 @@ import { RecentAttemptResponseDto } from 'src/modules/task-attempts/dto/response
 
 export class TaskDetail {
   title: string;
+  subtitle: string;
   slug: string;
   description?: string;
   image?: string;
