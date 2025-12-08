@@ -6,7 +6,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { v4 as uuidv4 } from 'uuid'; // Optional: untuk generate token
 import * as bcrypt from 'bcrypt';
-import { MailerService } from 'src/integrations/mailer/mailer.service';
+// import { MailerService } from 'src/integrations/mailer/mailer.service';
 import { LoginDto } from './dto/requests/login.dto';
 import { ForgotPasswordDto } from './dto/requests/forgot-password.dto';
 import { ResetPasswordDto } from './dto/requests/reset-password.dto';
@@ -27,7 +27,7 @@ export class AuthService {
     private readonly userService: UserService,
     private readonly passwordResetService: PasswordResetService,
     private readonly jwtService: JwtService,
-    private readonly mailerService: MailerService,
+    // private readonly mailerService: MailerService,
   ) {}
 
   // async register(dto: CreateUserDto): Promise<BaseResponseDto> {
@@ -257,15 +257,15 @@ export class AuthService {
     }
 
     // Kirim email reset
-    try {
-      await this.mailerService.sendResetPasswordEmail(
-        existingUser.email,
-        token,
-      );
-    } catch (err) {
-      console.error('Email failed to send:', err);
-      // Jangan throw, biarkan register tetap success
-    }
+    // try {
+    //   await this.mailerService.sendResetPasswordEmail(
+    //     existingUser.email,
+    //     token,
+    //   );
+    // } catch (err) {
+    //   console.error('Email failed to send:', err);
+    //   // Jangan throw, biarkan register tetap success
+    // }
 
     return {
       status: 200,
