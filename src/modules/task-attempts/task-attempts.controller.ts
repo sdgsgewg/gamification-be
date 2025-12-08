@@ -33,8 +33,9 @@ export class TaskAttemptController {
 
   @Get('popular')
   @UseGuards(JwtAuthGuard)
-  async getMostPopularTask() {
-    return this.taskAttemptService.findMostPopularTask();
+  async getMostPopularTask(@Req() req: any) {
+    const creatorId = req.user?.id || null;
+    return this.taskAttemptService.findMostPopularTask(creatorId);
   }
 
   @Get(':id')

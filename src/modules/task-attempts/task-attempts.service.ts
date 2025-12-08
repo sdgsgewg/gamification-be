@@ -208,7 +208,11 @@ export class TaskAttemptService {
     return Object.values(grouped);
   }
 
-  async findMostPopularTask(): Promise<MostPopularTaskResponseDto[]> {
+  async findMostPopularTask(
+    creatorId: string,
+  ): Promise<MostPopularTaskResponseDto[]> {
+    const user = await this.userService.findUserBy('id', creatorId);
+
     const qb = this.taskAttemptRepository
       .createQueryBuilder('attempt')
       .leftJoin('attempt.task', 'task')
@@ -217,6 +221,7 @@ export class TaskAttemptService {
         'task.title AS "title"',
         'COUNT(attempt.task_attempt_id) AS "attemptCount"',
         'task.created_by AS "createdBy"',
+        'task.creator_id AS "creatorId"',
       ])
       .where('attempt.status IN (:...validStatuses)', {
         validStatuses: [
@@ -228,6 +233,10 @@ export class TaskAttemptService {
       .groupBy('task.task_id')
       .orderBy('"attemptCount"', 'DESC')
       .limit(5);
+
+    if (user.role.name === UserRole.TEACHER) {
+      qb.andWhere('task.creator_id = :creatorId', { creatorId });
+    }
 
     const result = await qb.getRawMany();
 
