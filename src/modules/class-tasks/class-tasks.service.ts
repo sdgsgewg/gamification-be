@@ -40,7 +40,10 @@ import { FilterTaskAttemptDto } from '../task-attempts/dto/requests/filter-task-
 import { GroupedTaskAttemptResponseDto } from '../task-attempts/dto/responses/grouped-task-attempt.dto';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
-import { TaskAttemptOverviewResponseDto } from '../task-attempts/dto/responses/task-attempt-overview.dto';
+import {
+  ClassResponseDto,
+  TaskAttemptOverviewResponseDto,
+} from '../task-attempts/dto/responses/task-attempt-overview.dto';
 import { QuestionResponseDto } from '../task-questions/dto/responses/question-response.dto';
 import { QuestionOptionResponseDto } from '../task-question-options/dto/responses/question-option-response.dto';
 import { AnswerLogResponseDto } from '../task-answer-logs/dto/responses/answer-log-response.dto';
@@ -143,19 +146,24 @@ export class ClassTaskService {
             };
           } else {
             acc[dateKey] = {
-              dateLabel: 'Belum Dikerjakan',
+              dateLabel: 'Not Started',
               dayLabel: '',
               attempts: [],
             };
           }
         }
 
+        const classData: ClassResponseDto = {
+          name: classEntity.name,
+          slug: classEntity.slug,
+        };
+
         const taskDto: TaskAttemptOverviewResponseDto = {
           id: attempt?.task_attempt_id ?? null,
           title: task.title,
           image: task.image || null,
           status: attempt?.status ?? TaskAttemptStatus.NOT_STARTED,
-          classSlug: classEntity.slug,
+          class: classData,
           taskSlug: task.slug,
           deadline: getDate(classTask.end_time),
           lastAccessedTime: attempt?.last_accessed_at

@@ -44,6 +44,7 @@ import { ActivityLogEventType } from '../activty-logs/enums/activity-log-event-t
 import { UserRole } from '../roles/enums/user-role.enum';
 import { getResponseMessage } from 'src/common/utils/get-response-message.util';
 import { MostPopularTaskResponseDto } from './dto/responses/most-popular-task-response.dto';
+import { ClassResponseDto } from './dto/responses/task-attempt-overview.dto';
 
 @Injectable()
 export class TaskAttemptService {
@@ -60,9 +61,6 @@ export class TaskAttemptService {
     private readonly activityLogService: ActivityLogService,
   ) {}
 
-  // -------------------
-  // READ helpers (tidak diubah)
-  // -------------------
   async findAllTaskAttemptsByUser(
     userId: string,
     filterDto: FilterTaskAttemptDto,
@@ -173,12 +171,19 @@ export class TaskAttemptService {
             };
           } else {
             acc[dateKey] = {
-              dateLabel: 'Belum Dikerjakan',
+              dateLabel: 'Not Started',
               dayLabel: '',
               attempts: [],
             };
           }
         }
+
+        const classData: ClassResponseDto = attempt.class
+          ? {
+              name: attempt.class.name,
+              slug: attempt.class.slug,
+            }
+          : null;
 
         acc[dateKey].attempts.push({
           id: task_attempt_id,
@@ -188,7 +193,7 @@ export class TaskAttemptService {
               ? attempt.task.image
               : null,
           status,
-          classSlug: attempt.class?.slug ?? null,
+          class: classData,
           taskSlug: attempt.task?.slug ?? null,
           deadline: attempt.task?.end_time
             ? getDate(attempt.task.end_time)
