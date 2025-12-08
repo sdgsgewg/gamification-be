@@ -71,8 +71,6 @@ export class SupabaseStorageService {
       // Extract file path from public URL
       const filePath = this.getFilePathFromPublicUrl(publicUrl, bucket);
 
-      console.log('File path from public URL: ', filePath);
-
       const { error } = await this.supabase.storage
         .from(bucket)
         .remove([filePath]);

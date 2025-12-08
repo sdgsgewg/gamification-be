@@ -7,28 +7,28 @@ export class MailerService {
   private transporter: nodemailer.Transporter;
 
   constructor(private configService: ConfigService) {
-    this.transporter = nodemailer.createTransport({
-      host: this.configService.get('EMAIL_HOST'),
-      port: Number(this.configService.get('EMAIL_PORT')),
-      secure: Number(this.configService.get('EMAIL_PORT')) === 465, // TLS jika 465
-      auth: {
-        user: this.configService.get('EMAIL_USER'),
-        pass: this.configService.get('EMAIL_PASS'),
-      },
-      tls: {
-        // Gmail kadang strict di server hosting
-        rejectUnauthorized: false,
-      },
-    });
+    // this.transporter = nodemailer.createTransport({
+    //   host: this.configService.get('EMAIL_HOST'),
+    //   port: Number(this.configService.get('EMAIL_PORT')),
+    //   secure: Number(this.configService.get('EMAIL_PORT')) === 465, // TLS jika 465
+    //   auth: {
+    //     user: this.configService.get('EMAIL_USER'),
+    //     pass: this.configService.get('EMAIL_PASS'),
+    //   },
+    //   tls: {
+    //     // Gmail kadang strict di server hosting
+    //     rejectUnauthorized: false,
+    //   },
+    // });
 
-    // Untuk debug SMTP
-    this.transporter.verify((error, success) => {
-      if (error) {
-        console.error('SMTP connection error:', error);
-      } else {
-        console.log('SMTP server is ready:', success);
-      }
-    });
+    // // Untuk debug SMTP
+    // this.transporter.verify((error, success) => {
+    //   if (error) {
+    //     console.error('SMTP connection error:', error);
+    //   } else {
+    //     console.log('SMTP server is ready:', success);
+    //   }
+    // });
   }
 
   async sendEmailVerification(to: string, token: string) {
