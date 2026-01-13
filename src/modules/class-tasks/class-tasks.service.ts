@@ -518,7 +518,7 @@ export class ClassTaskService {
 
       recentAttemptsMeta = recentAttempts.map((a) => ({
         id: a.task_attempt_id,
-        startedAt: getDateTime(a.started_at) ?? '-',
+        startedAt: a.started_at ? getDateTime(a.started_at) : '-',
         submittedAt: a.taskSubmission
           ? getDateTime(a.taskSubmission.created_at)
           : '-',
