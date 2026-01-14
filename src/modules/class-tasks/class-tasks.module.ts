@@ -8,6 +8,7 @@ import { ClassTaskController } from './class-tasks.controller';
 import { ClassTaskService } from './class-tasks.service';
 import { Task } from '../tasks/entities/task.entity';
 import { ActivityLogModule } from '../activty-logs/activity-logs.module';
+import { TaskAttemptModule } from '../task-attempts/task-attempts.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { ActivityLogModule } from '../activty-logs/activity-logs.module';
       TaskAttempt,
       TaskAnswerLog,
     ]),
+    TaskAttemptModule,
     ActivityLogModule,
   ],
   controllers: [ClassTaskController],

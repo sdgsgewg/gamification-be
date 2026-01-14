@@ -1,33 +1,18 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Not, Repository, SelectQueryBuilder } from 'typeorm';
+import { Not, Repository, SelectQueryBuilder } from 'typeorm';
 import { FilterActivityDto } from './dto/requests/filter-activity.dto';
 import { Task } from '../tasks/entities/task.entity';
 import { TaskAttempt } from '../task-attempts/entities/task-attempt.entity';
 import { ActivityOverviewResponseDto } from './dto/responses/activity-overview-response.dto';
-import {
-  ActivityDetailResponseDto,
-  TaskDetail,
-} from './dto/responses/activity-detail-response.dto';
-import {
-  getDateTime,
-  getTimePeriod,
-} from 'src/common/utils/date-modifier.util';
-import { ActivityWithQuestionsResponseDto } from './dto/responses/activity-with-questions-response.dto';
 import { TaskAnswerLog } from '../task-answer-logs/entities/task-answer-log.entity';
-import {
-  ActivityProgress,
-  ActivityStats,
-  ActivitySummaryResponseDto,
-} from './dto/responses/activity-summary-response.dto';
 import { TaskTypeScope } from '../task-types/enums/task-type-scope.enum';
-import {
-  TaskAttemptStatus,
-  TaskAttemptStatusLabels,
-} from '../task-attempts/enums/task-attempt-status.enum';
-import { TaskDifficultyLabels } from '../tasks/enums/task-difficulty.enum';
+import { TaskAttemptStatus } from '../task-attempts/enums/task-attempt-status.enum';
 import { RecentAttemptResponseDto } from '../task-attempts/dto/responses/recent-attempt-response.dto';
 import { CurrentAttemptResponseDto } from '../task-attempts/dto/responses/current-attempt-response.dto';
+import { TaskAttemptService } from '../task-attempts/task-attempts.service';
+import { TaskResponseMapper } from '../tasks/mappers/task-response.mapper';
+import { TaskAttemptResponseMapper } from '../task-attempts/mapper/task-attempt-response.mapper';
 
 @Injectable()
 export class ActivityService {
@@ -38,6 +23,7 @@ export class ActivityService {
     private readonly taskAttemptRepository: Repository<TaskAttempt>,
     @InjectRepository(TaskAnswerLog)
     private readonly taskAnswerLogRepository: Repository<TaskAnswerLog>,
+    private readonly taskAttemptService: TaskAttemptService,
   ) {}
 
   // ==========================
@@ -273,7 +259,7 @@ export class ActivityService {
   // 🔍 DETAIL FETCH
   // ==========================
   async findActivityBySlug(slug: string, userId?: string) {
-    // Ambil task (selalu dari tabel tasks)
+    // Ambil task
     const task = await this.taskRepository.findOne({
       where: { slug },
       relations: {
@@ -286,8 +272,9 @@ export class ActivityService {
       order: { taskQuestions: { order: 'ASC' } },
     });
 
-    if (!task)
+    if (!task) {
       throw new NotFoundException(`Activity with slug ${slug} not found`);
+    }
 
     // Default metadata
     let currAttemptMeta: CurrentAttemptResponseDto = {
@@ -299,120 +286,24 @@ export class ActivityService {
 
     let recentAttemptsMeta: RecentAttemptResponseDto[] = [];
 
-    // Kalau userId ada → cari attempt user
+    // Kalau userId ada -> cari attempt user
     if (userId) {
-      // Current attempt
-      const currAttempt = await this.taskAttemptRepository.findOne({
-        where: { student_id: userId, task: { slug }, class_id: IsNull() },
-        order: { last_accessed_at: 'DESC' },
+      const attemptMeta = await this.taskAttemptService.getAttemptMeta({
+        userId,
+        taskId: task.task_id,
+        classId: null,
       });
 
-      if (currAttempt) {
-        currAttemptMeta = {
-          answeredCount: currAttempt.answered_question_count ?? 0,
-          startedAt: getDateTime(currAttempt.started_at) ?? null,
-          lastAccessedAt: getDateTime(currAttempt.last_accessed_at) ?? null,
-          status:
-            (currAttempt.status as TaskAttemptStatus) ??
-            TaskAttemptStatus.NOT_STARTED,
-        };
-      }
-
-      // All recent completed attempts → multiple
-      const recentAttempts = await this.taskAttemptRepository.find({
-        where: {
-          student_id: userId,
-          task: { slug },
-          status: TaskAttemptStatus.COMPLETED,
-          class_id: IsNull(),
-        },
-        order: { completed_at: 'ASC' },
-      });
-
-      recentAttemptsMeta = recentAttempts.map((a) => ({
-        id: a.task_attempt_id,
-        startedAt: getDateTime(a.started_at) ?? null,
-        completedAt: getDateTime(a.completed_at),
-        duration: getTimePeriod(a.started_at, a.completed_at),
-        status:
-          (a.status as TaskAttemptStatus) ?? TaskAttemptStatus.NOT_STARTED,
-      }));
+      currAttemptMeta = attemptMeta.current;
+      recentAttemptsMeta = attemptMeta.recent;
     }
 
     // Mapping ke DTO final
-    return this.mapActivityBySlugResponse(
+    return TaskResponseMapper.mapActivityDetail(
       task,
       currAttemptMeta,
       recentAttemptsMeta,
     );
-  }
-
-  private mapActivityBySlugResponse(
-    task: Task,
-    currAttemptMeta: CurrentAttemptResponseDto,
-    recentAttemptsMeta: RecentAttemptResponseDto[],
-  ): ActivityDetailResponseDto {
-    const {
-      task_id,
-      title,
-      slug,
-      description,
-      image,
-      difficulty,
-      subject,
-      material,
-      taskGrades,
-      taskQuestions,
-      taskType,
-      start_time,
-      end_time,
-    } = task;
-
-    // Task Detail
-    const taskDetail: TaskDetail = {
-      title: title,
-      slug: slug,
-      description: description ?? null,
-      image: image ?? null,
-      subject: subject ? { id: subject.subject_id, name: subject.name } : null,
-      material: material
-        ? { id: material.material_id, name: material.name }
-        : null,
-      grade:
-        taskGrades.length > 0
-          ? taskGrades
-              .map((tg) => tg.grade?.name.replace('Kelas ', ''))
-              .join(', ')
-          : null,
-      questionCount: taskQuestions.length || 0,
-      difficulty: TaskDifficultyLabels[difficulty],
-      createdBy: task.created_by || 'Unknown',
-      type: {
-        id: taskType.task_type_id,
-        name: taskType.name,
-        isRepeatable: taskType.is_repeatable,
-      },
-    };
-
-    return {
-      id: task_id,
-      taskDetail,
-      duration: {
-        startTime: start_time ?? null,
-        endTime: end_time ?? null,
-        duration: getTimePeriod(start_time, end_time),
-      },
-      currAttempt:
-        currAttemptMeta.status === TaskAttemptStatus.ON_PROGRESS
-          ? {
-              answeredCount: Number(currAttemptMeta.answeredCount) || 0,
-              startedAt: currAttemptMeta.startedAt,
-              lastAccessedAt: currAttemptMeta.lastAccessedAt,
-              status: currAttemptMeta.status,
-            }
-          : null,
-      recentAttempts: recentAttemptsMeta.length > 0 ? recentAttemptsMeta : [],
-    };
   }
 
   async findActivityWithQuestions(slug: string, userId?: string) {
@@ -458,63 +349,11 @@ export class ActivityService {
       }
     }
 
-    // Return DTO
-    return this.mapActivityWithQuestionsResponse(
+    return TaskResponseMapper.mapActivityWithQuestionsResponse(
       task,
       lastAttemptId,
       attemptAnswerLogs,
     );
-  }
-
-  private mapActivityWithQuestionsResponse(
-    taskWithRelations: Task,
-    lastAttemptId?: string | null,
-    attemptAnswerLogs: TaskAnswerLog[] = [],
-  ): ActivityWithQuestionsResponseDto {
-    const data: ActivityWithQuestionsResponseDto = {
-      id: taskWithRelations.task_id,
-      lastAttemptId: lastAttemptId ?? null,
-      startTime: taskWithRelations.start_time ?? null,
-      endTime: taskWithRelations.end_time ?? null,
-      duration: getTimePeriod(
-        taskWithRelations.start_time,
-        taskWithRelations.end_time,
-      ),
-      questions:
-        taskWithRelations.taskQuestions?.map((q) => {
-          const userAnswer = attemptAnswerLogs.find(
-            (log) => log.question_id === q.task_question_id,
-          );
-
-          return {
-            questionId: q.task_question_id,
-            text: q.text,
-            point: q.point,
-            type: q.type,
-            timeLimit: q.time_limit && q.time_limit > 0 ? q.time_limit : null,
-            image: q.image ?? null,
-            options: q.taskQuestionOptions?.map((o) => ({
-              optionId: o.task_question_option_id,
-              text: o.text,
-              isCorrect: o.is_correct,
-              // Auto-fill: tandai jawaban user
-              isSelected: userAnswer?.option_id === o.task_question_option_id,
-            })),
-            // Tambahkan jawaban text atau image user (jika ada)
-            userAnswer: userAnswer
-              ? {
-                  answerLogId: userAnswer.task_answer_log_id,
-                  text: userAnswer.answer_text,
-                  image: userAnswer.image,
-                  optionId: userAnswer.option_id,
-                  isCorrect: userAnswer.is_correct,
-                }
-              : null,
-          };
-        }) || [],
-    };
-
-    return data;
   }
 
   async findActivitySummaryFromAttempt(attemptId: string) {
@@ -552,81 +391,6 @@ export class ActivityService {
       throw new NotFoundException(`No attempt found with id ${attemptId}`);
     }
 
-    return this.mapActivitySummaryFromAttempt(attempt);
-  }
-
-  private mapActivitySummaryFromAttempt(
-    attempt: TaskAttempt,
-  ): ActivitySummaryResponseDto {
-    const { title, image, description, created_by, taskQuestions } =
-      attempt.task;
-    const {
-      points,
-      xp_gained,
-      started_at,
-      completed_at,
-      status,
-      task,
-      taskAnswerLogs,
-    } = attempt;
-
-    const totalPoints = taskQuestions.reduce((acc, q) => acc + q.point, 0);
-
-    const score = Math.round((points / totalPoints) * 100);
-
-    const stats: ActivityStats = {
-      pointGained: points,
-      totalPoints,
-      score,
-      xpGained: xp_gained,
-    };
-
-    const progress: ActivityProgress = {
-      startedAt: getDateTime(started_at),
-      completedAt: getDateTime(completed_at),
-      duration: getTimePeriod(started_at, completed_at),
-      status: TaskAttemptStatusLabels[status],
-    };
-
-    const questions =
-      task.taskQuestions?.map((q) => {
-        const userAnswer = taskAnswerLogs.find(
-          (log) => log.question_id === q.task_question_id,
-        );
-
-        return {
-          questionId: q.task_question_id,
-          text: q.text,
-          point: q.point,
-          type: q.type,
-          timeLimit: q.time_limit ?? null,
-          image: q.image ?? null,
-          options: q.taskQuestionOptions?.map((o) => ({
-            optionId: o.task_question_option_id,
-            text: o.text,
-            isCorrect: o.is_correct,
-            isSelected: userAnswer?.option_id === o.task_question_option_id,
-          })),
-          userAnswer: userAnswer
-            ? {
-                answerLogId: userAnswer.task_answer_log_id,
-                text: userAnswer.answer_text,
-                image: userAnswer.image,
-                optionId: userAnswer.option_id,
-                isCorrect: userAnswer.is_correct,
-              }
-            : null,
-        };
-      }) || [];
-
-    return {
-      title,
-      image,
-      description,
-      createdBy: created_by,
-      stats,
-      progress,
-      questions,
-    };
+    return TaskAttemptResponseMapper.mapActivitySummaryFromAttempt(attempt);
   }
 }

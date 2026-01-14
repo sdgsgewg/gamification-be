@@ -1,36 +1,19 @@
 import { CurrentAttemptResponseDto } from 'src/modules/task-attempts/dto/responses/current-attempt-response.dto';
 import { RecentAttemptResponseDto } from 'src/modules/task-attempts/dto/responses/recent-attempt-response.dto';
+import { BaseTaskType } from 'src/modules/task-types/dto/responses/task-type-base';
+import { BaseTaskDetail } from 'src/modules/tasks/dto/responses/task-detail-base';
+import { TaskDuration } from 'src/modules/tasks/dto/responses/task-duration.dto';
 
-export class TaskDetail {
-  title: string;
-  slug: string;
-  description?: string;
-  image?: string;
-  subject: { id: string; name: string };
-  material?: { id: string; name: string };
-  grade: string;
-  questionCount: number;
-  difficulty: string;
-  createdBy: string;
-  type: ActivityType;
-}
-
-export class ActivityType {
-  id: string;
-  name: string;
-  isRepeatable: boolean;
-}
-
-export class ActivityDuration {
-  startTime?: Date;
-  endTime?: Date;
-  duration?: string;
+export interface ActivityTaskDetail extends BaseTaskDetail {
+  type: BaseTaskType & {
+    isRepeatable: boolean;
+  };
 }
 
 export class ActivityDetailResponseDto {
   id: string;
-  taskDetail: TaskDetail;
-  duration?: ActivityDuration;
+  taskDetail: ActivityTaskDetail;
+  duration?: TaskDuration;
   currAttempt?: CurrentAttemptResponseDto;
   recentAttempts?: RecentAttemptResponseDto[];
 }

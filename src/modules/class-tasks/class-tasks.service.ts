@@ -9,28 +9,14 @@ import {
   getDate,
   getDateTime,
   getTime,
-  getTimePeriod,
 } from 'src/common/utils/date-modifier.util';
-import {
-  ClassTaskDetailResponseDto,
-  TaskDetail,
-  TaskDuration,
-} from './dto/responses/class-task-detail-response.dto';
+import { ClassTaskDetailResponseDto } from './dto/responses/class-task-detail-response.dto';
 import { ClassTaskWithQuestionsResponseDto } from './dto/responses/class-task-with-questions-response.dto';
 import { TaskAttempt } from '../task-attempts/entities/task-attempt.entity';
-import {
-  TaskAttemptStatus,
-  TaskAttemptStatusLabels,
-} from '../task-attempts/enums/task-attempt-status.enum';
+import { TaskAttemptStatus } from '../task-attempts/enums/task-attempt-status.enum';
 import { Task } from '../tasks/entities/task.entity';
 import { TaskAnswerLog } from '../task-answer-logs/entities/task-answer-log.entity';
-import {
-  ClassTaskAttemptProgress,
-  ClassTaskGradingProgress,
-  ClassTaskStats,
-  ClassTaskSummaryResponseDto,
-} from './dto/responses/class-task-summary-response.dto';
-import { TaskDifficultyLabels } from '../tasks/enums/task-difficulty.enum';
+import { ClassTaskSummaryResponseDto } from './dto/responses/class-task-summary-response.dto';
 import { TeacherClassTaskResponseDto } from './dto/responses/teacher-class-task-response.dto';
 import { ShareTaskIntoClassesDto } from './dto/requests/share-task-into-classes-request.dto';
 import { AvailableClassesResponseDto } from './dto/responses/available-classes-reponse.dto';
@@ -44,9 +30,6 @@ import {
   ClassResponseDto,
   TaskAttemptOverviewResponseDto,
 } from '../task-attempts/dto/responses/task-attempt-overview.dto';
-import { QuestionResponseDto } from '../task-questions/dto/responses/question-response.dto';
-import { QuestionOptionResponseDto } from '../task-question-options/dto/responses/question-option-response.dto';
-import { AnswerLogResponseDto } from '../task-answer-logs/dto/responses/answer-log-response.dto';
 import { RecentAttemptResponseDto } from '../task-attempts/dto/responses/recent-attempt-response.dto';
 import { CurrentAttemptResponseDto } from '../task-attempts/dto/responses/current-attempt-response.dto';
 import { ActivityLogService } from '../activty-logs/activity-logs.service';
@@ -57,6 +40,9 @@ import {
   ClassResponse,
   ClassTaskOverviewResponseDto,
 } from './dto/responses/class-task-overview-response.dto';
+import { TaskAttemptService } from '../task-attempts/task-attempts.service';
+import { TaskResponseMapper } from '../tasks/mappers/task-response.mapper';
+import { TaskAttemptResponseMapper } from '../task-attempts/mapper/task-attempt-response.mapper';
 
 @Injectable()
 export class ClassTaskService {
@@ -71,6 +57,7 @@ export class ClassTaskService {
     private readonly taskAttemptRepository: Repository<TaskAttempt>,
     @InjectRepository(TaskAnswerLog)
     private readonly taskAnswerLogRepository: Repository<TaskAnswerLog>,
+    private readonly taskAttemptService: TaskAttemptService,
     private readonly activityLogService: ActivityLogService,
   ) {}
 
@@ -460,12 +447,11 @@ export class ClassTaskService {
       },
     });
 
-    if (!classTask)
+    if (!classTask) {
       throw new NotFoundException(
         `Task with slug ${taskSlug} not found in this class`,
       );
-
-    const task = classTask.task;
+    }
 
     // Default metadata
     let currAttemptMeta: CurrentAttemptResponseDto = {
@@ -479,136 +465,27 @@ export class ClassTaskService {
 
     // Jika userId ada → ambil attempt
     if (userId) {
-      // Attempt terkini (on progress)
-      const currAttempt = await this.taskAttemptRepository.findOne({
-        where: {
-          student_id: userId,
-          task_id: task.task_id,
-          class_id: classEntity.class_id,
-          status: TaskAttemptStatus.ON_PROGRESS,
-        },
-        order: { last_accessed_at: 'DESC' },
+      const attemptMeta = await this.taskAttemptService.getAttemptMeta({
+        userId,
+        taskId: classTask.task.task_id,
+        classId: classEntity.class_id,
       });
 
-      if (currAttempt) {
-        currAttemptMeta = {
-          answeredCount: currAttempt.answered_question_count ?? 0,
-          startedAt: getDateTime(currAttempt.started_at),
-          lastAccessedAt: getDateTime(currAttempt.last_accessed_at),
-          status: currAttempt.status as TaskAttemptStatus,
-        };
-      }
-
-      // Attempt terakhir yang sudah selesai
-      const recentAttempts = await this.taskAttemptRepository.find({
-        where: {
-          student_id: userId,
-          task_id: task.task_id,
-          class_id: classEntity.class_id,
-          status: In([
-            TaskAttemptStatus.PAST_DUE,
-            TaskAttemptStatus.SUBMITTED,
-            TaskAttemptStatus.COMPLETED,
-          ]),
-        },
-        relations: {
-          taskSubmission: true,
-        },
-      });
-
-      recentAttemptsMeta = recentAttempts.map((a) => ({
-        id: a.task_attempt_id,
-        startedAt: a.started_at ? getDateTime(a.started_at) : '-',
-        submittedAt: a.taskSubmission
-          ? getDateTime(a.taskSubmission.created_at)
-          : '-',
-        completedAt: a.completed_at ? getDateTime(a.completed_at) : '-',
-        duration: a.taskSubmission
-          ? getTimePeriod(a.started_at, a.taskSubmission.created_at)
-          : '-',
-        status:
-          (a.status as TaskAttemptStatus) ?? TaskAttemptStatus.NOT_STARTED,
-      }));
+      currAttemptMeta = attemptMeta.current;
+      recentAttemptsMeta = attemptMeta.recent;
     }
 
     // Mapping ke DTO final
-    return this.mapClassTaskDetailResponse(
+    // return this.mapClassTaskDetailResponse(
+    //   classTask,
+    //   currAttemptMeta,
+    //   recentAttemptsMeta,
+    // );
+    return TaskResponseMapper.mapClassTaskDetail(
       classTask,
       currAttemptMeta,
       recentAttemptsMeta,
     );
-  }
-
-  private mapClassTaskDetailResponse(
-    classTask: ClassTask,
-    currAttemptMeta: CurrentAttemptResponseDto,
-    recentAttemptsMeta: RecentAttemptResponseDto[],
-  ): ClassTaskDetailResponseDto {
-    const task = classTask.task;
-    const {
-      task_id,
-      title,
-      slug,
-      image,
-      description,
-      subject,
-      material,
-      taskType,
-      taskGrades,
-      difficulty,
-      taskQuestions,
-      created_by,
-    } = task;
-
-    const taskDetail: TaskDetail = {
-      title,
-      subtitle: `From class '${classTask.class.name}'`,
-      slug,
-      description: description ?? null,
-      image: image ?? null,
-      subject: subject ? { id: subject.subject_id, name: subject.name } : null,
-      material: material
-        ? { id: material.material_id, name: material.name }
-        : null,
-      grade:
-        taskGrades?.length > 0
-          ? taskGrades
-              .map((g) => g.grade?.name?.replace('Kelas ', ''))
-              .join(', ')
-          : null,
-      difficulty: TaskDifficultyLabels[difficulty] ?? 'Unknown',
-      questionCount: taskQuestions?.length || 0,
-      createdBy: created_by ?? 'Unknown',
-      type: {
-        id: taskType.task_type_id,
-        name: taskType.name,
-        isRepeatable: taskType.is_repeatable,
-      },
-    };
-
-    const currAttempt: CurrentAttemptResponseDto | null =
-      currAttemptMeta?.status === TaskAttemptStatus.ON_PROGRESS
-        ? currAttemptMeta
-        : null;
-
-    const { start_time, end_time } = classTask;
-
-    const duration: TaskDuration = {
-      startTime: start_time ?? null,
-      endTime: end_time ?? null,
-      duration: getTimePeriod(start_time, end_time),
-    };
-
-    // ===========================
-    //  BUILD RESPONSE
-    // ===========================
-    return {
-      id: task_id,
-      taskDetail,
-      duration,
-      currAttempt: currAttempt ?? null,
-      recentAttempts: recentAttemptsMeta.length > 0 ? recentAttemptsMeta : [],
-    };
   }
 
   /**
@@ -619,7 +496,7 @@ export class ClassTaskService {
     taskSlug: string,
     userId?: string,
   ): Promise<ClassTaskWithQuestionsResponseDto> {
-    // 1️⃣ Cari class berdasarkan slug
+    // Cari class berdasarkan slug
     const classData = await this.classRepository.findOne({
       where: { slug: classSlug },
     });
@@ -628,7 +505,7 @@ export class ClassTaskService {
       throw new NotFoundException(`Class with slug ${classSlug} not found`);
     }
 
-    // 2️⃣ Cari ClassTask yang sesuai
+    // Cari ClassTask yang sesuai
     const classTask = await this.classTaskRepository.findOne({
       where: {
         class: { slug: classSlug },
@@ -683,59 +560,12 @@ export class ClassTaskService {
       }
     }
 
-    // 5️⃣ Kembalikan DTO yang sudah dipetakan
-    return this.mapClassTaskWithQuestionsResponse(
+    // Kembalikan DTO yang sudah dipetakan
+    return TaskResponseMapper.mapClassTaskWithQuestions(
       task,
       lastAttemptId,
       attemptAnswerLogs,
     );
-  }
-
-  private mapClassTaskWithQuestionsResponse(
-    taskWithRelations: Task,
-    lastAttemptId?: string | null,
-    attemptAnswerLogs: TaskAnswerLog[] = [],
-  ): ClassTaskWithQuestionsResponseDto {
-    return {
-      id: taskWithRelations.task_id,
-      lastAttemptId: lastAttemptId ?? null,
-      startTime: taskWithRelations.start_time ?? null,
-      endTime: taskWithRelations.end_time ?? null,
-      duration: getTimePeriod(
-        taskWithRelations.start_time,
-        taskWithRelations.end_time,
-      ),
-      questions:
-        taskWithRelations.taskQuestions?.map((q) => {
-          const userAnswer = attemptAnswerLogs.find(
-            (log) => log.question_id === q.task_question_id,
-          );
-
-          return {
-            questionId: q.task_question_id,
-            text: q.text,
-            point: q.point,
-            type: q.type,
-            timeLimit: q.time_limit && q.time_limit > 0 ? q.time_limit : null,
-            image: q.image ?? null,
-            options: q.taskQuestionOptions?.map((o) => ({
-              optionId: o.task_question_option_id,
-              text: o.text,
-              isCorrect: o.is_correct,
-              isSelected: userAnswer?.option_id === o.task_question_option_id,
-            })),
-            userAnswer: userAnswer
-              ? {
-                  answerLogId: userAnswer.task_answer_log_id,
-                  text: userAnswer.answer_text ?? null,
-                  image: userAnswer.image ?? null,
-                  optionId: userAnswer.option_id ?? null,
-                  isCorrect: userAnswer.is_correct ?? null,
-                }
-              : null,
-          };
-        }) || [],
-    };
   }
 
   /**
@@ -786,104 +616,7 @@ export class ClassTaskService {
       );
     }
 
-    return this.mapClassTaskSummaryFromAttempt(attempt);
-  }
-
-  private mapClassTaskSummaryFromAttempt(
-    attempt: TaskAttempt,
-  ): ClassTaskSummaryResponseDto {
-    const { title, image, description, taskQuestions } = attempt.task;
-    const {
-      points,
-      xp_gained,
-      started_at,
-      status,
-      task,
-      taskAnswerLogs,
-      taskSubmission,
-    } = attempt;
-
-    const totalPoints = taskQuestions.reduce((acc, q) => acc + q.point, 0);
-
-    const score = Math.round((points / totalPoints) * 100);
-
-    const stats: ClassTaskStats = {
-      pointGained: points,
-      totalPoints,
-      score,
-      xpGained: xp_gained,
-    };
-
-    const attemptProgress: ClassTaskAttemptProgress = {
-      startedAt: getDateTime(started_at),
-      submittedAt: getDateTime(taskSubmission.created_at),
-      duration: getTimePeriod(started_at, taskSubmission.created_at),
-      status: TaskAttemptStatusLabels[status],
-    };
-
-    const gradingProgress: ClassTaskGradingProgress = {
-      startGradedAt: getDateTime(taskSubmission.start_graded_at),
-      lastGradedAt: getDateTime(taskSubmission.last_graded_at),
-      finishGradedAt: getDateTime(taskSubmission.finish_graded_at),
-      duration: getTimePeriod(
-        taskSubmission.start_graded_at,
-        taskSubmission.finish_graded_at,
-      ),
-      status: TaskAttemptStatusLabels[taskSubmission.status],
-    };
-
-    const questions: QuestionResponseDto[] =
-      task.taskQuestions?.map((q) => {
-        const userAnswer = taskAnswerLogs?.find(
-          (log) => log.question_id === q.task_question_id,
-        );
-
-        const options: QuestionOptionResponseDto[] =
-          q.taskQuestionOptions?.map((o) => ({
-            optionId: o.task_question_option_id,
-            text: o.text,
-            isCorrect: !!o.is_correct,
-            isSelected: userAnswer?.option_id === o.task_question_option_id,
-          })) || [];
-
-        const answerLog: AnswerLogResponseDto | null = userAnswer
-          ? {
-              answerLogId: userAnswer.task_answer_log_id ?? null,
-              text: userAnswer.answer_text ?? null,
-              image: userAnswer.image ?? null,
-              optionId: userAnswer.option_id ?? null,
-              isCorrect:
-                typeof userAnswer.is_correct === 'boolean'
-                  ? userAnswer.is_correct
-                  : null,
-              pointAwarded: userAnswer.point_awarded ?? null,
-              teacherNotes: userAnswer.teacher_notes ?? null,
-            }
-          : null;
-
-        return {
-          questionId: q.task_question_id,
-          text: q.text,
-          point: q.point,
-          type: q.type,
-          timeLimit: q.time_limit ?? null,
-          image: q.image ?? null,
-          options,
-          userAnswer: answerLog,
-        };
-      }) || [];
-
-    return {
-      title,
-      image,
-      description,
-      teacherName: attempt.class.teacher?.name ?? 'Unknown',
-      className: attempt.class.name,
-      stats,
-      attemptProgress,
-      gradingProgress,
-      questions,
-    };
+    return TaskAttemptResponseMapper.mapClassTaskSummaryFromAttempt(attempt);
   }
 
   /**

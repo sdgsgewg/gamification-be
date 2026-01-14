@@ -8,6 +8,7 @@ import {
   Raw,
   Not,
   IsNull,
+  In,
 } from 'typeorm';
 import { TaskAttempt } from './entities/task-attempt.entity';
 import { CreateTaskAttemptDto } from './dto/requests/create-task-attempt.dto';
@@ -45,6 +46,8 @@ import { UserRole } from '../roles/enums/user-role.enum';
 import { getResponseMessage } from 'src/common/utils/get-response-message.util';
 import { MostPopularTaskResponseDto } from './dto/responses/most-popular-task-response.dto';
 import { ClassResponseDto } from './dto/responses/task-attempt-overview.dto';
+import { CurrentAttemptResponseDto } from './dto/responses/current-attempt-response.dto';
+import { AttemptMetaResponseDto } from './dto/responses/attempt-meta-response.dto';
 
 @Injectable()
 export class TaskAttemptService {
@@ -425,8 +428,76 @@ export class TaskAttemptService {
     };
   }
 
+  async getAttemptMeta({
+    userId,
+    taskId,
+    classId,
+  }: {
+    userId: string;
+    taskId: string;
+    classId?: string | null;
+  }): Promise<AttemptMetaResponseDto> {
+    let currAttemptMeta: CurrentAttemptResponseDto = {
+      answeredCount: 0,
+      startedAt: null,
+      lastAccessedAt: null,
+      status: TaskAttemptStatus.NOT_STARTED,
+    };
+
+    const currAttempt = await this.taskAttemptRepository.findOne({
+      where: {
+        student_id: userId,
+        task_id: taskId,
+        class_id: classId ?? IsNull(),
+        status: TaskAttemptStatus.ON_PROGRESS,
+      },
+      order: { last_accessed_at: 'DESC' },
+    });
+
+    if (currAttempt) {
+      currAttemptMeta = {
+        answeredCount: currAttempt.answered_question_count ?? 0,
+        startedAt: getDateTime(currAttempt.started_at),
+        lastAccessedAt: getDateTime(currAttempt.last_accessed_at),
+        status: currAttempt.status,
+      };
+    }
+
+    const recentAttempts = await this.taskAttemptRepository.find({
+      where: {
+        student_id: userId,
+        task_id: taskId,
+        class_id: classId ?? IsNull(),
+        status: In([
+          TaskAttemptStatus.SUBMITTED,
+          TaskAttemptStatus.COMPLETED,
+          TaskAttemptStatus.PAST_DUE,
+        ]),
+      },
+      relations: { taskSubmission: true },
+      order: { completed_at: 'DESC' },
+    });
+
+    return {
+      current: currAttemptMeta,
+      recent: recentAttempts.map((a) => ({
+        id: a.task_attempt_id,
+        startedAt: a.started_at ? getDateTime(a.started_at) : null,
+        submittedAt: a.taskSubmission
+          ? getDateTime(a.taskSubmission.created_at)
+          : null,
+        completedAt: a.completed_at ? getDateTime(a.completed_at) : null,
+        duration:
+          a.taskSubmission && a.started_at
+            ? getTimePeriod(a.started_at, a.taskSubmission.created_at)
+            : null,
+        status: a.status,
+      })),
+    };
+  }
+
   // =========================
-  // Helper: completedAt logic (tidak berubah)
+  // Helper: completedAt logic
   // =========================
   private getCompletedAt(
     questionCount: number,

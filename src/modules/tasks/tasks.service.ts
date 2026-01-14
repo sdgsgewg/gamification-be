@@ -14,11 +14,7 @@ import { TaskDetailResponseDto } from './dto/responses/task-detail-response.dto'
 import { slugify } from '../../common/utils/slug.util';
 import { DetailResponseDto } from 'src/common/responses/detail-response.dto';
 import { BaseResponseDto } from 'src/common/responses/base-response.dto';
-import {
-  getDateTime,
-  getDateTimeWithName,
-  getTimePeriod,
-} from 'src/common/utils/date-modifier.util';
+import { getDateTime } from 'src/common/utils/date-modifier.util';
 import { FileUploadService } from 'src/common/services/file-upload.service';
 import { SlugHelper } from 'src/common/helpers/slug.helper';
 import { TaskQuestionService } from '../task-questions/task-questions.service';
@@ -31,6 +27,7 @@ import { ClassTask } from '../class-tasks/entities/class-task.entity';
 import { getResponseMessage } from 'src/common/utils/get-response-message.util';
 import { TaskStatus } from './enums/task-status.enum';
 import { TaskGradeService } from '../task-grades/task-grades.service';
+import { TaskResponseMapper } from './mappers/task-response.mapper';
 
 @Injectable()
 export class TaskService {
@@ -162,90 +159,6 @@ export class TaskService {
     return taskOverviews;
   }
 
-  private getTaskDetailData(taskWithRelations: Task): TaskDetailResponseDto {
-    const data: TaskDetailResponseDto = {
-      id: taskWithRelations.task_id,
-      taskDetail: {
-        title: taskWithRelations.title,
-        slug: taskWithRelations.slug,
-        description: taskWithRelations.description ?? null,
-        image: taskWithRelations.image ?? null,
-        subject: taskWithRelations.subject
-          ? {
-              subjectId: taskWithRelations.subject.subject_id,
-              name: taskWithRelations.subject.name,
-            }
-          : null,
-        material: taskWithRelations.material
-          ? {
-              materialId: taskWithRelations.material.material_id,
-              name: taskWithRelations.material.name,
-            }
-          : null,
-        taskType: taskWithRelations.taskType
-          ? {
-              id: taskWithRelations.taskType.task_type_id,
-              name: taskWithRelations.taskType.name,
-              scope: taskWithRelations.taskType.scope,
-            }
-          : null,
-        taskGradeIds: taskWithRelations.taskGrades
-          ? taskWithRelations.taskGrades.map((tg) => tg.gradeId)
-          : [],
-        taskGrade:
-          taskWithRelations.taskGrades &&
-          taskWithRelations.taskGrades.length > 0
-            ? taskWithRelations.taskGrades
-                .map((tg) => tg.grade.name.replace('Kelas ', ''))
-                .join(', ')
-            : null,
-        questionCount: taskWithRelations.taskQuestions.length,
-        difficulty: TaskDifficultyLabels[taskWithRelations.difficulty],
-        status: taskWithRelations.is_finalized
-          ? TaskStatus.FINALIZED
-          : taskWithRelations.is_published
-            ? TaskStatus.PUBLISHED
-            : TaskStatus.DRAFT,
-      },
-      duration: {
-        startTime: taskWithRelations.start_time ?? null,
-        endTime: taskWithRelations.end_time ?? null,
-        duration: getTimePeriod(
-          taskWithRelations.start_time,
-          taskWithRelations.end_time,
-        ),
-      },
-      history: {
-        createdBy: `${getDateTimeWithName(taskWithRelations.created_at, taskWithRelations.created_by)}`,
-        updatedBy: taskWithRelations.updated_by
-          ? `${getDateTimeWithName(taskWithRelations.updated_at, taskWithRelations.updated_by)}`
-          : null,
-        publishedAt: taskWithRelations.published_at
-          ? getDateTime(taskWithRelations.published_at)
-          : null,
-        finalizedAt: taskWithRelations.finalized_at
-          ? getDateTime(taskWithRelations.finalized_at)
-          : null,
-      },
-      questions:
-        taskWithRelations.taskQuestions?.map((q) => ({
-          questionId: q.task_question_id,
-          text: q.text,
-          point: q.point,
-          type: q.type,
-          timeLimit: q.time_limit ?? null,
-          image: q.image ?? null,
-          options: q.taskQuestionOptions?.map((o) => ({
-            optionId: o.task_question_option_id,
-            text: o.text,
-            isCorrect: o.is_correct,
-          })),
-        })) || [],
-    };
-
-    return data;
-  }
-
   async findTaskBySlug(slug: string): Promise<TaskDetailResponseDto> {
     const qb = this.taskRepository
       .createQueryBuilder('task')
@@ -303,7 +216,7 @@ export class TaskService {
       ]),
     );
 
-    const taskDetail = this.getTaskDetailData(task);
+    const taskDetail = TaskResponseMapper.mapTaskDetail(task);
 
     taskDetail.assignedClasses = task.classTasks.map((ct) => {
       const stat = submissionMap[ct.class.class_id] ?? {
@@ -423,7 +336,7 @@ export class TaskService {
       ],
     });
 
-    const taskDetail = this.getTaskDetailData(taskWithRelations);
+    const taskDetail = TaskResponseMapper.mapTaskDetail(taskWithRelations);
 
     const response: DetailResponseDto<TaskDetailResponseDto> = {
       status: 200,
@@ -569,7 +482,7 @@ export class TaskService {
       ],
     });
 
-    const taskDetail = this.getTaskDetailData(taskWithRelations);
+    const taskDetail = TaskResponseMapper.mapTaskDetail(taskWithRelations);
 
     const response: DetailResponseDto<TaskDetailResponseDto> = {
       status: 200,

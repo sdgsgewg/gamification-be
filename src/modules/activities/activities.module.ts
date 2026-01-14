@@ -6,9 +6,13 @@ import { ActivityService } from './activities.service';
 import { TaskAttempt } from '../task-attempts/entities/task-attempt.entity';
 import { TaskAnswerLog } from '../task-answer-logs/entities/task-answer-log.entity';
 import { User } from '../users/entities/user.entity';
+import { TaskAttemptModule } from '../task-attempts/task-attempts.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Task, TaskAttempt, TaskAnswerLog, User])],
+  imports: [
+    TypeOrmModule.forFeature([Task, TaskAttempt, TaskAnswerLog, User]),
+    TaskAttemptModule,
+  ],
   controllers: [ActivityController],
   providers: [ActivityService],
   exports: [ActivityService],
