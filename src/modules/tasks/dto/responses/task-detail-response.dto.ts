@@ -27,6 +27,7 @@ export class TaskHistory {
   createdBy: string;
   publishedAt?: string;
   finalizedAt?: string;
+  archivedAt?: string;
   updatedBy?: string;
 }
 

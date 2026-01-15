@@ -12,9 +12,10 @@ type ActionType =
   | 'create'
   | 'update'
   | 'delete'
+  | 'finalize'
   | 'publish'
   | 'unpublish'
-  | 'finalize'
+  | 'archive'
   | 'fetch'
   | 'assign'
   | 'unassign';

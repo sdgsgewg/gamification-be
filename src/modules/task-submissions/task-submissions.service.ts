@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { TaskSubmission } from './entities/task-submission.entity';
 import { BaseResponseDto } from 'src/common/responses/base-response.dto';
 import { CreateTaskSubmissionDto } from './dto/requests/create-task-submission.dto';
@@ -19,13 +19,10 @@ import { ActivityLogService } from '../activty-logs/activity-logs.service';
 import { ActivityLogEventType } from '../activty-logs/enums/activity-log-event-type';
 import { getActivityLogDescription } from 'src/common/utils/get-activity-log-description.util';
 import { UserRole } from '../roles/enums/user-role.enum';
-import { FilterTaskSubmissionDto } from './dto/requests/filter-task-submission.dto';
-import { GroupedTaskSubmissionResponseDto } from './dto/responses/grouped-task-submission-response.dto';
-import { format } from 'date-fns';
-import { id } from 'date-fns/locale';
+// import { FilterTaskSubmissionDto } from './dto/requests/filter-task-submission.dto';
+// import { GroupedTaskSubmissionResponseDto } from './dto/responses/grouped-task-submission-response.dto';
 import {
   getDateTime,
-  getTime,
   getTimePeriod,
 } from 'src/common/utils/date-modifier.util';
 import {
@@ -36,6 +33,14 @@ import {
 } from './dto/responses/task-submission-detail-response.dto';
 import { TaskSubmissionWithAnswersResponseDto } from './dto/responses/task-submission-with-answers-response.dto';
 import { TaskDifficultyLabels } from '../tasks/enums/task-difficulty.enum';
+import { TeacherClassTaskAnalyticsDto } from './dto/responses/teacher-class-task-analytics-response.dto';
+import { Class } from '../classes/entities/class.entity';
+import { ClassTask } from '../class-tasks/entities/class-task.entity';
+import {
+  ClassTaskAttemptAnalyticsResponseDto,
+  StudentTaskAttemptAnalyticsDto,
+} from './dto/responses/class-task-attempt-analytics-response.dto';
+// import { TaskSubmissionResponseMapper } from './mapper/task-submission-response.mapper';
 
 @Injectable()
 export class TaskSubmissionService {
@@ -48,158 +53,371 @@ export class TaskSubmissionService {
     private readonly taskAnswerLogRepository: Repository<TaskAnswerLog>,
     @InjectRepository(TaskQuestionOption)
     private readonly taskQuestionOptionRepository: Repository<TaskQuestionOption>,
+    @InjectRepository(Class)
+    private readonly classRepository: Repository<Class>,
+    @InjectRepository(ClassTask)
+    private readonly classTaskRepository: Repository<ClassTask>,
     private readonly userService: UserService,
     private readonly activityLogService: ActivityLogService,
   ) {}
 
+  // async findAllTaskSubmissions(
+  //   userId: string,
+  //   filterDto: FilterTaskSubmissionDto,
+  // ): Promise<GroupedTaskSubmissionResponseDto[]> {
+  //   const qb = this.taskSubmissionRepository
+  //     .createQueryBuilder('ts')
+  //     .leftJoinAndSelect('ts.taskAttempt', 'ta')
+  //     .leftJoinAndSelect('ta.class', 'c')
+  //     .leftJoinAndSelect('ta.task', 't')
+  //     .leftJoinAndSelect('ta.student', 's');
+
+  //   // Filter berdasarkan user id
+  //   qb.where('c.teacher_id = :teacherId', { teacherId: userId });
+
+  //   // Tambahkan filter status
+  //   if (filterDto.status) {
+  //     qb.andWhere('ts.status = :status', { status: filterDto.status });
+  //   }
+
+  //   // Filter berdasarkan nama siswa
+  //   if (filterDto.searchText) {
+  //     qb.andWhere('s.name ILIKE :name', { name: `%${filterDto.searchText}%` });
+  //   }
+
+  //   // Sorting dinamis
+  //   const orderBy = filterDto.orderBy ?? 'ts.created_at';
+  //   const orderState = filterDto.orderState ?? 'ASC';
+  //   qb.orderBy(orderBy, orderState as 'ASC' | 'DESC');
+
+  //   // Eksekusi query
+  //   const submissions = await qb.getMany();
+
+  //   if (!submissions.length) {
+  //     throw new NotFoundException(
+  //       `No submission found for teacher with id ${userId}`,
+  //     );
+  //   }
+
+  //   const groupByGraded = filterDto.status === TaskSubmissionStatus.COMPLETED;
+
+  //   return TaskSubmissionResponseMapper.mapAndGroupTaskSubmissions(
+  //     submissions,
+  //     groupByGraded,
+  //   );
+  // }
+
+  // async findTaskSubmissionsInClass(
+  //   classSlug: string,
+  //   taskSlug: string,
+  //   filterDto: FilterTaskSubmissionDto,
+  // ): Promise<GroupedTaskSubmissionResponseDto[]> {
+  //   const qb = this.taskSubmissionRepository
+  //     .createQueryBuilder('ts')
+  //     .leftJoinAndSelect('ts.taskAttempt', 'ta')
+  //     .leftJoinAndSelect('ta.class', 'c')
+  //     .leftJoinAndSelect('ta.task', 't')
+  //     .leftJoinAndSelect('ta.student', 's');
+
+  //   // Filter berdasarkan class dan task slug
+  //   qb.where('c.slug = :classSlug', { classSlug }).andWhere(
+  //     't.slug = :taskSlug',
+  //     { taskSlug },
+  //   );
+
+  //   // Tambahkan filter status
+  //   if (filterDto.status) {
+  //     qb.andWhere('ts.status = :status', { status: filterDto.status });
+  //   }
+
+  //   // Filter berdasarkan nama siswa
+  //   if (filterDto.searchText) {
+  //     qb.andWhere('s.name ILIKE :name', { name: `%${filterDto.searchText}%` });
+  //   }
+
+  //   // Sorting dinamis
+  //   const orderBy = filterDto.orderBy ?? 'ts.created_at';
+  //   const orderState = filterDto.orderState ?? 'ASC';
+  //   qb.orderBy(orderBy, orderState as 'ASC' | 'DESC');
+
+  //   // Eksekusi query
+  //   const submissions = await qb.getMany();
+
+  //   if (!submissions.length) {
+  //     throw new NotFoundException(
+  //       `No submission found for class with slug ${classSlug} and task with slug ${taskSlug}`,
+  //     );
+  //   }
+
+  //   const groupByGraded = filterDto.status === TaskSubmissionStatus.COMPLETED;
+
+  //   return TaskSubmissionResponseMapper.mapAndGroupTaskSubmissions(
+  //     submissions,
+  //     groupByGraded,
+  //   );
+  // }
+
   async findAllTaskSubmissions(
-    userId: string,
-    filterDto: FilterTaskSubmissionDto,
-  ): Promise<GroupedTaskSubmissionResponseDto[]> {
-    const qb = this.taskSubmissionRepository
-      .createQueryBuilder('ts')
-      .leftJoinAndSelect('ts.taskAttempt', 'ta')
-      .leftJoinAndSelect('ta.class', 'c')
+    teacherId: string,
+  ): Promise<TeacherClassTaskAnalyticsDto[]> {
+    // 1️⃣ Ambil semua class yang diajar guru
+    const classes = await this.classRepository.find({
+      where: { teacher_id: teacherId },
+      relations: {
+        classStudents: true,
+      },
+    });
+
+    if (!classes.length) {
+      throw new NotFoundException('No class found for this teacher');
+    }
+
+    const classIds = classes.map((c) => c.class_id);
+
+    // 2️⃣ Ambil class_tasks + task
+    const classTasks = await this.classTaskRepository.find({
+      where: {
+        class: { class_id: In(classIds) },
+      },
+      relations: {
+        class: {
+          classStudents: true,
+        },
+        task: {
+          taskType: true,
+        },
+      },
+    });
+
+    if (!classTasks.length) return [];
+
+    // 3️⃣ Ambil semua attempt untuk class-task tsb
+    const attempts = await this.taskAttemptRepository
+      .createQueryBuilder('ta')
       .leftJoinAndSelect('ta.task', 't')
-      .leftJoinAndSelect('ta.student', 's');
+      .leftJoinAndSelect('ta.class', 'c')
+      .where('ta.class_id IN (:...classIds)', { classIds })
+      .getMany();
 
-    // Filter berdasarkan user id
-    qb.where('c.teacher_id = :teacherId', { teacherId: userId });
+    // 4️⃣ Grouping: classId-taskId
+    const attemptMap = new Map<string, typeof attempts>();
 
-    // Tambahkan filter status
-    if (filterDto.status) {
-      qb.andWhere('ts.status = :status', { status: filterDto.status });
+    for (const attempt of attempts) {
+      const key = `${attempt.class_id}-${attempt.task_id}`;
+      if (!attemptMap.has(key)) {
+        attemptMap.set(key, []);
+      }
+      attemptMap.get(key).push(attempt);
     }
 
-    // Filter berdasarkan nama siswa
-    if (filterDto.searchText) {
-      qb.andWhere('s.name ILIKE :name', { name: `%${filterDto.searchText}%` });
-    }
+    // 5️⃣ Build analytics
+    return classTasks.map((ct) => {
+      const key = `${ct.class_id}-${ct.task_id}`;
+      const taskAttempts = attemptMap.get(key) ?? [];
 
-    // Sorting dinamis
-    const orderBy = filterDto.orderBy ?? 'ts.created_at';
-    const orderState = filterDto.orderState ?? 'ASC';
-    qb.orderBy(orderBy, orderState as 'ASC' | 'DESC');
+      const totalStudents = ct.class.classStudents.length;
 
-    // Eksekusi query
-    const submissions = await qb.getMany();
+      const attemptsByStudent = new Map<string, TaskAttempt[]>();
+      taskAttempts.forEach((a) => {
+        if (!attemptsByStudent.has(a.student_id)) {
+          attemptsByStudent.set(a.student_id, []);
+        }
+        attemptsByStudent.get(a.student_id).push(a);
+      });
 
-    if (!submissions.length) {
-      throw new NotFoundException(
-        `No submission found for teacher with id ${userId}`,
-      );
-    }
+      const studentsAttempted = attemptsByStudent.size;
 
-    const groupByGraded = filterDto.status === TaskSubmissionStatus.COMPLETED;
+      let completedCount = 0;
+      const latestScores: number[] = [];
+      const allScores: number[] = [];
+      let totalAttempts = 0;
 
-    return this.mapAndGroupTaskSubmissions(submissions, groupByGraded);
+      attemptsByStudent.forEach((studentAttempts) => {
+        totalAttempts += studentAttempts.length;
+
+        const sorted = studentAttempts.sort(
+          (a, b) =>
+            new Date(a.started_at).getTime() - new Date(b.started_at).getTime(),
+        );
+
+        const latest = sorted[sorted.length - 1];
+
+        if (latest.status === TaskAttemptStatus.COMPLETED) {
+          completedCount++;
+        }
+
+        if (latest.points !== null) {
+          latestScores.push(latest.points);
+        }
+
+        sorted.forEach((a) => {
+          if (a.points !== null) {
+            allScores.push(a.points);
+          }
+        });
+      });
+
+      return {
+        className: ct.class.name,
+        classSlug: ct.class.slug,
+
+        taskTitle: ct.task.title,
+        taskSlug: ct.task.slug,
+        isRepeatable: ct.task.taskType.is_repeatable,
+
+        totalStudents,
+        studentsAttempted,
+        studentsCompleted: completedCount,
+
+        avgScoreLatestAttempt:
+          latestScores.length > 0
+            ? Number(
+                (
+                  latestScores.reduce((a, b) => a + b, 0) / latestScores.length
+                ).toFixed(2),
+              )
+            : 0,
+
+        avgScoreAllAttempts:
+          allScores.length > 0
+            ? Number(
+                (
+                  allScores.reduce((a, b) => a + b, 0) / allScores.length
+                ).toFixed(2),
+              )
+            : 0,
+
+        avgAttemptsPerStudent:
+          studentsAttempted > 0
+            ? Number((totalAttempts / studentsAttempted).toFixed(2))
+            : 0,
+
+        deadline: ct.end_time?.toISOString() ?? null,
+      };
+    });
   }
 
   async findTaskSubmissionsInClass(
     classSlug: string,
     taskSlug: string,
-    filterDto: FilterTaskSubmissionDto,
-  ): Promise<GroupedTaskSubmissionResponseDto[]> {
-    const qb = this.taskSubmissionRepository
-      .createQueryBuilder('ts')
-      .leftJoinAndSelect('ts.taskAttempt', 'ta')
-      .leftJoinAndSelect('ta.class', 'c')
-      .leftJoinAndSelect('ta.task', 't')
-      .leftJoinAndSelect('ta.student', 's');
-
-    // Filter berdasarkan class dan task slug
-    qb.where('c.slug = :classSlug', { classSlug }).andWhere(
-      't.slug = :taskSlug',
-      { taskSlug },
-    );
-
-    // Tambahkan filter status
-    if (filterDto.status) {
-      qb.andWhere('ts.status = :status', { status: filterDto.status });
-    }
-
-    // Filter berdasarkan nama siswa
-    if (filterDto.searchText) {
-      qb.andWhere('s.name ILIKE :name', { name: `%${filterDto.searchText}%` });
-    }
-
-    // Sorting dinamis
-    const orderBy = filterDto.orderBy ?? 'ts.created_at';
-    const orderState = filterDto.orderState ?? 'ASC';
-    qb.orderBy(orderBy, orderState as 'ASC' | 'DESC');
-
-    // Eksekusi query
-    const submissions = await qb.getMany();
-
-    if (!submissions.length) {
-      throw new NotFoundException(
-        `No submission found for class with slug ${classSlug} and task with slug ${taskSlug}`,
-      );
-    }
-
-    const groupByGraded = filterDto.status === TaskSubmissionStatus.COMPLETED;
-
-    return this.mapAndGroupTaskSubmissions(submissions, groupByGraded);
-  }
-
-  private mapAndGroupTaskSubmissions(
-    submissions: TaskSubmission[],
-    groupByGraded: boolean,
-  ): GroupedTaskSubmissionResponseDto[] {
-    const grouped = submissions.reduce(
-      (acc, submission) => {
-        const { title, image } = submission.taskAttempt.task;
-        const { name: className } = submission.taskAttempt.class;
-        const { name: studentName } = submission.taskAttempt.student;
-        const {
-          task_submission_id,
-          status,
-          created_at,
-          last_graded_at,
-          finish_graded_at,
-        } = submission;
-
-        // Pilih tanggal berdasarkan mode grouping
-        const dateValue = groupByGraded ? finish_graded_at : created_at;
-        if (!dateValue) return acc;
-
-        const date = new Date(dateValue);
-        if (isNaN(date.getTime())) return acc;
-
-        const dateKey = format(date, 'yyyy-MM-dd');
-        if (!acc[dateKey]) {
-          acc[dateKey] = {
-            dateLabel: format(date, 'd MMM yyyy', { locale: id }),
-            dayLabel: format(date, 'EEEE', { locale: id }),
-            submissions: [],
-          };
-        }
-
-        const gradedTime =
-          status === TaskSubmissionStatus.COMPLETED
-            ? getTime(finish_graded_at)
-            : status === TaskSubmissionStatus.ON_PROGRESS
-              ? getTime(last_graded_at)
-              : getTime(created_at);
-
-        // Map langsung ke DTO kecil di sini
-        acc[dateKey].submissions.push({
-          id: task_submission_id,
-          title,
-          image: image !== '' ? image : null,
-          className,
-          studentName,
-          status,
-          submittedTime: getTime(created_at),
-          gradedTime,
-        });
-
-        return acc;
+  ): Promise<ClassTaskAttemptAnalyticsResponseDto> {
+    // 1️⃣ Validasi class-task
+    const classTask = await this.classTaskRepository.findOne({
+      where: {
+        class: { slug: classSlug },
+        task: { slug: taskSlug },
       },
-      {} as Record<string, GroupedTaskSubmissionResponseDto>,
-    );
+      relations: {
+        class: true,
+        task: true,
+      },
+    });
 
-    return Object.values(grouped);
+    if (!classTask) {
+      throw new NotFoundException('Task not found in this class');
+    }
+
+    // 2️⃣ Ambil semua attempt
+    const attempts = await this.taskAttemptRepository
+      .createQueryBuilder('ta')
+      .leftJoinAndSelect('ta.student', 's')
+      .leftJoinAndSelect('ta.taskSubmission', 'ts')
+      .where('ta.class_id = :classId', {
+        classId: classTask.class_id,
+      })
+      .andWhere('ta.task_id = :taskId', {
+        taskId: classTask.task_id,
+      })
+      .orderBy('ta.started_at', 'ASC')
+      .getMany();
+
+    if (!attempts.length) {
+      return {
+        className: classTask.class.name,
+        taskTitle: classTask.task.title,
+        taskSlug,
+        averageScoreAllStudents: 0,
+        averageAttempts: 0,
+        students: [],
+      };
+    }
+
+    // 3️⃣ Group by student
+    const studentMap = new Map<string, typeof attempts>();
+
+    attempts.forEach((attempt) => {
+      if (!studentMap.has(attempt.student_id)) {
+        studentMap.set(attempt.student_id, []);
+      }
+      studentMap.get(attempt.student_id).push(attempt);
+    });
+
+    let totalScore = 0;
+    let totalAttempts = 0;
+
+    const students: StudentTaskAttemptAnalyticsDto[] = [];
+
+    studentMap.forEach((studentAttempts, studentId) => {
+      const sorted = [...studentAttempts].sort(
+        (a, b) =>
+          new Date(a.started_at).getTime() - new Date(b.started_at).getTime(),
+      );
+
+      const scores = sorted
+        .map((a) => a.points)
+        .filter((p): p is number => p !== null);
+
+      const firstScore = scores[0];
+      const lastScore = scores[scores.length - 1];
+
+      totalScore += scores.reduce((a, b) => a + b, 0);
+      totalAttempts += sorted.length;
+
+      // 🔥 LATEST ATTEMPT
+      const latestAttempt = sorted[sorted.length - 1];
+
+      students.push({
+        studentId,
+        studentName: sorted[0].student.name,
+
+        totalAttempts: sorted.length,
+        firstAttemptScore: firstScore,
+        lastAttemptScore: lastScore,
+        averageScore:
+          scores.length > 0
+            ? Number(
+                (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(2),
+              )
+            : 0,
+        improvement: scores.length > 1 ? lastScore - firstScore : 0,
+
+        latestStatus: latestAttempt.status,
+        latestSubmissionId:
+          latestAttempt?.taskSubmission?.task_submission_id ?? undefined,
+
+        attempts: sorted.map((a, idx) => ({
+          submissionId: a.taskSubmission?.task_submission_id,
+          attemptNumber: idx + 1,
+          attemptId: a.task_attempt_id,
+          score: a.points,
+          status: a.status,
+          completedAt: a.completed_at,
+        })),
+      });
+    });
+
+    return {
+      className: classTask.class.name,
+      taskTitle: classTask.task.title,
+      taskSlug,
+      averageScoreAllStudents:
+        totalAttempts > 0 ? Number((totalScore / totalAttempts).toFixed(2)) : 0,
+      averageAttempts:
+        students.length > 0
+          ? Number((totalAttempts / students.length).toFixed(2))
+          : 0,
+      students,
+    };
   }
 
   async findTaskSubmissionById(

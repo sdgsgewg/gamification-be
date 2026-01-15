@@ -15,6 +15,7 @@ import {
   OneToMany,
 } from 'typeorm';
 import { TaskDifficulty } from '../enums/task-difficulty.enum';
+import { TaskStatus } from '../enums/task-status.enum';
 
 @Entity('tasks')
 export class Task {
@@ -42,17 +43,17 @@ export class Task {
   @Column({ type: 'varchar', default: TaskDifficulty.MEDIUM })
   difficulty: TaskDifficulty;
 
-  @Column({ type: 'boolean', default: false })
-  is_published: boolean;
+  @Column({ type: 'varchar', default: TaskStatus.DRAFT })
+  status: TaskStatus;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  finalized_at: Date;
 
   @Column({ type: 'timestamptz', nullable: true })
   published_at: Date;
 
-  @Column({ type: 'boolean', default: false })
-  is_finalized: boolean;
-
   @Column({ type: 'timestamptz', nullable: true })
-  finalized_at: Date;
+  archived_at: Date;
 
   @Column({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;

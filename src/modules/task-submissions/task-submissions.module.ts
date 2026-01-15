@@ -8,6 +8,8 @@ import { TaskAnswerLog } from '../task-answer-logs/entities/task-answer-log.enti
 import { TaskQuestionOption } from '../task-question-options/entities/task-question-option.entity';
 import { UserModule } from '../users/users.module';
 import { ActivityLogModule } from '../activty-logs/activity-logs.module';
+import { Class } from '../classes/entities/class.entity';
+import { ClassTask } from '../class-tasks/entities/class-task.entity';
 
 @Module({
   imports: [
@@ -16,6 +18,8 @@ import { ActivityLogModule } from '../activty-logs/activity-logs.module';
       TaskAttempt,
       TaskAnswerLog,
       TaskQuestionOption,
+      Class,
+      ClassTask,
     ]),
     UserModule,
     ActivityLogModule,

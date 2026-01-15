@@ -129,6 +129,12 @@ export class TaskController {
   // STATUS MANAGEMENT
   // ======================
 
+  @Put(':id/finalize')
+  @UseGuards(JwtAuthGuard)
+  async finalizeTask(@Param('id') id: string, @Req() req: any) {
+    return this.taskService.finalizeTask(id, req.user?.id || null);
+  }
+
   @Put(':id/publish')
   @UseGuards(JwtAuthGuard)
   async publishTask(@Param('id') id: string, @Req() req: any) {
@@ -141,9 +147,9 @@ export class TaskController {
     return this.taskService.unpublishTask(id, req.user?.id || null);
   }
 
-  @Put(':id/finalize')
+  @Put(':id/archive')
   @UseGuards(JwtAuthGuard)
-  async finalizeTask(@Param('id') id: string, @Req() req: any) {
-    return this.taskService.finalizeTask(id, req.user?.id || null);
+  async archiveTask(@Param('id') id: string, @Req() req: any) {
+    return this.taskService.archiveTask(id, req.user?.id || null);
   }
 }

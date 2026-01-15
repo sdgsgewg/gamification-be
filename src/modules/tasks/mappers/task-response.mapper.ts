@@ -15,7 +15,6 @@ import { TaskAnswerLog } from 'src/modules/task-answer-logs/entities/task-answer
 import { ClassTaskWithQuestionsResponseDto } from 'src/modules/class-tasks/dto/responses/class-task-with-questions-response.dto';
 import { BaseTaskDetail } from '../dto/responses/task-detail-base';
 import { TaskDetailResponseDto } from '../dto/responses/task-detail-response.dto';
-import { TaskStatus } from '../enums/task-status.enum';
 import { ActivityWithQuestionsResponseDto } from 'src/modules/activities/dto/responses/activity-with-questions-response.dto';
 
 export class TaskResponseMapper {
@@ -81,11 +80,7 @@ export class TaskResponseMapper {
         gradeIds: task.taskGrades
           ? task.taskGrades.map((tg) => tg.gradeId)
           : [],
-        status: task.is_finalized
-          ? TaskStatus.FINALIZED
-          : task.is_published
-            ? TaskStatus.PUBLISHED
-            : TaskStatus.DRAFT,
+        status: task.status,
       },
       duration: {
         startTime: task.start_time ?? null,
@@ -97,8 +92,9 @@ export class TaskResponseMapper {
         updatedBy: task.updated_by
           ? `${getDateTimeWithName(task.updated_at, task.updated_by)}`
           : null,
-        publishedAt: task.published_at ? getDateTime(task.published_at) : null,
         finalizedAt: task.finalized_at ? getDateTime(task.finalized_at) : null,
+        publishedAt: task.published_at ? getDateTime(task.published_at) : null,
+        archivedAt: task.archived_at ? getDateTime(task.archived_at) : null,
       },
       questions:
         task.taskQuestions?.map((q) => ({

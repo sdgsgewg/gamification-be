@@ -754,13 +754,6 @@ export class ClassTaskService {
       }
     }
 
-    // Update status task menjadi PUBLISHED
-    if (!task.is_published || !task.published_at) {
-      task.is_published = true;
-      task.published_at = new Date();
-      await this.taskRepository.save(task);
-    }
-
     return {
       status: 200,
       isSuccess: true,

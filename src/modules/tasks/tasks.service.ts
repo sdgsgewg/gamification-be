@@ -25,7 +25,7 @@ import { MasterHistoryTransactionType } from '../master-history/enums/master-his
 import { getMasterHistoryDescription } from 'src/common/utils/get-master-history-description.util';
 import { ClassTask } from '../class-tasks/entities/class-task.entity';
 import { getResponseMessage } from 'src/common/utils/get-response-message.util';
-import { TaskStatus } from './enums/task-status.enum';
+import { TaskStatus, TaskStatusLabels } from './enums/task-status.enum';
 import { TaskGradeService } from '../task-grades/task-grades.service';
 import { TaskResponseMapper } from './mappers/task-response.mapper';
 
@@ -56,9 +56,8 @@ export class TaskService {
         'task.task_id AS "taskId"',
         'task.title AS "title"',
         'task.slug AS "slug"',
-        'task.is_published::boolean AS "isPublished"',
-        'task.is_finalized::boolean AS "isFinalized"',
         'task.difficulty AS "difficulty"',
+        'task.status AS "status"',
         'taskType.name AS "taskType"',
         'subject.name AS "subject"',
         'material.name AS "material"',
@@ -111,17 +110,9 @@ export class TaskService {
       });
     }
     if (filterDto.status) {
-      if (filterDto.status === TaskStatus.FINALIZED) {
-        qb.andWhere('task.is_finalized IS NOT NULL');
-      } else if (filterDto.status === TaskStatus.PUBLISHED) {
-        qb.andWhere('task.is_finalized IS NULL').andWhere(
-          'task.is_published IS NOT NULL',
-        );
-      } else if (filterDto.status === TaskStatus.DRAFT) {
-        qb.andWhere('task.is_finalized IS NULL').andWhere(
-          'task.is_published IS NULL',
-        );
-      }
+      qb.andWhere('task.status ILIKE :status', {
+        status: `%${filterDto.status}%`,
+      });
     }
 
     // Order by
@@ -133,10 +124,6 @@ export class TaskService {
     const rawTasks = await qb.getRawMany();
 
     const taskOverviews: TaskOverviewResponseDto[] = rawTasks.map((t) => {
-      // pastikan boolean
-      const isFinalized = t.isFinalized === true || t.isFinalized === 'true';
-      const isPublished = t.isPublished === true || t.isPublished === 'true';
-
       return {
         taskId: t.taskId,
         title: t.title,
@@ -148,11 +135,7 @@ export class TaskService {
         questionCount: Number(t.questionCount) || 0,
         difficulty: TaskDifficultyLabels[t.difficulty],
         assignedClassCount: Number(t.assignedClassCount) || 0,
-        status: isFinalized
-          ? TaskStatus.FINALIZED
-          : isPublished
-            ? TaskStatus.PUBLISHED
-            : TaskStatus.DRAFT,
+        status: TaskStatusLabels[t.status],
       };
     });
 
@@ -372,8 +355,8 @@ export class TaskService {
   ): Promise<DetailResponseDto<TaskDetailResponseDto>> {
     const existingTask = await this.findTaskOrThrow(id);
 
-    if (existingTask.is_finalized)
-      throw new BadRequestException('Finalized task cannot be edited.');
+    if (existingTask.status !== TaskStatus.DRAFT)
+      throw new BadRequestException('Task already locked.');
 
     let imageUrl = existingTask.image;
 
@@ -501,6 +484,9 @@ export class TaskService {
     // Cek tugas dulu
     const task = await this.findTaskOrThrow(id);
 
+    if (task.status !== TaskStatus.DRAFT)
+      throw new BadRequestException('Task already locked.');
+
     // Add event to master history
     await this.masterHistoryService.createMasterHistory({
       tableName: 'tasks',
@@ -541,18 +527,55 @@ export class TaskService {
     return response;
   }
 
+  async finalizeTask(id: string, userId: string) {
+    const existingTask = await this.findTaskOrThrow(id);
+
+    if (existingTask.status !== TaskStatus.DRAFT)
+      throw new BadRequestException('Task must be in draft status.');
+
+    existingTask.status = TaskStatus.FINALIZED;
+    existingTask.finalized_at = new Date();
+    existingTask.updated_at = new Date();
+    existingTask.updated_by = existingTask.creator.name;
+
+    const updatedTask = await this.taskRepository.save(existingTask);
+
+    // Add event to master history
+    await this.masterHistoryService.createMasterHistory({
+      tableName: 'tasks',
+      pkName: 'task_id',
+      pkValue: updatedTask.task_id,
+      transactionType: MasterHistoryTransactionType.FINALIZE,
+      description: getMasterHistoryDescription(
+        MasterHistoryTransactionType.FINALIZE,
+        'task',
+        existingTask,
+        undefined,
+      ),
+      dataBefore: existingTask,
+      dataAfter: updatedTask,
+      createdBy: userId,
+    });
+
+    const response: BaseResponseDto = {
+      status: 200,
+      isSuccess: true,
+      message: getResponseMessage({
+        entity: 'task',
+        action: 'finalize',
+      }),
+    };
+
+    return response;
+  }
+
   async publishTask(id: string, userId: string) {
     const existingTask = await this.findTaskOrThrow(id);
 
-    if (existingTask.is_finalized)
-      throw new BadRequestException(
-        'Task has been finalized and cannot be republished.',
-      );
-
-    if (existingTask.is_published)
+    if (existingTask.status === TaskStatus.PUBLISHED)
       throw new BadRequestException('Task is already published.');
 
-    existingTask.is_published = true;
+    existingTask.status = TaskStatus.PUBLISHED;
     existingTask.published_at = new Date();
     existingTask.updated_at = new Date();
     existingTask.updated_by = existingTask.creator.name;
@@ -591,13 +614,10 @@ export class TaskService {
   async unpublishTask(id: string, userId: string) {
     const existingTask = await this.findTaskOrThrow(id);
 
-    if (!existingTask.is_published)
+    if (existingTask.status !== TaskStatus.PUBLISHED)
       throw new BadRequestException('Task is not published.');
 
-    if (existingTask.is_finalized)
-      throw new BadRequestException('Finalized tasks cannot be unpublished.');
-
-    existingTask.is_published = false;
+    existingTask.status = TaskStatus.FINALIZED;
     existingTask.published_at = null;
     existingTask.updated_at = new Date();
     existingTask.updated_by = existingTask.creator.name;
@@ -633,19 +653,14 @@ export class TaskService {
     return response;
   }
 
-  async finalizeTask(id: string, userId: string) {
+  async archiveTask(id: string, userId: string) {
     const existingTask = await this.findTaskOrThrow(id);
 
-    if (!existingTask.is_published)
-      throw new BadRequestException(
-        'Task must be published before finalization.',
-      );
+    if (existingTask.status !== TaskStatus.PUBLISHED)
+      throw new BadRequestException('Task is not published.');
 
-    if (existingTask.is_finalized)
-      throw new BadRequestException('Task is already finalized.');
-
-    existingTask.is_finalized = true;
-    existingTask.finalized_at = new Date();
+    existingTask.status = TaskStatus.ARCHIVED;
+    existingTask.archived_at = new Date();
     existingTask.updated_at = new Date();
     existingTask.updated_by = existingTask.creator.name;
 
@@ -656,9 +671,9 @@ export class TaskService {
       tableName: 'tasks',
       pkName: 'task_id',
       pkValue: updatedTask.task_id,
-      transactionType: MasterHistoryTransactionType.FINALIZE,
+      transactionType: MasterHistoryTransactionType.ARCHIVE,
       description: getMasterHistoryDescription(
-        MasterHistoryTransactionType.FINALIZE,
+        MasterHistoryTransactionType.ARCHIVE,
         'task',
         existingTask,
         undefined,
@@ -673,7 +688,7 @@ export class TaskService {
       isSuccess: true,
       message: getResponseMessage({
         entity: 'task',
-        action: 'finalize',
+        action: 'archive',
       }),
     };
 
