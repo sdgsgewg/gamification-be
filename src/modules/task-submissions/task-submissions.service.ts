@@ -36,10 +36,8 @@ import { TaskDifficultyLabels } from '../tasks/enums/task-difficulty.enum';
 import { TeacherClassTaskAnalyticsDto } from './dto/responses/teacher-class-task-analytics-response.dto';
 import { Class } from '../classes/entities/class.entity';
 import { ClassTask } from '../class-tasks/entities/class-task.entity';
-import {
-  ClassTaskAttemptAnalyticsResponseDto,
-  StudentTaskAttemptAnalyticsDto,
-} from './dto/responses/class-task-attempt-analytics-response.dto';
+import { ClassTaskAttemptAnalyticsResponseDto } from './dto/responses/class-task-attempt-analytics-response.dto';
+import { StudentTaskAttemptAnalyticsDto } from '../task-attempts/dto/responses/student-attempt/student-task-attempt-analytics-response.dto';
 // import { TaskSubmissionResponseMapper } from './mapper/task-submission-response.mapper';
 
 @Injectable()
@@ -301,7 +299,7 @@ export class TaskSubmissionService {
     classSlug: string,
     taskSlug: string,
   ): Promise<ClassTaskAttemptAnalyticsResponseDto> {
-    // 1️⃣ Validasi class-task
+    // Validasi class-task
     const classTask = await this.classTaskRepository.findOne({
       where: {
         class: { slug: classSlug },
@@ -317,7 +315,7 @@ export class TaskSubmissionService {
       throw new NotFoundException('Task not found in this class');
     }
 
-    // 2️⃣ Ambil semua attempt
+    // Ambil semua attempt
     const attempts = await this.taskAttemptRepository
       .createQueryBuilder('ta')
       .leftJoinAndSelect('ta.student', 's')
@@ -342,7 +340,7 @@ export class TaskSubmissionService {
       };
     }
 
-    // 3️⃣ Group by student
+    // Group by student
     const studentMap = new Map<string, typeof attempts>();
 
     attempts.forEach((attempt) => {
@@ -373,7 +371,7 @@ export class TaskSubmissionService {
       totalScore += scores.reduce((a, b) => a + b, 0);
       totalAttempts += sorted.length;
 
-      // 🔥 LATEST ATTEMPT
+      // LATEST ATTEMPT
       const latestAttempt = sorted[sorted.length - 1];
 
       students.push({

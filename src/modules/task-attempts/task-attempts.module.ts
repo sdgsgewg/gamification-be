@@ -5,20 +5,15 @@ import { TaskAttemptService } from './task-attempts.service';
 import { TaskAttempt } from './entities/task-attempt.entity';
 import { TaskAnswerLogModule } from '../task-answer-logs/task-answer-logs.module';
 import { Task } from '../tasks/entities/task.entity';
-import { TaskQuestion } from '../task-questions/entities/task-question.entity';
-import { TaskQuestionOption } from '../task-question-options/entities/task-question-option.entity';
 import { UserModule } from '../users/users.module';
 import { TaskSubmissionModule } from '../task-submissions/task-submissions.module';
 import { ActivityLogModule } from '../activty-logs/activity-logs.module';
+import { Class } from '../classes/entities/class.entity';
+import { ClassTask } from '../class-tasks/entities/class-task.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([
-      TaskAttempt,
-      Task,
-      TaskQuestion,
-      TaskQuestionOption,
-    ]),
+    TypeOrmModule.forFeature([TaskAttempt, Task, Class, ClassTask]),
     TaskAnswerLogModule,
     UserModule,
     TaskSubmissionModule,

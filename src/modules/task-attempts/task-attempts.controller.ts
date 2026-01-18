@@ -20,6 +20,10 @@ import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 export class TaskAttemptController {
   constructor(private readonly taskAttemptService: TaskAttemptService) {}
 
+  /**
+   * [GET] /
+   * Get all task attempts by user (student) with optional filters
+   */
   @Get('')
   @UseGuards(JwtAuthGuard)
   async getAllTaskAttemptsByUser(
@@ -31,6 +35,10 @@ export class TaskAttemptController {
     return this.taskAttemptService.findAllTaskAttemptsByUser(userId, filterDto);
   }
 
+  /**
+   * [GET] /popular
+   * Get most popular tasks created by the creator (teacher/admin)
+   */
   @Get('popular')
   @UseGuards(JwtAuthGuard)
   async getMostPopularTask(@Req() req: any) {
@@ -38,6 +46,62 @@ export class TaskAttemptController {
     return this.taskAttemptService.findMostPopularTask(creatorId);
   }
 
+  /**
+   * [GET] /class
+   * Get all task attempts from each teacher's classes
+   */
+  @Get('/class')
+  @UseGuards(JwtAuthGuard)
+  async getAllTaskAttemptsFromClasses(@Req() req: any) {
+    const teacherId = req.user?.id || null;
+    return this.taskAttemptService.findAllTaskAttemptsFromClasses(teacherId);
+  }
+
+  /**
+   * [GET] /activity
+   * Get all task attempts from each task on activity page
+   */
+  @Get('/activity')
+  @UseGuards(JwtAuthGuard)
+  async getAllTaskAttemptsFromActivityPage(@Req() req: any) {
+    const teacherId = req.user?.id || null;
+    return this.taskAttemptService.findAllTaskAttemptsFromActivityPage(
+      teacherId,
+    );
+  }
+
+  /**
+   * [GET] /class/:classSlug/:taskSlug
+   * Get student attempts from a task in a class
+   */
+  @Get('/class/:classSlug/:taskSlug')
+  async getStudentAttemptsFromClassTask(
+    @Param('classSlug') classSlug: string,
+    @Param('taskSlug') taskSlug: string,
+  ) {
+    return this.taskAttemptService.findStudentAttemptsFromClassTask(
+      classSlug,
+      taskSlug,
+    );
+  }
+
+  /**
+   * [GET] /activity/:taskSlug
+   * Get student attempts from a task on activity page
+   */
+  @Get('/activity/:taskSlug')
+  async getStudentAttemptsFromActivityTask(
+    @Param('taskSlug') taskSlug: string,
+  ) {
+    return this.taskAttemptService.findStudentAttemptsFromActivityTask(
+      taskSlug,
+    );
+  }
+
+  /**
+   * [GET] /:id
+   * Get task attempt detail by id
+   */
   @Get(':id')
   async getTaskAttemptDetail(@Param('id') id: string) {
     if (!id) {

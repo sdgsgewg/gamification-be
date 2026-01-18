@@ -1,28 +1,4 @@
-import { TaskAttemptStatus } from 'src/modules/task-attempts/enums/task-attempt-status.enum';
-
-export class StudentAttemptDetailDto {
-  attemptNumber: number;
-  attemptId: string;
-  score: number;
-  status: TaskAttemptStatus;
-  completedAt?: Date;
-}
-
-export class StudentTaskAttemptAnalyticsDto {
-  studentId: string;
-  studentName: string;
-
-  totalAttempts: number;
-  firstAttemptScore?: number;
-  lastAttemptScore?: number;
-  averageScore?: number;
-  improvement?: number;
-
-  latestStatus: TaskAttemptStatus;
-  latestSubmissionId?: string;
-
-  attempts: StudentAttemptDetailDto[];
-}
+import { StudentTaskAttemptAnalyticsDto } from 'src/modules/task-attempts/dto/responses/student-attempt/student-task-attempt-analytics-response.dto';
 
 export class ClassTaskAttemptAnalyticsResponseDto {
   className: string;

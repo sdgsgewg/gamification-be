@@ -15,7 +15,6 @@ import { CreateTaskAttemptDto } from './dto/requests/create-task-attempt.dto';
 import { UpdateTaskAttemptDto } from './dto/requests/update-task-attempt.dto';
 import { TaskAnswerLogService } from '../task-answer-logs/task-answer-logs.service';
 import { Task } from '../tasks/entities/task.entity';
-import { TaskQuestionOption } from '../task-question-options/entities/task-question-option.entity';
 import { UserService } from '../users/users.service';
 import { DetailResponseDto } from 'src/common/responses/detail-response.dto';
 import { UpsertTaskAttemptResponseDto } from './dto/responses/upsert-task-attempt.dto';
@@ -48,6 +47,13 @@ import { MostPopularTaskResponseDto } from './dto/responses/most-popular-task-re
 import { ClassResponseDto } from './dto/responses/task-attempt-overview.dto';
 import { CurrentAttemptResponseDto } from './dto/responses/current-attempt-response.dto';
 import { AttemptMetaResponseDto } from './dto/responses/attempt-meta-response.dto';
+import { ClassTaskStudentAttemptResponseDto } from './dto/responses/student-attempt/class-task-student-attempt-response.dto';
+import { ClassTaskAttemptResponseDto } from './dto/responses/student-attempt/class-task-attempt-response.dto';
+import { Class } from '../classes/entities/class.entity';
+import { ClassTask } from '../class-tasks/entities/class-task.entity';
+import { ActivityTaskAttemptResponseDto } from './dto/responses/student-attempt/activity-task-attempt-response.dto';
+import { TaskAttemptResponseMapper } from './mapper/task-attempt-response.mapper';
+import { ActivityTaskStudentAttemptResponseDto } from './dto/responses/student-attempt/activity-task-student-attempt-response.dto';
 
 @Injectable()
 export class TaskAttemptService {
@@ -56,8 +62,10 @@ export class TaskAttemptService {
     private readonly taskAttemptRepository: Repository<TaskAttempt>,
     @InjectRepository(Task)
     private readonly taskRepository: Repository<Task>,
-    @InjectRepository(TaskQuestionOption)
-    private readonly taskQuestionOptionRepository: Repository<TaskQuestionOption>,
+    @InjectRepository(Class)
+    private readonly classRepository: Repository<Class>,
+    @InjectRepository(ClassTask)
+    private readonly classTaskRepository: Repository<ClassTask>,
     private readonly taskAnswerLogService: TaskAnswerLogService,
     private readonly userService: UserService,
     private readonly taskSubmissionService: TaskSubmissionService,
@@ -260,6 +268,168 @@ export class TaskAttemptService {
     }));
 
     return data;
+  }
+
+  // --------------------------
+  // Return all attempts from each teacher's classes
+  // --------------------------
+  async findAllTaskAttemptsFromClasses(
+    teacherId: string,
+  ): Promise<ClassTaskAttemptResponseDto[]> {
+    const classes = await this.classRepository.find({
+      where: { teacher_id: teacherId },
+      relations: { classStudents: true },
+    });
+
+    if (!classes.length) {
+      throw new NotFoundException('No class found for this teacher');
+    }
+
+    const classIds = classes.map((c) => c.class_id);
+
+    const classTasks = await this.classTaskRepository.find({
+      where: { class: { class_id: In(classIds) } },
+      relations: {
+        class: { classStudents: true },
+        task: { taskType: true },
+      },
+    });
+
+    if (!classTasks.length) return [];
+
+    const attempts = await this.taskAttemptRepository
+      .createQueryBuilder('ta')
+      .leftJoinAndSelect('ta.task', 't')
+      .leftJoinAndSelect('ta.class', 'c')
+      .where('ta.class_id IN (:...classIds)', { classIds })
+      .getMany();
+
+    return TaskAttemptResponseMapper.mapClassTaskAttempts(classTasks, attempts);
+  }
+
+  // --------------------------
+  // Return all attempts from activity page
+  // --------------------------
+  async findAllTaskAttemptsFromActivityPage(
+    teacherId: string,
+  ): Promise<ActivityTaskAttemptResponseDto[]> {
+    const tasks = await this.taskRepository.find({
+      where: { creator_id: teacherId },
+      relations: { taskType: true },
+    });
+
+    if (!tasks.length) {
+      throw new NotFoundException('No task found for this teacher');
+    }
+
+    const attempts = await this.taskAttemptRepository
+      .createQueryBuilder('ta')
+      .leftJoinAndSelect('ta.task', 't')
+      .where('ta.class_id IS NULL')
+      .andWhere('t.creator_id = :teacherId', { teacherId })
+      .getMany();
+
+    if (!attempts.length) return [];
+
+    return TaskAttemptResponseMapper.mapActivityTaskAttempts(tasks, attempts);
+  }
+
+  // --------------------------
+  // Return student attempts from a task in a class
+  // --------------------------
+  async findStudentAttemptsFromClassTask(
+    classSlug: string,
+    taskSlug: string,
+  ): Promise<ClassTaskStudentAttemptResponseDto> {
+    // Validasi class-task
+    const classTask = await this.classTaskRepository.findOne({
+      where: {
+        class: { slug: classSlug },
+        task: { slug: taskSlug },
+      },
+      relations: {
+        class: true,
+        task: true,
+      },
+    });
+
+    if (!classTask) {
+      throw new NotFoundException('Task not found in this class');
+    }
+
+    // Ambil semua attempt
+    const attempts = await this.taskAttemptRepository
+      .createQueryBuilder('ta')
+      .leftJoinAndSelect('ta.student', 's')
+      .leftJoinAndSelect('ta.taskSubmission', 'ts')
+      .where('ta.class_id = :classId', {
+        classId: classTask.class_id,
+      })
+      .andWhere('ta.task_id = :taskId', {
+        taskId: classTask.task_id,
+      })
+      .orderBy('ta.started_at', 'ASC')
+      .getMany();
+
+    if (!attempts.length) {
+      return {
+        class: {
+          name: classTask.class.name,
+        },
+        task: {
+          title: classTask.task.title,
+          slug: classTask.task.slug,
+        },
+        averageScoreAllStudents: 0,
+        averageAttempts: 0,
+        students: [],
+      };
+    }
+
+    return TaskAttemptResponseMapper.mapStudentAttemptsFromClassTask(
+      classTask,
+      attempts,
+    );
+  }
+
+  // --------------------------
+  // Return student attempts from a task on activity page
+  // --------------------------
+  async findStudentAttemptsFromActivityTask(
+    taskSlug: string,
+  ): Promise<ActivityTaskStudentAttemptResponseDto> {
+    const task = await this.taskRepository.findOne({
+      where: { slug: taskSlug },
+    });
+
+    if (!task) {
+      throw new NotFoundException('Task not found');
+    }
+
+    const attempts = await this.taskAttemptRepository
+      .createQueryBuilder('ta')
+      .leftJoinAndSelect('ta.student', 's')
+      .leftJoinAndSelect('ta.taskSubmission', 'ts')
+      .andWhere('ta.task_id = :taskId', { taskId: task.task_id })
+      .orderBy('ta.started_at', 'ASC')
+      .getMany();
+
+    if (!attempts.length) {
+      return {
+        task: {
+          title: task.title,
+          slug: task.slug,
+        },
+        averageScoreAllStudents: 0,
+        averageAttempts: 0,
+        students: [],
+      };
+    }
+
+    return TaskAttemptResponseMapper.mapStudentAttemptsFromActivityTask(
+      task,
+      attempts,
+    );
   }
 
   async findTaskAttemptById(attemptId: string) {
