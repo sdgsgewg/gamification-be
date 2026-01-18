@@ -22,10 +22,12 @@ export class LeaderboardService {
   ) {}
 
   /**
-   * Find leaderboard for all students based on scope:
-   * - GLOBAL   -> activity + class
-   * - ACTIVITY -> only attempts where class_id IS NULL
-   * - CLASS    -> only attempts where class_id IS NOT NULL
+   * ================================
+   * STUDENT LEADERBOARD (GLOBAL / ACTIVITY / CLASS)
+   * Rule:
+   * - Points = SUM(best attempt per task)
+   * - XP & Level = tie breaker only
+   * ================================
    */
   async findStudentLeaderboard(
     filterDto: FilterStudentLeaderboardDto,
@@ -35,31 +37,41 @@ export class LeaderboardService {
     const query = this.userRepository
       .createQueryBuilder('user')
       .leftJoin('user.role', 'role')
-      .leftJoin('user.taskAttempts', 'attempt')
       .select('user.user_id', 'id')
       .addSelect('user.name', 'name')
       .addSelect('user.username', 'username')
       .addSelect('user.image', 'image')
       .addSelect('user.level', 'level')
       .addSelect('user.xp', 'xp')
-      .addSelect('COALESCE(SUM(attempt.points), 0)', 'point')
+      .addSelect((subQuery) => {
+        const bestAttemptPerTask = subQuery
+          .subQuery()
+          .select('MAX(attempt.points)', 'points')
+          .addSelect('attempt.task_id', 'task_id')
+          .from(TaskAttempt, 'attempt')
+          .where('attempt.student_id = user.user_id');
+
+        // Scope filter
+        if (scope === LeaderboardScope.ACTIVITY) {
+          bestAttemptPerTask.andWhere('attempt.class_id IS NULL');
+        } else if (scope === LeaderboardScope.CLASS) {
+          bestAttemptPerTask.andWhere('attempt.class_id IS NOT NULL');
+        }
+
+        bestAttemptPerTask.groupBy('attempt.task_id');
+
+        return subQuery
+          .select('COALESCE(SUM(best.points), 0)')
+          .from(`(${bestAttemptPerTask.getQuery()})`, 'best')
+          .setParameters(bestAttemptPerTask.getParameters());
+      }, 'point')
       .where('role.name = :roleName', { roleName: UserRole.STUDENT });
 
-    // Apply scope filter
-    if (scope === LeaderboardScope.ACTIVITY) {
-      query.andWhere('attempt.class_id IS NULL');
-    } else if (scope === LeaderboardScope.CLASS) {
-      query.andWhere('attempt.class_id IS NOT NULL');
-    }
-
-    query.groupBy('user.user_id');
-
-    // ORDERING
     query
       .orderBy('point', 'DESC')
       .addOrderBy('user.xp', 'DESC')
       .addOrderBy('user.level', 'DESC')
-      .addOrderBy('user.name', 'DESC');
+      .addOrderBy('user.name', 'ASC');
 
     const rawResults = await query.limit(50).getRawMany();
 
@@ -67,25 +79,24 @@ export class LeaderboardService {
       throw new NotFoundException('No student leaderboard data found');
     }
 
-    // Add rank and map to DTO
-    const results: StudentLeaderboardResponseDto[] = rawResults.map(
-      (user, index) => ({
-        id: user.id,
-        rank: index + 1,
-        name: user.name,
-        username: user.username,
-        image: user.image,
-        level: Number(user.level) || 0,
-        xp: Number(user.xp) || 0,
-        point: Number(user.point) || 0,
-      }),
-    );
-
-    return results;
+    return rawResults.map((row, index) => ({
+      id: row.id,
+      rank: index + 1,
+      name: row.name,
+      username: row.username,
+      image: row.image,
+      level: Number(row.level) || 0,
+      xp: Number(row.xp) || 0,
+      point: Number(row.point) || 0,
+    }));
   }
 
   /**
-   * Find leaderboard for all students in one class
+   * ================================
+   * CLASS STUDENT LEADERBOARD
+   * Rule:
+   * - Best attempt per task per student (inside class)
+   * ================================
    */
   async findClassStudentsLeaderboard(
     classId: string,
@@ -100,7 +111,20 @@ export class LeaderboardService {
       .addSelect('student.image', 'image')
       .addSelect('student.level', 'level')
       .addSelect('student.xp', 'xp')
-      .addSelect('COALESCE(SUM(attempt.points), 0)', 'point')
+      .addSelect('SUM(best.points)', 'point')
+      .innerJoin(
+        (qb) =>
+          qb
+            .select('MAX(a.points)', 'points')
+            .addSelect('a.task_id', 'task_id')
+            .addSelect('a.student_id', 'student_id')
+            .from(TaskAttempt, 'a')
+            .where('a.class_id = :classId', { classId })
+            .groupBy('a.task_id')
+            .addGroupBy('a.student_id'),
+        'best',
+        'best.student_id = student.user_id AND best.task_id = attempt.task_id',
+      )
       .where('attempt.class_id = :classId', { classId })
       .andWhere('role.name = :role', { role: UserRole.STUDENT })
       .groupBy('student.user_id')
@@ -112,19 +136,28 @@ export class LeaderboardService {
       .orderBy('point', 'DESC')
       .addOrderBy('xp', 'DESC')
       .addOrderBy('level', 'DESC')
-      .addOrderBy('name', 'DESC')
+      .addOrderBy('name', 'ASC')
       .limit(50)
       .getRawMany();
 
-    // Tambahkan rank (peringkat)
-    return results.map((student, index) => ({
-      ...student,
+    return results.map((row, index) => ({
+      id: row.id,
       rank: index + 1,
+      name: row.name,
+      username: row.username,
+      image: row.image,
+      level: Number(row.level) || 0,
+      xp: Number(row.xp) || 0,
+      point: Number(row.point) || 0,
     }));
   }
 
   /**
-   * Find leaderboard for all classes registered into the system
+   * ================================
+   * CLASS LEADERBOARD
+   * Rule:
+   * - SUM(best attempt per task per student)
+   * ================================
    */
   async findClassLeaderboard(): Promise<ClassLeaderboardResponseDto[]> {
     const rawResults = await this.classRepository
@@ -133,24 +166,34 @@ export class LeaderboardService {
       .select('class.class_id', 'id')
       .addSelect('class.name', 'name')
       .addSelect('class.image', 'image')
-      .addSelect('COALESCE(SUM(attempt.points), 0)', 'point')
+      .addSelect('COALESCE(SUM(best.points), 0)', 'point')
+      .innerJoin(
+        (qb) =>
+          qb
+            .select('MAX(a.points)', 'points')
+            .addSelect('a.task_id', 'task_id')
+            .addSelect('a.class_id', 'class_id')
+            .from(TaskAttempt, 'a')
+            .where('a.class_id IS NOT NULL')
+            .groupBy('a.task_id')
+            .addGroupBy('a.class_id'),
+        'best',
+        'best.class_id = class.class_id',
+      )
       .groupBy('class.class_id')
+      .addGroupBy('class.name')
+      .addGroupBy('class.image')
       .orderBy('point', 'DESC')
-      .addOrderBy('name', 'DESC')
+      .addOrderBy('name', 'ASC')
       .limit(50)
       .getRawMany();
 
-    // Mapping ke DTO + rank
-    const results: ClassLeaderboardResponseDto[] = rawResults.map(
-      (cls, index) => ({
-        id: cls.id,
-        rank: index + 1,
-        name: cls.name,
-        image: cls.image,
-        point: Number(cls.point) || 0,
-      }),
-    );
-
-    return results;
+    return rawResults.map((cls, index) => ({
+      id: cls.id,
+      rank: index + 1,
+      name: cls.name,
+      image: cls.image,
+      point: Number(cls.point) || 0,
+    }));
   }
 }
