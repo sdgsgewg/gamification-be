@@ -1,5 +1,7 @@
 import {
+  getDate,
   getDateTime,
+  getTime,
   getTimePeriod,
 } from 'src/common/utils/date-modifier.util';
 import {
@@ -28,8 +30,213 @@ import { ActivityTaskAttemptResponseDto } from '../dto/responses/student-attempt
 import { ClassTaskStudentAttemptResponseDto } from '../dto/responses/student-attempt/class-task-student-attempt-response.dto';
 import { StudentTaskAttemptAnalyticsDto } from '../dto/responses/student-attempt/student-task-attempt-analytics-response.dto';
 import { ActivityTaskStudentAttemptResponseDto } from '../dto/responses/student-attempt/activity-task-student-attempt-response.dto';
+import {
+  TaskAttemptDetailResponseDto,
+  TaskAttemptProgress,
+  TaskAttemptStats,
+} from '../dto/responses/task-attempt-detail.dto';
+import { TaskDifficultyLabels } from 'src/modules/tasks/enums/task-difficulty.enum';
+import { GroupedTaskAttemptResponseDto } from '../dto/responses/grouped-task-attempt.dto';
+import { TaskAttemptHelper } from 'src/common/helpers/task-attempt.helper';
+import { format } from 'date-fns';
+import { id } from 'date-fns/locale';
+import { ClassResponseDto } from '../dto/responses/task-attempt-overview.dto';
 
 export class TaskAttemptResponseMapper {
+  // ===========================
+  // TASK ATTEMPTS (HISTORY)
+  // ===========================
+  static mapAndGroupTaskAttempts(
+    attempts: TaskAttempt[],
+  ): GroupedTaskAttemptResponseDto[] {
+    const grouped = attempts.reduce(
+      (acc, attempt) => {
+        const { task_attempt_id, status, last_accessed_at, completed_at } =
+          attempt;
+
+        const dateObj = TaskAttemptHelper.getPrimaryDateForAttempt(attempt);
+
+        const dateKey = dateObj ? format(dateObj, 'yyyy-MM-dd') : 'no-date';
+
+        if (!acc[dateKey]) {
+          if (dateObj) {
+            acc[dateKey] = {
+              dateLabel: format(dateObj, 'd MMM yyyy', { locale: id }),
+              dayLabel: format(dateObj, 'EEEE', { locale: id }),
+              attempts: [],
+            };
+          } else {
+            acc[dateKey] = {
+              dateLabel: 'Not Started',
+              dayLabel: '',
+              attempts: [],
+            };
+          }
+        }
+
+        const classData: ClassResponseDto = attempt.class
+          ? {
+              name: attempt.class.name,
+              slug: attempt.class.slug,
+            }
+          : null;
+
+        acc[dateKey].attempts.push({
+          id: task_attempt_id,
+          title: attempt.task?.title ?? 'Unknown Task',
+          image:
+            attempt.task?.image && attempt.task.image !== ''
+              ? attempt.task.image
+              : null,
+          status,
+          class: classData,
+          taskSlug: attempt.task?.slug ?? null,
+          deadline: attempt.task?.end_time
+            ? getDate(attempt.task.end_time)
+            : null,
+          lastAccessedTime: getTime(last_accessed_at),
+          submittedTime: attempt.taskSubmission?.created_at
+            ? getTime(attempt.taskSubmission.created_at)
+            : null,
+          completedTime: completed_at ? getTime(completed_at) : null,
+        });
+
+        return acc;
+      },
+      {} as Record<string, GroupedTaskAttemptResponseDto>,
+    );
+
+    return Object.values(grouped);
+  }
+
+  // ==============================
+  // TASK ATTEMPT DETAIL (HISTORY)
+  // ==============================
+  static mapTaskAttemptDetail(
+    attempt: TaskAttempt,
+  ): TaskAttemptDetailResponseDto {
+    const {
+      title,
+      slug,
+      image,
+      description,
+      subject,
+      material,
+      taskType,
+      taskGrades,
+      difficulty,
+      taskQuestions,
+      start_time,
+      end_time,
+      created_by,
+    } = attempt.task;
+    const {
+      answered_question_count,
+      points,
+      xp_gained,
+      started_at,
+      last_accessed_at,
+      completed_at,
+      status,
+      task,
+      taskAnswerLogs,
+    } = attempt;
+
+    const totalPoints = taskQuestions.reduce(
+      (acc, question) => acc + (question.point ?? 0),
+      0,
+    );
+
+    const score = Math.round((points / totalPoints) * 100);
+
+    const stats: TaskAttemptStats = {
+      pointGained: points,
+      xpGained: xp_gained,
+      totalPoints,
+      score,
+    };
+
+    const rawStatus = status as string | null;
+
+    const normalizedStatus = Object.values(TaskAttemptStatus).includes(
+      rawStatus as TaskAttemptStatus,
+    )
+      ? (rawStatus as TaskAttemptStatus)
+      : TaskAttemptStatus.NOT_STARTED;
+
+    const progress: TaskAttemptProgress = {
+      startedAt: getDateTime(started_at),
+      lastAccessedAt: getDateTime(last_accessed_at),
+      completedAt: getDateTime(completed_at),
+      timeTaken: getTimePeriod(started_at, completed_at),
+      status: normalizedStatus,
+    };
+
+    const questions =
+      task.taskQuestions?.map((q) => {
+        const userAnswer = taskAnswerLogs.find(
+          (log) => log.question_id === q.task_question_id,
+        );
+
+        return {
+          questionId: q.task_question_id,
+          text: q.text,
+          point: q.point,
+          type: q.type,
+          timeLimit: q.time_limit ?? null,
+          image: q.image ?? null,
+          options: q.taskQuestionOptions?.map((o) => ({
+            optionId: o.task_question_option_id,
+            text: o.text,
+            isCorrect: o.is_correct,
+            isSelected: userAnswer?.option_id === o.task_question_option_id,
+          })),
+          userAnswer: userAnswer
+            ? {
+                answerLogId: userAnswer.task_answer_log_id,
+                text: userAnswer.answer_text,
+                image: userAnswer.image,
+                optionId: userAnswer.option_id,
+                isCorrect: userAnswer.is_correct,
+              }
+            : null,
+        };
+      }) || [];
+
+    return {
+      title,
+      slug,
+      image,
+      description,
+      subject: subject.name,
+      material: material ? material.name : null,
+      grade:
+        taskGrades.length > 0
+          ? taskGrades
+              .map((tg) => tg.grade.name.replace('Kelas ', ''))
+              .join(', ')
+          : null,
+      questionCount: taskQuestions.length,
+      difficulty: TaskDifficultyLabels[difficulty],
+      createdBy: created_by || 'Unknown',
+      type: {
+        name: taskType.name,
+        isRepeatable: taskType.is_repeatable,
+      },
+      attempt: {
+        answeredCount: answered_question_count ?? 0,
+      },
+      stats,
+      duration: {
+        startTime: start_time ?? null,
+        endTime: end_time ?? null,
+        duration: getTimePeriod(start_time, end_time),
+      },
+      progress,
+      questions,
+    };
+  }
+
   // ===========================
   // CLASS TASK ATTEMPT
   // ===========================

@@ -1,8 +1,19 @@
 import { Task } from 'src/modules/tasks/entities/task.entity';
 import { TaskDifficulty } from 'src/modules/tasks/enums/task-difficulty.enum';
 import { TaskAnswerLog } from 'src/modules/task-answer-logs/entities/task-answer-log.entity';
+import { TaskAttempt } from 'src/modules/task-attempts/entities/task-attempt.entity';
+import { TaskAttemptStatus } from 'src/modules/task-attempts/enums/task-attempt-status.enum';
 
 export class TaskXpHelper {
+  /**
+   * Cek apakah pengguna berhak mendapatkan XP dari pengerjaan tugas ini.
+   */
+  static shouldGrantXp(previousAttempts: TaskAttempt[]): boolean {
+    return !previousAttempts.some(
+      (a) => a.status === TaskAttemptStatus.COMPLETED && a.xp_gained != null,
+    );
+  }
+
   /**
    * Hitung total poin dan XP yang didapatkan dari pengerjaan tugas.
    * Rumus:

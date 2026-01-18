@@ -20,31 +20,20 @@ import { DetailResponseDto } from 'src/common/responses/detail-response.dto';
 import { UpsertTaskAttemptResponseDto } from './dto/responses/upsert-task-attempt.dto';
 import { LevelHelper } from 'src/common/helpers/level.helper';
 import {
-  TaskAttemptDetailResponseDto,
-  TaskAttemptProgress,
-  TaskAttemptStats,
-} from './dto/responses/task-attempt-detail.dto';
-import {
-  getDate,
   getDateTime,
-  getTime,
   getTimePeriod,
 } from 'src/common/utils/date-modifier.util';
 import { FilterTaskAttemptDto } from './dto/requests/filter-task-attempt.dto';
-import { format } from 'date-fns';
-import { id } from 'date-fns/locale';
 import { GroupedTaskAttemptResponseDto } from './dto/responses/grouped-task-attempt.dto';
 import { TaskAttemptStatus } from './enums/task-attempt-status.enum';
 import { TaskSubmissionService } from '../task-submissions/task-submissions.service';
 import { TaskXpHelper } from 'src/common/helpers/task-xp.helper';
-import { TaskDifficultyLabels } from '../tasks/enums/task-difficulty.enum';
 import { ActivityLogService } from '../activty-logs/activity-logs.service';
 import { getActivityLogDescription } from 'src/common/utils/get-activity-log-description.util';
 import { ActivityLogEventType } from '../activty-logs/enums/activity-log-event-type';
 import { UserRole } from '../roles/enums/user-role.enum';
 import { getResponseMessage } from 'src/common/utils/get-response-message.util';
 import { MostPopularTaskResponseDto } from './dto/responses/most-popular-task-response.dto';
-import { ClassResponseDto } from './dto/responses/task-attempt-overview.dto';
 import { CurrentAttemptResponseDto } from './dto/responses/current-attempt-response.dto';
 import { AttemptMetaResponseDto } from './dto/responses/attempt-meta-response.dto';
 import { ClassTaskStudentAttemptResponseDto } from './dto/responses/student-attempt/class-task-student-attempt-response.dto';
@@ -54,6 +43,7 @@ import { ClassTask } from '../class-tasks/entities/class-task.entity';
 import { ActivityTaskAttemptResponseDto } from './dto/responses/student-attempt/activity-task-attempt-response.dto';
 import { TaskAttemptResponseMapper } from './mapper/task-attempt-response.mapper';
 import { ActivityTaskStudentAttemptResponseDto } from './dto/responses/student-attempt/activity-task-student-attempt-response.dto';
+import { TaskAttemptHelper } from 'src/common/helpers/task-attempt.helper';
 
 @Injectable()
 export class TaskAttemptService {
@@ -132,96 +122,7 @@ export class TaskAttemptService {
       );
     }
 
-    return this.mapAndGroupTaskAttempts(attempts);
-  }
-
-  private getPrimaryDateForAttempt(attempt: TaskAttempt): Date | null {
-    const status = attempt.status;
-
-    switch (status) {
-      case TaskAttemptStatus.NOT_STARTED:
-      case TaskAttemptStatus.ON_PROGRESS:
-        return attempt.last_accessed_at
-          ? new Date(attempt.last_accessed_at)
-          : null;
-
-      case TaskAttemptStatus.SUBMITTED:
-        return attempt.taskSubmission?.created_at
-          ? new Date(attempt.taskSubmission.created_at)
-          : null;
-
-      case TaskAttemptStatus.COMPLETED:
-        return attempt.completed_at ? new Date(attempt.completed_at) : null;
-
-      case TaskAttemptStatus.PAST_DUE:
-        return attempt.task?.end_time ? new Date(attempt.task.end_time) : null;
-
-      default:
-        return null;
-    }
-  }
-
-  private mapAndGroupTaskAttempts(
-    attempts: TaskAttempt[],
-  ): GroupedTaskAttemptResponseDto[] {
-    const grouped = attempts.reduce(
-      (acc, attempt) => {
-        const { task_attempt_id, status, last_accessed_at, completed_at } =
-          attempt;
-
-        const dateObj = this.getPrimaryDateForAttempt(attempt);
-
-        const dateKey = dateObj ? format(dateObj, 'yyyy-MM-dd') : 'no-date';
-
-        if (!acc[dateKey]) {
-          if (dateObj) {
-            acc[dateKey] = {
-              dateLabel: format(dateObj, 'd MMM yyyy', { locale: id }),
-              dayLabel: format(dateObj, 'EEEE', { locale: id }),
-              attempts: [],
-            };
-          } else {
-            acc[dateKey] = {
-              dateLabel: 'Not Started',
-              dayLabel: '',
-              attempts: [],
-            };
-          }
-        }
-
-        const classData: ClassResponseDto = attempt.class
-          ? {
-              name: attempt.class.name,
-              slug: attempt.class.slug,
-            }
-          : null;
-
-        acc[dateKey].attempts.push({
-          id: task_attempt_id,
-          title: attempt.task?.title ?? 'Unknown Task',
-          image:
-            attempt.task?.image && attempt.task.image !== ''
-              ? attempt.task.image
-              : null,
-          status,
-          class: classData,
-          taskSlug: attempt.task?.slug ?? null,
-          deadline: attempt.task?.end_time
-            ? getDate(attempt.task.end_time)
-            : null,
-          lastAccessedTime: getTime(last_accessed_at),
-          submittedTime: attempt.taskSubmission?.created_at
-            ? getTime(attempt.taskSubmission.created_at)
-            : null,
-          completedTime: completed_at ? getTime(completed_at) : null,
-        });
-
-        return acc;
-      },
-      {} as Record<string, GroupedTaskAttemptResponseDto>,
-    );
-
-    return Object.values(grouped);
+    return TaskAttemptResponseMapper.mapAndGroupTaskAttempts(attempts);
   }
 
   async findMostPopularTask(
@@ -270,9 +171,9 @@ export class TaskAttemptService {
     return data;
   }
 
-  // --------------------------
+  // -------------------------------------------------
   // Return all attempts from each teacher's classes
-  // --------------------------
+  // -------------------------------------------------
   async findAllTaskAttemptsFromClasses(
     teacherId: string,
   ): Promise<ClassTaskAttemptResponseDto[]> {
@@ -470,132 +371,7 @@ export class TaskAttemptService {
       throw new NotFoundException(`No attempt found for id ${attemptId}`);
     }
 
-    return this.mapTaskAttemptDetail(attempt);
-  }
-
-  private mapTaskAttemptDetail(
-    attempt: TaskAttempt,
-  ): TaskAttemptDetailResponseDto {
-    const {
-      title,
-      slug,
-      image,
-      description,
-      subject,
-      material,
-      taskType,
-      taskGrades,
-      difficulty,
-      taskQuestions,
-      start_time,
-      end_time,
-      created_by,
-    } = attempt.task;
-    const {
-      answered_question_count,
-      points,
-      xp_gained,
-      started_at,
-      last_accessed_at,
-      completed_at,
-      status,
-      task,
-      taskAnswerLogs,
-    } = attempt;
-
-    const totalPoints = taskQuestions.reduce(
-      (acc, question) => acc + (question.point ?? 0),
-      0,
-    );
-
-    const score = Math.round((points / totalPoints) * 100);
-
-    const stats: TaskAttemptStats = {
-      pointGained: points,
-      xpGained: xp_gained,
-      totalPoints,
-      score,
-    };
-
-    const rawStatus = status as string | null;
-
-    const normalizedStatus = Object.values(TaskAttemptStatus).includes(
-      rawStatus as TaskAttemptStatus,
-    )
-      ? (rawStatus as TaskAttemptStatus)
-      : TaskAttemptStatus.NOT_STARTED;
-
-    const progress: TaskAttemptProgress = {
-      startedAt: getDateTime(started_at),
-      lastAccessedAt: getDateTime(last_accessed_at),
-      completedAt: getDateTime(completed_at),
-      timeTaken: getTimePeriod(started_at, completed_at),
-      status: normalizedStatus,
-    };
-
-    const questions =
-      task.taskQuestions?.map((q) => {
-        const userAnswer = taskAnswerLogs.find(
-          (log) => log.question_id === q.task_question_id,
-        );
-
-        return {
-          questionId: q.task_question_id,
-          text: q.text,
-          point: q.point,
-          type: q.type,
-          timeLimit: q.time_limit ?? null,
-          image: q.image ?? null,
-          options: q.taskQuestionOptions?.map((o) => ({
-            optionId: o.task_question_option_id,
-            text: o.text,
-            isCorrect: o.is_correct,
-            isSelected: userAnswer?.option_id === o.task_question_option_id,
-          })),
-          userAnswer: userAnswer
-            ? {
-                answerLogId: userAnswer.task_answer_log_id,
-                text: userAnswer.answer_text,
-                image: userAnswer.image,
-                optionId: userAnswer.option_id,
-                isCorrect: userAnswer.is_correct,
-              }
-            : null,
-        };
-      }) || [];
-
-    return {
-      title,
-      slug,
-      image,
-      description,
-      subject: subject.name,
-      material: material ? material.name : null,
-      grade:
-        taskGrades.length > 0
-          ? taskGrades
-              .map((tg) => tg.grade.name.replace('Kelas ', ''))
-              .join(', ')
-          : null,
-      questionCount: taskQuestions.length,
-      difficulty: TaskDifficultyLabels[difficulty],
-      createdBy: created_by || 'Unknown',
-      type: {
-        name: taskType.name,
-        isRepeatable: taskType.is_repeatable,
-      },
-      attempt: {
-        answeredCount: answered_question_count ?? 0,
-      },
-      stats,
-      duration: {
-        startTime: start_time ?? null,
-        endTime: end_time ?? null,
-        duration: getTimePeriod(start_time, end_time),
-      },
-      progress,
-      questions,
-    };
+    return TaskAttemptResponseMapper.mapTaskAttemptDetail(attempt);
   }
 
   async getAttemptMeta({
@@ -666,19 +442,6 @@ export class TaskAttemptService {
     };
   }
 
-  // =========================
-  // Helper: completedAt logic
-  // =========================
-  private getCompletedAt(
-    questionCount: number,
-    answeredQuestionCount: number,
-    isClassTask = false,
-  ): Date | null {
-    return answeredQuestionCount >= questionCount && !isClassTask
-      ? new Date()
-      : null;
-  }
-
   private async getTaskWithQuestions(taskId: string): Promise<Task> {
     const task = await this.taskRepository.findOne({
       where: { task_id: taskId },
@@ -741,9 +504,9 @@ export class TaskAttemptService {
     }
   }
 
-  // --------------------------
+  // --------------------------------------------------------------
   // buildTaskAttempt (SIMPLIFIED) - no xp/points computation here
-  // --------------------------
+  // --------------------------------------------------------------
   private async buildTaskAttempt(
     existing: TaskAttempt | null,
     task: Task,
@@ -752,7 +515,7 @@ export class TaskAttemptService {
   ): Promise<TaskAttempt> {
     const questionCount = task.taskQuestions.length;
     const { answeredQuestionCount } = dto;
-    const completedAt = this.getCompletedAt(
+    const completedAt = TaskAttemptHelper.getCompletedAt(
       questionCount,
       answeredQuestionCount,
       isClassTask,
@@ -761,10 +524,15 @@ export class TaskAttemptService {
     const attempt =
       existing ??
       this.taskAttemptRepository.create({
-        ...(this.isCreateDto(dto) && { task_id: dto.taskId }),
-        ...(this.isCreateDto(dto) && { student_id: dto.studentId }),
-        ...(this.isCreateDto(dto) && isClassTask && { class_id: dto.classId }),
-        ...(this.isCreateDto(dto) && { started_at: dto.startedAt }),
+        ...(TaskAttemptHelper.isCreateDto(dto) && { task_id: dto.taskId }),
+        ...(TaskAttemptHelper.isCreateDto(dto) && {
+          student_id: dto.studentId,
+        }),
+        ...(TaskAttemptHelper.isCreateDto(dto) &&
+          isClassTask && { class_id: dto.classId }),
+        ...(TaskAttemptHelper.isCreateDto(dto) && {
+          started_at: dto.startedAt,
+        }),
       });
 
     attempt.answered_question_count = answeredQuestionCount;
@@ -789,22 +557,34 @@ export class TaskAttemptService {
     savedAttempt: TaskAttempt,
     task: Task,
   ): Promise<TaskAttempt> {
-    // We expect taskAnswerLogService to be able to return saved logs by attempt id
-    // Ensure taskAnswerLogService has method `findAllByAttemptId(attemptId)`
+    // Ambil semua answer logs
     const savedLogs = await this.taskAnswerLogService.findAllByAttemptId(
       savedAttempt.task_attempt_id,
     );
 
-    // If there are no saved logs, just return
     if (!savedLogs || savedLogs.length === 0) return savedAttempt;
 
+    // Ambil previous COMPLETED attempts utk task ini oleh student ini
+    const previousAttempts = await this.taskAttemptRepository.find({
+      where: {
+        task_id: savedAttempt.task_id,
+        student_id: savedAttempt.student_id,
+      },
+      select: ['task_attempt_id', 'status', 'xp_gained'],
+    });
+
+    // Hitung points SELALU
     const { points, xpGained } = await TaskXpHelper.calculatePointsAndXp(
       task,
       savedLogs,
     );
 
     savedAttempt.points = points;
-    savedAttempt.xp_gained = xpGained;
+
+    // Tentukan apakah XP boleh diberikan
+    const shouldGrantXp = TaskXpHelper.shouldGrantXp(previousAttempts);
+
+    savedAttempt.xp_gained = shouldGrantXp ? xpGained : null;
 
     await this.taskAttemptRepository.save(savedAttempt);
 
@@ -892,17 +672,6 @@ export class TaskAttemptService {
     return data;
   }
 
-  // helper type guard
-  private isCreateDto(dto: any): dto is CreateTaskAttemptDto {
-    return (
-      (dto as CreateTaskAttemptDto).taskId !== undefined ||
-      (dto as CreateTaskAttemptDto).studentId !== undefined
-    );
-  }
-
-  // ================================
-  // CREATE / UPDATE (refactored to use persistAttemptAndLogs)
-  // ================================
   async createTaskAttempt(
     dto: CreateTaskAttemptDto,
   ): Promise<DetailResponseDto<UpsertTaskAttemptResponseDto>> {
@@ -997,9 +766,9 @@ export class TaskAttemptService {
     };
   }
 
-  // --------------------------
+  // ---------------------------------
   // Activity log helper (kept as-is)
-  // --------------------------
+  // ---------------------------------
   private async saveActivityLog(
     existing: TaskAttempt | null,
     savedTaskAttempt: TaskAttempt,
