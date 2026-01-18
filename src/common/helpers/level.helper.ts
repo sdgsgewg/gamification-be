@@ -26,7 +26,7 @@ export class LevelHelper {
   /**
    * Hitung level dan XP baru setelah mendapat XP tambahan.
    */
-  static getUserLevel(
+  static getUserNewLevel(
     currLvl: number,
     currXp: number,
     xpGained: number,
@@ -87,7 +87,7 @@ export class LevelHelper {
       xpGained,
     );
 
-    const { newLevel, newXp } = this.getUserLevel(
+    const { newLevel, newXp } = this.getUserNewLevel(
       previousLevel,
       previousXp,
       xpGained,

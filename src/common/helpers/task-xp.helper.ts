@@ -10,7 +10,7 @@ export class TaskXpHelper {
    * - HARD = 3
    * - MEDIUM = 2
    * - EASY = 1.5
-   * total points: points (jumlah poin benar dari seluruh soal)  * xpBaseRate
+   * total points: points (jumlah poin benar dari seluruh soal) * xpBaseRate
    */
   static async calculatePointsAndXp(
     task: Task,

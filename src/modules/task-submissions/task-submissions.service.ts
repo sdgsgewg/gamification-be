@@ -775,9 +775,6 @@ export class TaskSubmissionService {
       taskAttempt.status = TaskAttemptStatus.COMPLETED;
       taskAttempt.completed_at = new Date();
 
-      //  Update level dan XP user
-      await this.userService.updateLevelAndXp(taskAttempt.student_id, xpGained);
-
       // Simpan semua perubahan
       const savedTaskAttempt =
         await this.taskAttemptRepository.save(taskAttempt);

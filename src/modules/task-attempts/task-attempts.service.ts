@@ -779,7 +779,7 @@ export class TaskAttemptService {
   }
 
   // --------------------------
-  // NEW HELPER: finalizePointsAndXp
+  // HELPER: finalizePointsAndXp
   // - fetch saved answer logs
   // - call TaskXpHelper
   // - update attempt.points & attempt.xp_gained
@@ -808,19 +808,11 @@ export class TaskAttemptService {
 
     await this.taskAttemptRepository.save(savedAttempt);
 
-    // Update user level & xp (only for non-class tasks) — caller ensures non-class
-    if (savedAttempt.student_id && xpGained) {
-      await this.userService.updateLevelAndXp(
-        savedAttempt.student_id,
-        xpGained,
-      );
-    }
-
     return savedAttempt;
   }
 
   // --------------------------
-  // NEW HELPER: maybeCreateSubmissionForClassTask
+  // HELPER: maybeCreateSubmissionForClassTask
   // --------------------------
   private async maybeCreateSubmissionForClassTask(
     savedAttempt: TaskAttempt,

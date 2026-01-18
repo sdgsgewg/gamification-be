@@ -22,10 +22,10 @@ import { BaseResponseDto } from 'src/common/responses/base-response.dto';
 import { FileUploadService } from 'src/common/services/file-upload.service';
 import { UpdateUserDto } from './dto/requests/update-user.dto';
 import { MasterHistoryTransactionType } from '../master-history/enums/master-history-transaction-type';
-import { getMasterHistoryDescription } from 'src/common/utils/get-master-history-description.util';
 import { UserSession } from '../user-sessions/entities/user-sessions.entity';
 import { UserLastLoginResponseDto } from './dto/responses/user-last-login-response.dto';
 import { UserRoleCountResponseDto } from './dto/responses/user-role-count-response.dto';
+import { TaskAttempt } from '../task-attempts/entities/task-attempt.entity';
 
 @Injectable()
 export class UserService {
@@ -34,6 +34,8 @@ export class UserService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(UserSession)
     private readonly userSessionRepository: Repository<UserSession>,
+    @InjectRepository(TaskAttempt)
+    private readonly taskAttemptRepository: Repository<TaskAttempt>,
     private readonly roleService: RoleService,
     private readonly masterHistoryService: MasterHistoryService,
     private readonly activityLogService: ActivityLogService,
@@ -118,7 +120,47 @@ export class UserService {
     };
   }
 
-  private getUserDetailData(userWithRelations: User): UserDetailResponseDto {
+  async getUserCurrentLevelAndXp(
+    userId: string,
+  ): Promise<{ level: number; xp: number }> {
+    // Pastikan user exists
+    const user = await this.userRepository.findOne({
+      where: { user_id: userId },
+      select: ['user_id'],
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User with id ${userId} not found`);
+    }
+
+    // Ambil total XP dari semua task attempts
+    const { totalXp } = await this.taskAttemptRepository
+      .createQueryBuilder('ta')
+      .select('COALESCE(SUM(ta.xp_gained), 0)', 'totalXp')
+      .where('ta.student_id = :userId', { userId })
+      .getRawOne<{ totalXp: string }>();
+
+    const xp = Number(totalXp);
+
+    // Hitung level berdasarkan total XP
+    let level = 1;
+
+    while (xp >= LevelHelper.getTotalXpForLevel(level + 1)) {
+      level++;
+    }
+
+    return {
+      level,
+      xp,
+    };
+  }
+
+  private async getUserDetailData(
+    userWithRelations: User,
+  ): Promise<UserDetailResponseDto> {
+    const { level: currLevel, xp: currXp } =
+      await this.getUserCurrentLevelAndXp(userWithRelations.user_id);
+
     const data: UserDetailResponseDto = {
       userId: userWithRelations.user_id,
       name: userWithRelations.name,
@@ -144,8 +186,8 @@ export class UserService {
             name: userWithRelations.grade.name,
           }
         : null,
-      level: userWithRelations.level,
-      xp: userWithRelations.xp,
+      level: currLevel,
+      xp: currXp,
       emailVerifiedAt: `${getDateTime(userWithRelations.email_verified_at)}`,
       createdAt: `${getDateTime(userWithRelations.created_at)}`,
     };
@@ -177,7 +219,7 @@ export class UserService {
       return null;
     }
 
-    return this.getUserDetailData(user);
+    return await this.getUserDetailData(user);
   }
 
   async findUserLastLogin(userId: string): Promise<UserLastLoginResponseDto> {
@@ -208,14 +250,16 @@ export class UserService {
       throw new NotFoundException(`User with id ${userId} $ not found`);
     }
 
-    const { user_id, level, xp } = user;
-    const nextLvlMinXp = LevelHelper.getTotalXpForLevel(level + 1);
-    const xpProgress = LevelHelper.getXpProgress(xp, nextLvlMinXp);
+    const { user_id } = user;
+    const { level: currLevel, xp: currXp } =
+      await this.getUserCurrentLevelAndXp(userId);
 
+    const nextLvlMinXp = LevelHelper.getTotalXpForLevel(currLevel + 1);
+    const xpProgress = LevelHelper.getXpProgress(currXp, nextLvlMinXp);
     const data: UserStatsResponseDto = {
       id: user_id,
-      level,
-      currXp: xp,
+      level: currLevel,
+      currXp: currXp,
       nextLvlMinXp,
       xpProgress,
     };
@@ -237,8 +281,6 @@ export class UserService {
         email,
         password: hashedPassword,
         role_id: roleId,
-        level: 1,
-        xp: 0,
         created_at: new Date(),
       });
     } else if (roleName === UserRole.TEACHER) {
@@ -258,7 +300,7 @@ export class UserService {
       relations: ['role', 'grade'],
     });
 
-    return this.getUserDetailData(userWithRelations);
+    return await this.getUserDetailData(userWithRelations);
   }
 
   async findUserOrThrow(id: string) {
@@ -365,23 +407,6 @@ export class UserService {
     };
 
     return response;
-  }
-
-  async updateLevelAndXp(userId: string, xpGained: number): Promise<void> {
-    const existingUser = await this.userRepository.findOne({
-      where: { user_id: userId },
-    });
-    if (!existingUser) throw new Error('User not found');
-
-    const { newLevel, newXp } = LevelHelper.getUserLevel(
-      existingUser.level,
-      existingUser.xp,
-      xpGained,
-    );
-
-    existingUser.level = newLevel;
-    existingUser.xp = newXp;
-    await this.userRepository.save(existingUser);
   }
 
   async findUserRecentActivities(
