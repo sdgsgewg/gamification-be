@@ -1,4 +1,5 @@
 import { StudentTaskAttemptAnalyticsDto } from './student-task-attempt-analytics-response.dto';
+import { TaskAttemptAnalyticsDto } from './task-attempt-analytics-response.dto';
 
 export abstract class BaseStudentAttempt {
   task: {
@@ -8,6 +9,8 @@ export abstract class BaseStudentAttempt {
 
   averageScoreAllStudents: number;
   averageAttempts: number;
+
+  attempts: TaskAttemptAnalyticsDto[];
 
   students: StudentTaskAttemptAnalyticsDto[];
 }

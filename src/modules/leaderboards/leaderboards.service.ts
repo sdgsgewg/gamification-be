@@ -9,6 +9,7 @@ import { StudentLeaderboardResponseDto } from './dto/responses/student-leaderboa
 import { FilterStudentLeaderboardDto } from './dto/requests/filter-student-leaderboard.dto';
 import { LeaderboardScope } from './dto/enums/leaderboard-scope.enum';
 import { ClassLeaderboardResponseDto } from './dto/responses/class-leaderboard-response.dto';
+import { LevelHelper } from 'src/common/helpers/level.helper';
 
 @Injectable()
 export class LeaderboardService {
@@ -37,58 +38,82 @@ export class LeaderboardService {
     const query = this.userRepository
       .createQueryBuilder('user')
       .leftJoin('user.role', 'role')
+      .where('role.name = :roleName', { roleName: UserRole.STUDENT })
+
       .select('user.user_id', 'id')
       .addSelect('user.name', 'name')
       .addSelect('user.username', 'username')
       .addSelect('user.image', 'image')
-      .addSelect('user.level', 'level')
-      .addSelect('user.xp', 'xp')
-      .addSelect((subQuery) => {
-        const bestAttemptPerTask = subQuery
+
+      // ======================
+      // TOTAL XP
+      // ======================
+      .addSelect((qb) => {
+        return qb
           .subQuery()
-          .select('MAX(attempt.points)', 'points')
-          .addSelect('attempt.task_id', 'task_id')
-          .from(TaskAttempt, 'attempt')
-          .where('attempt.student_id = user.user_id');
+          .select('COALESCE(SUM(ta.xp_gained), 0)')
+          .from(TaskAttempt, 'ta')
+          .where('ta.student_id = user.user_id');
+      }, 'xp')
 
-        // Scope filter
-        if (scope === LeaderboardScope.ACTIVITY) {
-          bestAttemptPerTask.andWhere('attempt.class_id IS NULL');
-        } else if (scope === LeaderboardScope.CLASS) {
-          bestAttemptPerTask.andWhere('attempt.class_id IS NOT NULL');
-        }
+      // ======================
+      // TOTAL POINT (BEST ATTEMPT PER TASK)
+      // ======================
+      .addSelect((qb) => {
+        const sub = qb
+          .subQuery()
+          .select('SUM(best.points)')
+          .from((qb2) => {
+            const inner = qb2
+              .subQuery()
+              .select('MAX(a.points)', 'points')
+              .addSelect('a.task_id', 'task_id')
+              .from(TaskAttempt, 'a')
+              .where('a.student_id = user.user_id');
 
-        bestAttemptPerTask.groupBy('attempt.task_id');
+            if (scope === LeaderboardScope.ACTIVITY) {
+              inner.andWhere('a.class_id IS NULL');
+            } else if (scope === LeaderboardScope.CLASS) {
+              inner.andWhere('a.class_id IS NOT NULL');
+            }
 
-        return subQuery
-          .select('COALESCE(SUM(best.points), 0)')
-          .from(`(${bestAttemptPerTask.getQuery()})`, 'best')
-          .setParameters(bestAttemptPerTask.getParameters());
+            inner.groupBy('a.task_id');
+            return inner;
+          }, 'best');
+
+        return sub;
       }, 'point')
-      .where('role.name = :roleName', { roleName: UserRole.STUDENT });
 
-    query
       .orderBy('point', 'DESC')
-      .addOrderBy('user.xp', 'DESC')
-      .addOrderBy('user.level', 'DESC')
-      .addOrderBy('user.name', 'ASC');
+      .addOrderBy('xp', 'DESC')
+      .addOrderBy('name', 'ASC')
+      .limit(50);
 
-    const rawResults = await query.limit(50).getRawMany();
+    const rawResults = await query.getRawMany();
 
     if (!rawResults.length) {
       throw new NotFoundException('No student leaderboard data found');
     }
 
-    return rawResults.map((row, index) => ({
-      id: row.id,
-      rank: index + 1,
-      name: row.name,
-      username: row.username,
-      image: row.image,
-      level: Number(row.level) || 0,
-      xp: Number(row.xp) || 0,
-      point: Number(row.point) || 0,
-    }));
+    return rawResults.map((row, index) => {
+      const xp = Number(row.xp) || 0;
+
+      let level = 1;
+      while (xp >= LevelHelper.getTotalXpForLevel(level + 1)) {
+        level++;
+      }
+
+      return {
+        id: row.id,
+        rank: index + 1,
+        name: row.name,
+        username: row.username,
+        image: row.image,
+        xp,
+        level,
+        point: Number(row.point) || 0,
+      };
+    });
   }
 
   /**
@@ -105,13 +130,22 @@ export class LeaderboardService {
       .createQueryBuilder('attempt')
       .leftJoin('attempt.student', 'student')
       .leftJoin('student.role', 'role')
+
       .select('student.user_id', 'id')
       .addSelect('student.name', 'name')
       .addSelect('student.username', 'username')
       .addSelect('student.image', 'image')
-      .addSelect('student.level', 'level')
-      .addSelect('student.xp', 'xp')
+
+      // ======================
+      // TOTAL XP
+      // ======================
+      .addSelect('COALESCE(SUM(attempt.xp_gained), 0)', 'xp')
+
+      // ======================
+      // TOTAL POINT
+      // ======================
       .addSelect('SUM(best.points)', 'point')
+
       .innerJoin(
         (qb) =>
           qb
@@ -125,31 +159,40 @@ export class LeaderboardService {
         'best',
         'best.student_id = student.user_id AND best.task_id = attempt.task_id',
       )
+
       .where('attempt.class_id = :classId', { classId })
       .andWhere('role.name = :role', { role: UserRole.STUDENT })
+
       .groupBy('student.user_id')
       .addGroupBy('student.name')
       .addGroupBy('student.username')
       .addGroupBy('student.image')
-      .addGroupBy('student.level')
-      .addGroupBy('student.xp')
+
       .orderBy('point', 'DESC')
       .addOrderBy('xp', 'DESC')
-      .addOrderBy('level', 'DESC')
       .addOrderBy('name', 'ASC')
       .limit(50)
       .getRawMany();
 
-    return results.map((row, index) => ({
-      id: row.id,
-      rank: index + 1,
-      name: row.name,
-      username: row.username,
-      image: row.image,
-      level: Number(row.level) || 0,
-      xp: Number(row.xp) || 0,
-      point: Number(row.point) || 0,
-    }));
+    return results.map((row, index) => {
+      const xp = Number(row.xp) || 0;
+
+      let level = 1;
+      while (xp >= LevelHelper.getTotalXpForLevel(level + 1)) {
+        level++;
+      }
+
+      return {
+        id: row.id,
+        rank: index + 1,
+        name: row.name,
+        username: row.username,
+        image: row.image,
+        xp,
+        level,
+        point: Number(row.point) || 0,
+      };
+    });
   }
 
   /**

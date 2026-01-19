@@ -112,7 +112,7 @@ export class TaskAttemptController {
 
   @Post('activity')
   async createActivityAttempt(@Body() dto: CreateTaskAttemptDto) {
-    return this.taskAttemptService.createTaskAttempt(dto);
+    return this.taskAttemptService.createActivityTaskAttempt(dto);
   }
 
   @Post('class')
@@ -125,7 +125,7 @@ export class TaskAttemptController {
     @Param('id') id: string,
     @Body() dto: UpdateTaskAttemptDto,
   ) {
-    return this.taskAttemptService.updateTaskAttempt(id, dto);
+    return this.taskAttemptService.updateActivityTaskAttempt(id, dto);
   }
 
   @Put('class/:id')

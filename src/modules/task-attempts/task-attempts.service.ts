@@ -1,15 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import {
-  Repository,
-  Between,
-  MoreThanOrEqual,
-  LessThanOrEqual,
-  Raw,
-  Not,
-  IsNull,
-  In,
-} from 'typeorm';
+import { Repository, IsNull, In } from 'typeorm';
 import { TaskAttempt } from './entities/task-attempt.entity';
 import { CreateTaskAttemptDto } from './dto/requests/create-task-attempt.dto';
 import { UpdateTaskAttemptDto } from './dto/requests/update-task-attempt.dto';
@@ -19,10 +10,7 @@ import { UserService } from '../users/users.service';
 import { DetailResponseDto } from 'src/common/responses/detail-response.dto';
 import { UpsertTaskAttemptResponseDto } from './dto/responses/upsert-task-attempt.dto';
 import { LevelHelper } from 'src/common/helpers/level.helper';
-import {
-  getDateTime,
-  getTimePeriod,
-} from 'src/common/utils/date-modifier.util';
+import { getDateTime } from 'src/common/utils/date-modifier.util';
 import { FilterTaskAttemptDto } from './dto/requests/filter-task-attempt.dto';
 import { GroupedTaskAttemptResponseDto } from './dto/responses/grouped-task-attempt.dto';
 import { TaskAttemptStatus } from './enums/task-attempt-status.enum';
@@ -36,14 +24,15 @@ import { getResponseMessage } from 'src/common/utils/get-response-message.util';
 import { MostPopularTaskResponseDto } from './dto/responses/most-popular-task-response.dto';
 import { CurrentAttemptResponseDto } from './dto/responses/current-attempt-response.dto';
 import { AttemptMetaResponseDto } from './dto/responses/attempt-meta-response.dto';
-import { ClassTaskStudentAttemptResponseDto } from './dto/responses/student-attempt/class-task-student-attempt-response.dto';
-import { ClassTaskAttemptResponseDto } from './dto/responses/student-attempt/class-task-attempt-response.dto';
+import { ClassTaskStudentAttemptResponseDto } from './dto/responses/attempt-analytics/class-task-student-attempt-response.dto';
+import { ClassTaskAttemptResponseDto } from './dto/responses/attempt-analytics/class-task-attempt-response.dto';
 import { Class } from '../classes/entities/class.entity';
 import { ClassTask } from '../class-tasks/entities/class-task.entity';
-import { ActivityTaskAttemptResponseDto } from './dto/responses/student-attempt/activity-task-attempt-response.dto';
+import { ActivityTaskAttemptResponseDto } from './dto/responses/attempt-analytics/activity-task-attempt-response.dto';
 import { TaskAttemptResponseMapper } from './mapper/task-attempt-response.mapper';
-import { ActivityTaskStudentAttemptResponseDto } from './dto/responses/student-attempt/activity-task-student-attempt-response.dto';
+import { ActivityTaskStudentAttemptResponseDto } from './dto/responses/attempt-analytics/activity-task-student-attempt-response.dto';
 import { TaskAttemptHelper } from 'src/common/helpers/task-attempt.helper';
+import { TaskType } from '../task-types/enums/task-type.enum';
 
 @Injectable()
 export class TaskAttemptService {
@@ -70,59 +59,80 @@ export class TaskAttemptService {
       throw new NotFoundException(`No user with id ${userId}`);
     }
 
-    const where: any = {
-      student_id: userId,
-    };
+    const qb = this.taskAttemptRepository
+      .createQueryBuilder('ta')
+      .leftJoinAndSelect('ta.task', 'task')
+      .leftJoinAndSelect('ta.class', 'class')
+      .leftJoinAndSelect('ta.taskSubmission', 'ts')
+
+      // JOIN MANUAL KE class_tasks
+      .leftJoin(
+        'class_tasks',
+        'ct',
+        'ct.task_id = ta.task_id AND ct.class_id = ta.class_id',
+      )
+
+      // SELECT DEADLINE
+      .addSelect('ct.end_time', 'class_deadline')
+      .addSelect('task.end_time', 'task_deadline')
+
+      .where('ta.student_id = :userId', { userId });
 
     if (filterDto.status) {
-      where.status = filterDto.status;
+      qb.andWhere('ta.status = :status', { status: filterDto.status });
     }
 
     if (filterDto.isClassTask) {
-      where.class_id = Not(IsNull());
+      qb.andWhere('ta.class_id IS NOT NULL');
     } else {
-      where.class_id = IsNull();
+      qb.andWhere('ta.class_id IS NULL');
     }
 
     if (filterDto.dateFrom && filterDto.dateTo) {
-      where.last_accessed_at = Between(filterDto.dateFrom, filterDto.dateTo);
+      qb.andWhere('ta.last_accessed_at BETWEEN :from AND :to', {
+        from: filterDto.dateFrom,
+        to: filterDto.dateTo,
+      });
     } else if (filterDto.dateFrom) {
-      where.last_accessed_at = MoreThanOrEqual(filterDto.dateFrom);
+      qb.andWhere('ta.last_accessed_at >= :from', {
+        from: filterDto.dateFrom,
+      });
     } else if (filterDto.dateTo) {
-      where.last_accessed_at = LessThanOrEqual(filterDto.dateTo);
+      qb.andWhere('ta.last_accessed_at <= :to', {
+        to: filterDto.dateTo,
+      });
     }
 
     if (filterDto.searchText) {
-      where.task = {
-        ...where.task,
-        title: Raw((alias) => `${alias} ILIKE :title`, {
-          title: `%${filterDto.searchText}%`,
-        }),
-      };
+      qb.andWhere('task.title ILIKE :title', {
+        title: `%${filterDto.searchText}%`,
+      });
     }
 
-    const orderBy = filterDto.orderBy ?? 'last_accessed_at';
+    const orderBy = filterDto.orderBy ?? 'ta.last_accessed_at';
     const orderState = filterDto.orderState ?? 'DESC';
 
-    const attempts = await this.taskAttemptRepository.find({
-      where,
-      relations: {
-        task: true,
-        class: true,
-        taskSubmission: true,
-      },
-      order: {
-        [orderBy]: orderState,
-      },
-    });
+    qb.orderBy(orderBy, orderState as 'ASC' | 'DESC');
 
-    if (attempts.length === 0) {
+    // PAKAI getRawAndEntities
+    const { entities, raw } = await qb.getRawAndEntities();
+
+    if (!entities.length) {
       throw new NotFoundException(
         `No attempt found for user with id ${userId}`,
       );
     }
 
-    return TaskAttemptResponseMapper.mapAndGroupTaskAttempts(attempts);
+    // MERGE DEADLINE KE ENTITY
+    const attemptsWithDeadline = entities.map((attempt, index) => ({
+      ...attempt,
+      class_deadline: raw[index].class_deadline,
+      task_deadline: raw[index].task_deadline,
+    }));
+
+    return TaskAttemptResponseMapper.mapAndGroupTaskAttempts(
+      attemptsWithDeadline,
+    );
   }
 
   async findMostPopularTask(
@@ -283,6 +293,7 @@ export class TaskAttemptService {
         },
         averageScoreAllStudents: 0,
         averageAttempts: 0,
+        attempts: [],
         students: [],
       };
     }
@@ -323,6 +334,7 @@ export class TaskAttemptService {
         },
         averageScoreAllStudents: 0,
         averageAttempts: 0,
+        attempts: [],
         students: [],
       };
     }
@@ -426,19 +438,24 @@ export class TaskAttemptService {
 
     return {
       current: currAttemptMeta,
-      recent: recentAttempts.map((a) => ({
-        id: a.task_attempt_id,
-        startedAt: a.started_at ? getDateTime(a.started_at) : null,
-        submittedAt: a.taskSubmission
-          ? getDateTime(a.taskSubmission.created_at)
-          : null,
-        completedAt: a.completed_at ? getDateTime(a.completed_at) : null,
-        duration:
-          a.taskSubmission && a.started_at
-            ? getTimePeriod(a.started_at, a.taskSubmission.created_at)
+      recent: recentAttempts.map((a) => {
+        const duration = TaskAttemptHelper.calculateDuration(
+          a.started_at,
+          a.taskSubmission?.created_at,
+          a.completed_at,
+        );
+
+        return {
+          id: a.task_attempt_id,
+          startedAt: a.started_at ? getDateTime(a.started_at) : null,
+          submittedAt: a.taskSubmission
+            ? getDateTime(a.taskSubmission.created_at)
             : null,
-        status: a.status,
-      })),
+          completedAt: a.completed_at ? getDateTime(a.completed_at) : null,
+          duration, // ← sekarang bisa null, bukan ''
+          status: a.status,
+        };
+      }),
     };
   }
 
@@ -485,7 +502,7 @@ export class TaskAttemptService {
   }
 
   // --------------------------
-  // saveAnswerLogs (unchanged)
+  // saveAnswerLogs
   // --------------------------
   private async saveAnswerLogs(
     attemptId: string,
@@ -515,11 +532,22 @@ export class TaskAttemptService {
   ): Promise<TaskAttempt> {
     const questionCount = task.taskQuestions.length;
     const { answeredQuestionCount } = dto;
-    const completedAt = TaskAttemptHelper.getCompletedAt(
-      questionCount,
-      answeredQuestionCount,
-      isClassTask,
-    );
+
+    const isAllAnswered = answeredQuestionCount >= questionCount;
+
+    const isAutoCompleteClassTask =
+      isAllAnswered &&
+      [TaskType.SELF_PRACTICE, TaskType.TRYOUT].includes(
+        task.taskType.name as TaskType,
+      );
+
+    const completedAt = isAutoCompleteClassTask
+      ? new Date()
+      : TaskAttemptHelper.getCompletedAt(
+          questionCount,
+          answeredQuestionCount,
+          isClassTask,
+        );
 
     const attempt =
       existing ??
@@ -536,13 +564,27 @@ export class TaskAttemptService {
       });
 
     attempt.answered_question_count = answeredQuestionCount;
-    attempt.status = dto.status;
+
+    // Auto Complete Logic
+    if (isAutoCompleteClassTask) {
+      attempt.status = TaskAttemptStatus.COMPLETED;
+      attempt.completed_at = completedAt;
+    } else {
+      if (isAllAnswered) {
+        attempt.status = TaskAttemptStatus.SUBMITTED;
+      } else {
+        attempt.status = TaskAttemptStatus.ON_PROGRESS;
+      }
+
+      // Only set completed_at for non-class tasks
+      if (!isClassTask) {
+        attempt.completed_at = completedAt;
+      }
+    }
+
     if (!attempt.started_at) attempt.started_at = dto.startedAt;
     attempt.last_accessed_at = dto.lastAccessedAt;
-    // only set completed_at for non-class task (builder doesn't calculate XP)
-    if (!isClassTask) attempt.completed_at = completedAt;
 
-    // NOTE: removed XP/points calculation from builder — handled after saving logs
     return attempt;
   }
 
@@ -557,6 +599,15 @@ export class TaskAttemptService {
     savedAttempt: TaskAttempt,
     task: Task,
   ): Promise<TaskAttempt> {
+    if (
+      ![TaskType.SELF_PRACTICE, TaskType.TRYOUT].includes(
+        task.taskType.name as TaskType,
+      ) &&
+      savedAttempt.status !== TaskAttemptStatus.COMPLETED &&
+      savedAttempt.answered_question_count < task.taskQuestions.length
+    )
+      return;
+
     // Ambil semua answer logs
     const savedLogs = await this.taskAnswerLogService.findAllByAttemptId(
       savedAttempt.task_attempt_id,
@@ -598,10 +649,13 @@ export class TaskAttemptService {
     savedAttempt: TaskAttempt,
     task: Task,
   ) {
+    const needSubmissionTaskType = [TaskType.ASSIGNMENT, TaskType.QUIZ];
+
     // Only for class tasks when status is SUBMITTED and all questions answered
     if (
       savedAttempt.class_id &&
       savedAttempt.status === TaskAttemptStatus.SUBMITTED &&
+      needSubmissionTaskType.includes(task.taskType.name as TaskType) &&
       savedAttempt.answered_question_count === task.taskQuestions.length
     ) {
       await this.taskSubmissionService.createTaskSubmission({
@@ -644,14 +698,8 @@ export class TaskAttemptService {
       !!existing,
     );
 
-    // 4. If non-class and COMPLETED and all answered -> finalize points & xp
-    if (
-      !isClassTask &&
-      savedAttempt.status === TaskAttemptStatus.COMPLETED &&
-      savedAttempt.answered_question_count >= task.taskQuestions.length
-    ) {
-      await this.finalizePointsAndXp(savedAttempt, task);
-    }
+    // 4. Finalize points & xp
+    await this.finalizePointsAndXp(savedAttempt, task);
 
     // 5. For class task, possibly create TaskSubmission (SUBMITTED & all answered)
     if (isClassTask) {
@@ -672,7 +720,10 @@ export class TaskAttemptService {
     return data;
   }
 
-  async createTaskAttempt(
+  // ---------------------------------
+  // Activity Task Attempt Methods
+  // ---------------------------------
+  async createActivityTaskAttempt(
     dto: CreateTaskAttemptDto,
   ): Promise<DetailResponseDto<UpsertTaskAttemptResponseDto>> {
     const { taskId } = dto;
@@ -692,7 +743,7 @@ export class TaskAttemptService {
     };
   }
 
-  async updateTaskAttempt(
+  async updateActivityTaskAttempt(
     id: string,
     dto: UpdateTaskAttemptDto,
   ): Promise<DetailResponseDto<UpsertTaskAttemptResponseDto>> {
@@ -719,6 +770,9 @@ export class TaskAttemptService {
     };
   }
 
+  // ---------------------------------
+  // Class Task Attempt Methods
+  // ---------------------------------
   async createClassTaskAttempt(
     dto: CreateTaskAttemptDto,
   ): Promise<DetailResponseDto<UpsertTaskAttemptResponseDto>> {

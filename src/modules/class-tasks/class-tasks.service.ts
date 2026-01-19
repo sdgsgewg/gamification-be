@@ -475,12 +475,6 @@ export class ClassTaskService {
       recentAttemptsMeta = attemptMeta.recent;
     }
 
-    // Mapping ke DTO final
-    // return this.mapClassTaskDetailResponse(
-    //   classTask,
-    //   currAttemptMeta,
-    //   recentAttemptsMeta,
-    // );
     return TaskResponseMapper.mapClassTaskDetail(
       classTask,
       currAttemptMeta,
@@ -512,6 +506,7 @@ export class ClassTaskService {
         task: { slug: taskSlug },
       },
       relations: {
+        class: true,
         task: {
           taskQuestions: { taskQuestionOptions: true },
         },
@@ -532,7 +527,7 @@ export class ClassTaskService {
       );
     }
 
-    const { task } = classTask;
+    const { class: classEntity, task } = classTask;
 
     // Default values
     let lastAttemptId: string | null = null;
@@ -562,6 +557,8 @@ export class ClassTaskService {
 
     // Kembalikan DTO yang sudah dipetakan
     return TaskResponseMapper.mapClassTaskWithQuestions(
+      classTask,
+      classEntity,
       task,
       lastAttemptId,
       attemptAnswerLogs,

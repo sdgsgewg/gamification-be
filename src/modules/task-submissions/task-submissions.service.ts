@@ -37,7 +37,7 @@ import { TeacherClassTaskAnalyticsDto } from './dto/responses/teacher-class-task
 import { Class } from '../classes/entities/class.entity';
 import { ClassTask } from '../class-tasks/entities/class-task.entity';
 import { ClassTaskAttemptAnalyticsResponseDto } from './dto/responses/class-task-attempt-analytics-response.dto';
-import { StudentTaskAttemptAnalyticsDto } from '../task-attempts/dto/responses/student-attempt/student-task-attempt-analytics-response.dto';
+import { StudentTaskAttemptAnalyticsDto } from '../task-attempts/dto/responses/attempt-analytics/student-task-attempt-analytics-response.dto';
 // import { TaskSubmissionResponseMapper } from './mapper/task-submission-response.mapper';
 
 @Injectable()

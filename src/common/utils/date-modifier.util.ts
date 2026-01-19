@@ -57,6 +57,7 @@ export function getTimePeriod(startTime: Date, endTime: Date): string {
   const days = Math.floor((diffMinutes % (60 * 24 * 7)) / (60 * 24));
   const hours = Math.floor((diffMinutes % (60 * 24)) / 60);
   const minutes = diffMinutes % 60;
+  const seconds = Math.floor((diffMs % (1000 * 60)) / 1000);
 
   const parts: string[] = [];
   if (months > 0) parts.push(`${months} ${months > 1 ? `Months` : `Month`}`);
@@ -65,6 +66,8 @@ export function getTimePeriod(startTime: Date, endTime: Date): string {
   if (hours > 0) parts.push(`${hours} ${hours > 1 ? `Hours` : `Hour`}`);
   if (minutes > 0)
     parts.push(`${minutes} ${minutes > 1 ? `Minutes` : `Minute`}`);
+  if (seconds > 0)
+    parts.push(`${seconds} ${seconds > 1 ? `Seconds` : `Second`}`);
 
   return parts.join(' ');
 }
@@ -116,5 +119,5 @@ export function getTime(date: Date): string {
   if (displayHours === 0) displayHours = 12;
   const hoursStr = displayHours.toString().padStart(2, '0');
 
-  return `${hoursStr }:${minutes} ${ampm}`;
+  return `${hoursStr}:${minutes} ${ampm}`;
 }

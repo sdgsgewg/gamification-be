@@ -28,12 +28,16 @@ import { getResponseMessage } from 'src/common/utils/get-response-message.util';
 import { TaskStatus, TaskStatusLabels } from './enums/task-status.enum';
 import { TaskGradeService } from '../task-grades/task-grades.service';
 import { TaskResponseMapper } from './mappers/task-response.mapper';
+import { TaskAttemptStatus } from '../task-attempts/enums/task-attempt-status.enum';
+import { TaskAttempt } from '../task-attempts/entities/task-attempt.entity';
 
 @Injectable()
 export class TaskService {
   constructor(
     @InjectRepository(Task)
     private readonly taskRepository: Repository<Task>,
+    @InjectRepository(TaskAttempt)
+    private readonly taskAttemptRepository: Repository<TaskAttempt>,
     private readonly taskGradeService: TaskGradeService,
     private readonly taskQuestionService: TaskQuestionService,
     private readonly fileUploadService: FileUploadService,
@@ -169,22 +173,51 @@ export class TaskService {
     }
 
     // Ambil jumlah submission per class
-    const submissionStats = await this.taskRepository.manager
-      .createQueryBuilder()
+    const submissionStats = await this.taskAttemptRepository
+      .createQueryBuilder('ta')
       .select('ct.class_id', 'classId')
-      .addSelect('COUNT(ts.task_submission_id)', 'submissionCount')
+
+      // Submission = ada submission ATAU status attempt completed
       .addSelect(
-        'COUNT(CASE WHEN ts.finish_graded_at IS NOT NULL THEN 1 END)',
+        `
+    COUNT(
+      DISTINCT CASE
+        WHEN ts.task_submission_id IS NOT NULL
+          OR ta.status = :completedStatus
+        THEN ta.student_id
+      END
+    )
+    `,
+        'submissionCount',
+      )
+
+      // Graded = submission selesai dinilai ATAU status attempt completed
+      .addSelect(
+        `
+    COUNT(
+      DISTINCT CASE
+        WHEN ts.finish_graded_at IS NOT NULL
+          OR ta.status = :completedStatus
+        THEN ta.student_id
+      END
+    )
+    `,
         'gradedCount',
       )
-      .from('class_tasks', 'ct')
-      .innerJoin('task_attempts', 'ta', 'ta.class_id = ct.class_id')
+
       .innerJoin(
+        'class_tasks',
+        'ct',
+        'ct.class_id = ta.class_id AND ct.task_id = ta.task_id',
+      )
+      .leftJoin(
         'task_submissions',
         'ts',
         'ts.task_attempt_id = ta.task_attempt_id',
       )
+
       .where('ct.task_id = :taskId', { taskId: task.task_id })
+      .setParameter('completedStatus', TaskAttemptStatus.COMPLETED)
       .groupBy('ct.class_id')
       .getRawMany();
 

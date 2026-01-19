@@ -16,6 +16,7 @@ import { ClassTaskWithQuestionsResponseDto } from 'src/modules/class-tasks/dto/r
 import { BaseTaskDetail } from '../dto/responses/task-detail-base';
 import { TaskDetailResponseDto } from '../dto/responses/task-detail-response.dto';
 import { ActivityWithQuestionsResponseDto } from 'src/modules/activities/dto/responses/activity-with-questions-response.dto';
+import { Class } from 'src/modules/classes/entities/class.entity';
 
 export class TaskResponseMapper {
   // ===========================
@@ -174,12 +175,16 @@ export class TaskResponseMapper {
   // CLASS TASK WITH QUESTIONS
   // ===========================
   static mapClassTaskWithQuestions(
+    classTask: ClassTask,
+    classEntity: Class,
     task: Task,
     lastAttemptId: string | null,
     answerLogs: TaskAnswerLog[],
   ): ClassTaskWithQuestionsResponseDto {
     return {
-      id: task.task_id,
+      id: classTask.class_task_id,
+      classId: classEntity.class_id,
+      taskId: task.task_id,
       lastAttemptId,
       startTime: task.start_time ?? null,
       endTime: task.end_time ?? null,

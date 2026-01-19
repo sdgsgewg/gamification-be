@@ -23,13 +23,13 @@ import {
 import { QuestionResponseDto } from 'src/modules/task-questions/dto/responses/question-response.dto';
 import { QuestionOptionResponseDto } from 'src/modules/task-question-options/dto/responses/question-option-response.dto';
 import { AnswerLogResponseDto } from 'src/modules/task-answer-logs/dto/responses/answer-log-response.dto';
-import { ClassTaskAttemptResponseDto } from '../dto/responses/student-attempt/class-task-attempt-response.dto';
+import { ClassTaskAttemptResponseDto } from '../dto/responses/attempt-analytics/class-task-attempt-response.dto';
 import { ClassTask } from 'src/modules/class-tasks/entities/class-task.entity';
 import { Task } from 'src/modules/tasks/entities/task.entity';
-import { ActivityTaskAttemptResponseDto } from '../dto/responses/student-attempt/activity-task-attempt-response.dto';
-import { ClassTaskStudentAttemptResponseDto } from '../dto/responses/student-attempt/class-task-student-attempt-response.dto';
-import { StudentTaskAttemptAnalyticsDto } from '../dto/responses/student-attempt/student-task-attempt-analytics-response.dto';
-import { ActivityTaskStudentAttemptResponseDto } from '../dto/responses/student-attempt/activity-task-student-attempt-response.dto';
+import { ActivityTaskAttemptResponseDto } from '../dto/responses/attempt-analytics/activity-task-attempt-response.dto';
+import { ClassTaskStudentAttemptResponseDto } from '../dto/responses/attempt-analytics/class-task-student-attempt-response.dto';
+import { StudentTaskAttemptAnalyticsDto } from '../dto/responses/attempt-analytics/student-task-attempt-analytics-response.dto';
+import { ActivityTaskStudentAttemptResponseDto } from '../dto/responses/attempt-analytics/activity-task-student-attempt-response.dto';
 import {
   TaskAttemptDetailResponseDto,
   TaskAttemptProgress,
@@ -44,7 +44,7 @@ import { ClassResponseDto } from '../dto/responses/task-attempt-overview.dto';
 
 export class TaskAttemptResponseMapper {
   // ===========================
-  // TASK ATTEMPTS (HISTORY)
+  // TASK ATTEMPTS (HISTORY & DASHBOARD STUDENT TASK)
   // ===========================
   static mapAndGroupTaskAttempts(
     attempts: TaskAttempt[],
@@ -81,6 +81,8 @@ export class TaskAttemptResponseMapper {
             }
           : null;
 
+        const deadline = TaskAttemptHelper.resolveDeadline(attempt);
+
         acc[dateKey].attempts.push({
           id: task_attempt_id,
           title: attempt.task?.title ?? 'Unknown Task',
@@ -91,9 +93,7 @@ export class TaskAttemptResponseMapper {
           status,
           class: classData,
           taskSlug: attempt.task?.slug ?? null,
-          deadline: attempt.task?.end_time
-            ? getDate(attempt.task.end_time)
-            : null,
+          deadline: deadline ? getDate(deadline) : null,
           lastAccessedTime: getTime(last_accessed_at),
           submittedTime: attempt.taskSubmission?.created_at
             ? getTime(attempt.taskSubmission.created_at)
@@ -110,7 +110,7 @@ export class TaskAttemptResponseMapper {
   }
 
   // ==============================
-  // TASK ATTEMPT DETAIL (HISTORY)
+  // TASK ATTEMPT DETAIL (HISTORY & DASHBOARD STUDENT TASK)
   // ==============================
   static mapTaskAttemptDetail(
     attempt: TaskAttempt,
@@ -440,22 +440,6 @@ export class TaskAttemptResponseMapper {
     classTask: ClassTask,
     attempts: TaskAttempt[],
   ): ClassTaskStudentAttemptResponseDto {
-    if (!attempts.length) {
-      return {
-        class: {
-          name: classTask.class.name,
-        },
-        task: {
-          title: classTask.task.title,
-          slug: classTask.task.slug,
-        },
-        averageScoreAllStudents: 0,
-        averageAttempts: 0,
-        students: [],
-      };
-    }
-
-    // Group by student
     const studentMap = new Map<string, TaskAttempt[]>();
 
     attempts.forEach((attempt) => {
@@ -464,6 +448,9 @@ export class TaskAttemptResponseMapper {
       }
       studentMap.get(attempt.student_id)!.push(attempt);
     });
+
+    const attemptDistributions =
+      TaskAttemptHelper.calculateAttemptDistribution(studentMap);
 
     let totalScore = 0;
     let totalAttempts = 0;
@@ -519,9 +506,7 @@ export class TaskAttemptResponseMapper {
     });
 
     return {
-      class: {
-        name: classTask.class.name,
-      },
+      class: { name: classTask.class.name },
       task: {
         title: classTask.task.title,
         slug: classTask.task.slug,
@@ -532,6 +517,8 @@ export class TaskAttemptResponseMapper {
         students.length > 0
           ? Number((totalAttempts / students.length).toFixed(2))
           : 0,
+
+      attempts: attemptDistributions,
       students,
     };
   }
@@ -543,19 +530,6 @@ export class TaskAttemptResponseMapper {
     task: Task,
     attempts: TaskAttempt[],
   ): ActivityTaskStudentAttemptResponseDto {
-    if (!attempts.length) {
-      return {
-        task: {
-          title: task.title,
-          slug: task.slug,
-        },
-        averageScoreAllStudents: 0,
-        averageAttempts: 0,
-        students: [],
-      };
-    }
-
-    // Group by student
     const studentMap = new Map<string, TaskAttempt[]>();
 
     attempts.forEach((attempt) => {
@@ -564,6 +538,9 @@ export class TaskAttemptResponseMapper {
       }
       studentMap.get(attempt.student_id)!.push(attempt);
     });
+
+    const attemptDistributions =
+      TaskAttemptHelper.calculateAttemptDistribution(studentMap);
 
     let totalScore = 0;
     let totalAttempts = 0;
@@ -580,9 +557,6 @@ export class TaskAttemptResponseMapper {
         .map((a) => a.points)
         .filter((p): p is number => p !== null);
 
-      const firstScore = scores[0];
-      const lastScore = scores[scores.length - 1];
-
       totalScore += scores.reduce((a, b) => a + b, 0);
       totalAttempts += sorted.length;
 
@@ -591,30 +565,17 @@ export class TaskAttemptResponseMapper {
       students.push({
         studentId,
         studentName: sorted[0].student.name,
-
         totalAttempts: sorted.length,
-        firstAttemptScore: firstScore,
-        lastAttemptScore: lastScore,
         averageScore:
           scores.length > 0
             ? Number(
                 (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(2),
               )
             : 0,
-        improvement: scores.length > 1 ? lastScore - firstScore : 0,
-
         latestStatus: latestAttempt.status,
         latestSubmissionId:
           latestAttempt.taskSubmission?.task_submission_id ?? undefined,
-
-        attempts: sorted.map((a, idx) => ({
-          submissionId: a.taskSubmission?.task_submission_id,
-          attemptNumber: idx + 1,
-          attemptId: a.task_attempt_id,
-          score: a.points,
-          status: a.status,
-          completedAt: a.completed_at,
-        })),
+        attempts: [],
       });
     });
 
@@ -629,6 +590,8 @@ export class TaskAttemptResponseMapper {
         students.length > 0
           ? Number((totalAttempts / students.length).toFixed(2))
           : 0,
+
+      attempts: attemptDistributions,
       students,
     };
   }
@@ -644,6 +607,7 @@ export class TaskAttemptResponseMapper {
       points,
       xp_gained,
       started_at,
+      completed_at,
       status,
       task,
       taskAnswerLogs,
@@ -661,23 +625,34 @@ export class TaskAttemptResponseMapper {
       xpGained: xp_gained,
     };
 
+    // Attempt Progress
+    const completedAt = completed_at ? getDateTime(completed_at) : null;
+    const submittedAt = taskSubmission ? taskSubmission.created_at : null;
+    const duration = submittedAt
+      ? getTimePeriod(started_at, submittedAt)
+      : getTimePeriod(started_at, completed_at);
+
     const attemptProgress: ClassTaskAttemptProgress = {
       startedAt: getDateTime(started_at),
-      submittedAt: getDateTime(taskSubmission.created_at),
-      duration: getTimePeriod(started_at, taskSubmission.created_at),
+      completedAt,
+      submittedAt: getDateTime(submittedAt),
+      duration,
       status: TaskAttemptStatusLabels[status],
     };
 
-    const gradingProgress: ClassTaskGradingProgress = {
-      startGradedAt: getDateTime(taskSubmission.start_graded_at),
-      lastGradedAt: getDateTime(taskSubmission.last_graded_at),
-      finishGradedAt: getDateTime(taskSubmission.finish_graded_at),
-      duration: getTimePeriod(
-        taskSubmission.start_graded_at,
-        taskSubmission.finish_graded_at,
-      ),
-      status: TaskAttemptStatusLabels[taskSubmission.status],
-    };
+    // Grading Progress
+    const gradingProgress: ClassTaskGradingProgress = taskSubmission
+      ? {
+          startGradedAt: getDateTime(taskSubmission.start_graded_at),
+          lastGradedAt: getDateTime(taskSubmission.last_graded_at),
+          finishGradedAt: getDateTime(taskSubmission.finish_graded_at),
+          duration: getTimePeriod(
+            taskSubmission.start_graded_at,
+            taskSubmission.finish_graded_at,
+          ),
+          status: TaskAttemptStatusLabels[taskSubmission.status],
+        }
+      : null;
 
     const questions: QuestionResponseDto[] =
       task.taskQuestions?.map((q) => {

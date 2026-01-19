@@ -9,6 +9,7 @@ export class ClassTaskStats {
 
 export class ClassTaskAttemptProgress {
   startedAt: string;
+  completedAt: string;
   submittedAt: string;
   duration: string;
   status: string;
@@ -30,6 +31,6 @@ export class ClassTaskSummaryResponseDto {
   className: string;
   stats: ClassTaskStats;
   attemptProgress: ClassTaskAttemptProgress;
-  gradingProgress: ClassTaskGradingProgress;
+  gradingProgress?: ClassTaskGradingProgress | null;
   questions: QuestionResponseDto[];
 }

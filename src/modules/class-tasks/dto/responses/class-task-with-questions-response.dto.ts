@@ -2,6 +2,8 @@ import { QuestionResponseDto } from 'src/modules/task-questions/dto/responses/qu
 
 export class ClassTaskWithQuestionsResponseDto {
   id: string;
+  classId: string;
+  taskId: string;
   lastAttemptId?: string;
   startTime?: Date;
   endTime?: Date;

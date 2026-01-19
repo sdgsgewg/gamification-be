@@ -1,4 +1,4 @@
-import { StudentTaskAttemptAnalyticsDto } from 'src/modules/task-attempts/dto/responses/student-attempt/student-task-attempt-analytics-response.dto';
+import { StudentTaskAttemptAnalyticsDto } from 'src/modules/task-attempts/dto/responses/attempt-analytics/student-task-attempt-analytics-response.dto';
 
 export class ClassTaskAttemptAnalyticsResponseDto {
   className: string;
