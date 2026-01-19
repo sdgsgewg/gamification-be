@@ -260,7 +260,9 @@ export class TaskAttemptService {
       },
       relations: {
         class: true,
-        task: true,
+        task: {
+          taskQuestions: true,
+        },
       },
     });
 
@@ -312,6 +314,9 @@ export class TaskAttemptService {
   ): Promise<ActivityTaskStudentAttemptResponseDto> {
     const task = await this.taskRepository.findOne({
       where: { slug: taskSlug },
+      relations: {
+        taskQuestions: true,
+      },
     });
 
     if (!task) {

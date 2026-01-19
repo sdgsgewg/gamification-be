@@ -103,6 +103,7 @@ export class TaskAttemptHelper {
    */
   static calculateAttemptDistribution(
     studentMap: Map<string, TaskAttempt[]>,
+    getScore: (attempt: TaskAttempt) => number | null,
   ): TaskAttemptAnalyticsDto[] {
     const attemptScores = new Map<number, number[]>();
 
@@ -113,7 +114,8 @@ export class TaskAttemptHelper {
       );
 
       sorted.forEach((attempt, index) => {
-        if (attempt.points === null) return;
+        const score = getScore(attempt);
+        if (score === null) return;
 
         const attemptNumber = index + 1;
 
@@ -121,7 +123,7 @@ export class TaskAttemptHelper {
           attemptScores.set(attemptNumber, []);
         }
 
-        attemptScores.get(attemptNumber)!.push(attempt.points);
+        attemptScores.get(attemptNumber)!.push(score);
       });
     });
 

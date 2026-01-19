@@ -449,8 +449,13 @@ export class TaskAttemptResponseMapper {
       studentMap.get(attempt.student_id)!.push(attempt);
     });
 
-    const attemptDistributions =
-      TaskAttemptHelper.calculateAttemptDistribution(studentMap);
+    const maxScore = classTask.task.taskQuestions.reduce((acc, q) => acc + q.point, 0);
+
+    const attemptDistributions = TaskAttemptHelper.calculateAttemptDistribution(
+      studentMap,
+      (a) =>
+        a.points !== null && maxScore > 0 ? (a.points / maxScore) * 100 : null,
+    );
 
     let totalScore = 0;
     let totalAttempts = 0;
@@ -464,7 +469,16 @@ export class TaskAttemptResponseMapper {
       );
 
       const scores = sorted
-        .map((a) => a.points)
+        .map((a) => {
+          const score =
+            (a.points /
+              classTask.task.taskQuestions.reduce(
+                (acc, q) => acc + q.point,
+                0,
+              )) *
+            100;
+          return score;
+        })
         .filter((p): p is number => p !== null);
 
       const firstScore = scores[0];
@@ -539,8 +553,13 @@ export class TaskAttemptResponseMapper {
       studentMap.get(attempt.student_id)!.push(attempt);
     });
 
-    const attemptDistributions =
-      TaskAttemptHelper.calculateAttemptDistribution(studentMap);
+    const maxScore = task.taskQuestions.reduce((acc, q) => acc + q.point, 0);
+
+    const attemptDistributions = TaskAttemptHelper.calculateAttemptDistribution(
+      studentMap,
+      (a) =>
+        a.points !== null && maxScore > 0 ? (a.points / maxScore) * 100 : null,
+    );
 
     let totalScore = 0;
     let totalAttempts = 0;
@@ -554,7 +573,13 @@ export class TaskAttemptResponseMapper {
       );
 
       const scores = sorted
-        .map((a) => a.points)
+        .map((a) => {
+          const score =
+            (a.points /
+              task.taskQuestions.reduce((acc, q) => acc + q.point, 0)) *
+            100;
+          return score;
+        })
         .filter((p): p is number => p !== null);
 
       totalScore += scores.reduce((a, b) => a + b, 0);
