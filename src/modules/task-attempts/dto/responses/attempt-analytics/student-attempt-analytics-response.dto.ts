@@ -1,7 +1,7 @@
 import { TaskAttemptStatus } from 'src/modules/task-attempts/enums/task-attempt-status.enum';
 import { StudentAttemptDetailDto } from './student-attempt-detail-response.dto';
 
-export class StudentTaskAttemptAnalyticsDto {
+export class StudentAttemptAnalyticsDto {
   studentId: string;
   studentName: string;
 

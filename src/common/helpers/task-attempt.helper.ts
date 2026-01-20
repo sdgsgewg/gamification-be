@@ -1,8 +1,8 @@
 import { CreateTaskAttemptDto } from 'src/modules/task-attempts/dto/requests/create-task-attempt.dto';
-import { TaskAttemptAnalyticsDto } from 'src/modules/task-attempts/dto/responses/attempt-analytics/task-attempt-analytics-response.dto';
 import { TaskAttempt } from 'src/modules/task-attempts/entities/task-attempt.entity';
 import { TaskAttemptStatus } from 'src/modules/task-attempts/enums/task-attempt-status.enum';
 import { getTimePeriod } from '../utils/date-modifier.util';
+import { AttemptAnalyticsDto } from 'src/modules/task-attempts/dto/responses/attempt-analytics/attempt-analytics-response.dto';
 
 export class TaskAttemptHelper {
   /**
@@ -104,7 +104,7 @@ export class TaskAttemptHelper {
   static calculateAttemptDistribution(
     studentMap: Map<string, TaskAttempt[]>,
     getScore: (attempt: TaskAttempt) => number | null,
-  ): TaskAttemptAnalyticsDto[] {
+  ): AttemptAnalyticsDto[] {
     const attemptScores = new Map<number, number[]>();
 
     studentMap.forEach((attempts) => {

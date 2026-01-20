@@ -15,6 +15,7 @@ import { CreateTaskAttemptDto } from './dto/requests/create-task-attempt.dto';
 import { UpdateTaskAttemptDto } from './dto/requests/update-task-attempt.dto';
 import { FilterTaskAttemptDto } from './dto/requests/filter-task-attempt.dto';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { FilterTaskAttemptAnalyticsDto } from './dto/requests/filter-task-attempt-analytics.dto';
 
 @Controller('/task-attempts')
 export class TaskAttemptController {
@@ -47,54 +48,36 @@ export class TaskAttemptController {
   }
 
   /**
-   * [GET] /class
-   * Get all task attempts from each teacher's classes
+   * [GET] /analytics
+   * Get all task attempts from each teacher's classes or activity page
    */
-  @Get('/class')
+  @Get('/analytics')
   @UseGuards(JwtAuthGuard)
-  async getAllTaskAttemptsFromClasses(@Req() req: any) {
+  async getAllTaskAttemptsAnalytics(
+    @Query() filterDto: FilterTaskAttemptAnalyticsDto,
+    @Req() req: any,
+  ) {
     const teacherId = req.user?.id || null;
-    return this.taskAttemptService.findAllTaskAttemptsFromClasses(teacherId);
-  }
-
-  /**
-   * [GET] /activity
-   * Get all task attempts from each task on activity page
-   */
-  @Get('/activity')
-  @UseGuards(JwtAuthGuard)
-  async getAllTaskAttemptsFromActivityPage(@Req() req: any) {
-    const teacherId = req.user?.id || null;
-    return this.taskAttemptService.findAllTaskAttemptsFromActivityPage(
+    return this.taskAttemptService.findAllTaskAttemptsAnalytics(
       teacherId,
+      filterDto,
     );
   }
 
   /**
-   * [GET] /class/:classSlug/:taskSlug
+   * [GET] /analytics/:classSlug/:taskSlug
    * Get student attempts from a task in a class
    */
-  @Get('/class/:classSlug/:taskSlug')
-  async getStudentAttemptsFromClassTask(
+  @Get('/analytics/:classSlug/:taskSlug')
+  async getTaskAttemptDetailAnalytics(
     @Param('classSlug') classSlug: string,
     @Param('taskSlug') taskSlug: string,
+    @Query() filterDto: FilterTaskAttemptAnalyticsDto,
   ) {
-    return this.taskAttemptService.findStudentAttemptsFromClassTask(
+    return this.taskAttemptService.findTaskAttemptDetailAnalytics(
       classSlug,
       taskSlug,
-    );
-  }
-
-  /**
-   * [GET] /activity/:taskSlug
-   * Get student attempts from a task on activity page
-   */
-  @Get('/activity/:taskSlug')
-  async getStudentAttemptsFromActivityTask(
-    @Param('taskSlug') taskSlug: string,
-  ) {
-    return this.taskAttemptService.findStudentAttemptsFromActivityTask(
-      taskSlug,
+      filterDto
     );
   }
 

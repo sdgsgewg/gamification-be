@@ -24,15 +24,17 @@ import { getResponseMessage } from 'src/common/utils/get-response-message.util';
 import { MostPopularTaskResponseDto } from './dto/responses/most-popular-task-response.dto';
 import { CurrentAttemptResponseDto } from './dto/responses/current-attempt-response.dto';
 import { AttemptMetaResponseDto } from './dto/responses/attempt-meta-response.dto';
-import { ClassTaskStudentAttemptResponseDto } from './dto/responses/attempt-analytics/class-task-student-attempt-response.dto';
-import { ClassTaskAttemptResponseDto } from './dto/responses/attempt-analytics/class-task-attempt-response.dto';
 import { Class } from '../classes/entities/class.entity';
 import { ClassTask } from '../class-tasks/entities/class-task.entity';
-import { ActivityTaskAttemptResponseDto } from './dto/responses/attempt-analytics/activity-task-attempt-response.dto';
 import { TaskAttemptResponseMapper } from './mapper/task-attempt-response.mapper';
-import { ActivityTaskStudentAttemptResponseDto } from './dto/responses/attempt-analytics/activity-task-student-attempt-response.dto';
 import { TaskAttemptHelper } from 'src/common/helpers/task-attempt.helper';
 import { TaskType } from '../task-types/enums/task-type.enum';
+import { FilterTaskAttemptAnalyticsDto } from './dto/requests/filter-task-attempt-analytics.dto';
+import { TaskAttemptAnalyticsResponseDto } from './dto/responses/attempt-analytics/task-attempt-analytics-response.dto';
+import { TaskAttemptScope } from './enums/task-attempt-scope.enum';
+import { TaskAttemptAnalyticsMapper } from './mapper/task-attempt-analytics.mapper';
+import { TaskAttemptDetailAnalyticsResponseDto } from './dto/responses/attempt-analytics/task-attempt-detail-analytics-response.dto';
+import { TaskAttemptDetailAnalyticsMapper } from './mapper/task-attempt-detail-analytics.mapper';
 
 @Injectable()
 export class TaskAttemptService {
@@ -182,19 +184,31 @@ export class TaskAttemptService {
   }
 
   // -------------------------------------------------
+  // Return all attempts from each teacher's classes or activity page
+  // -------------------------------------------------
+  async findAllTaskAttemptsAnalytics(
+    teacherId: string,
+    filterDto: FilterTaskAttemptAnalyticsDto,
+  ): Promise<TaskAttemptAnalyticsResponseDto[]> {
+    if (filterDto.scope === TaskAttemptScope.CLASS) {
+      return this.getClassScopeAnalytics(teacherId);
+    }
+
+    return this.getActivityScopeAnalytics(teacherId);
+  }
+
+  // -------------------------------------------------
   // Return all attempts from each teacher's classes
   // -------------------------------------------------
-  async findAllTaskAttemptsFromClasses(
+  private async getClassScopeAnalytics(
     teacherId: string,
-  ): Promise<ClassTaskAttemptResponseDto[]> {
+  ): Promise<TaskAttemptAnalyticsResponseDto[]> {
     const classes = await this.classRepository.find({
       where: { teacher_id: teacherId },
       relations: { classStudents: true },
     });
 
-    if (!classes.length) {
-      throw new NotFoundException('No class found for this teacher');
-    }
+    if (!classes.length) return [];
 
     const classIds = classes.map((c) => c.class_id);
 
@@ -211,27 +225,28 @@ export class TaskAttemptService {
     const attempts = await this.taskAttemptRepository
       .createQueryBuilder('ta')
       .leftJoinAndSelect('ta.task', 't')
-      .leftJoinAndSelect('ta.class', 'c')
       .where('ta.class_id IN (:...classIds)', { classIds })
       .getMany();
 
-    return TaskAttemptResponseMapper.mapClassTaskAttempts(classTasks, attempts);
+    return TaskAttemptAnalyticsMapper.map({
+      scope: TaskAttemptScope.CLASS,
+      items: classTasks,
+      attempts,
+    });
   }
 
   // --------------------------
   // Return all attempts from activity page
   // --------------------------
-  async findAllTaskAttemptsFromActivityPage(
+  private async getActivityScopeAnalytics(
     teacherId: string,
-  ): Promise<ActivityTaskAttemptResponseDto[]> {
+  ): Promise<TaskAttemptAnalyticsResponseDto[]> {
     const tasks = await this.taskRepository.find({
       where: { creator_id: teacherId },
       relations: { taskType: true },
     });
 
-    if (!tasks.length) {
-      throw new NotFoundException('No task found for this teacher');
-    }
+    if (!tasks.length) return [];
 
     const attempts = await this.taskAttemptRepository
       .createQueryBuilder('ta')
@@ -240,18 +255,35 @@ export class TaskAttemptService {
       .andWhere('t.creator_id = :teacherId', { teacherId })
       .getMany();
 
-    if (!attempts.length) return [];
+    return TaskAttemptAnalyticsMapper.map({
+      scope: TaskAttemptScope.ACTIVITY,
+      items: tasks,
+      attempts,
+    });
+  }
 
-    return TaskAttemptResponseMapper.mapActivityTaskAttempts(tasks, attempts);
+  // -------------------------------------------------
+  // Return task attempt detail from a task in class or activity page
+  // -------------------------------------------------
+  async findTaskAttemptDetailAnalytics(
+    classSlug: string,
+    taskSlug: string,
+    filterDto: FilterTaskAttemptAnalyticsDto,
+  ): Promise<TaskAttemptDetailAnalyticsResponseDto> {
+    if (filterDto.scope === TaskAttemptScope.CLASS) {
+      return this.getClassScopeAnalyticsDetail(classSlug, taskSlug);
+    }
+
+    return this.getActivityScopeAnalyticsDetail(taskSlug);
   }
 
   // --------------------------
   // Return student attempts from a task in a class
   // --------------------------
-  async findStudentAttemptsFromClassTask(
+  async getClassScopeAnalyticsDetail(
     classSlug: string,
     taskSlug: string,
-  ): Promise<ClassTaskStudentAttemptResponseDto> {
+  ): Promise<TaskAttemptDetailAnalyticsResponseDto> {
     // Validasi class-task
     const classTask = await this.classTaskRepository.findOne({
       where: {
@@ -300,18 +332,19 @@ export class TaskAttemptService {
       };
     }
 
-    return TaskAttemptResponseMapper.mapStudentAttemptsFromClassTask(
-      classTask,
+    return TaskAttemptDetailAnalyticsMapper.map({
+      scope: TaskAttemptScope.CLASS,
+      item: classTask,
       attempts,
-    );
+    });
   }
 
   // --------------------------
   // Return student attempts from a task on activity page
   // --------------------------
-  async findStudentAttemptsFromActivityTask(
+  async getActivityScopeAnalyticsDetail(
     taskSlug: string,
-  ): Promise<ActivityTaskStudentAttemptResponseDto> {
+  ): Promise<TaskAttemptDetailAnalyticsResponseDto> {
     const task = await this.taskRepository.findOne({
       where: { slug: taskSlug },
       relations: {
@@ -344,10 +377,11 @@ export class TaskAttemptService {
       };
     }
 
-    return TaskAttemptResponseMapper.mapStudentAttemptsFromActivityTask(
-      task,
+    return TaskAttemptDetailAnalyticsMapper.map({
+      scope: TaskAttemptScope.ACTIVITY,
+      item: task,
       attempts,
-    );
+    });
   }
 
   async findTaskAttemptById(attemptId: string) {
