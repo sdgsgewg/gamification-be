@@ -34,6 +34,7 @@ import { TaskAttemptHelper } from 'src/common/helpers/task-attempt.helper';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { ClassResponseDto } from '../dto/responses/task-attempt-overview.dto';
+import { StudentAttemptDetailDto } from '../dto/responses/attempt-analytics/student-attempt-detail-response.dto';
 
 export class TaskAttemptResponseMapper {
   // ===========================
@@ -418,5 +419,26 @@ export class TaskAttemptResponseMapper {
       progress,
       questions,
     };
+  }
+
+  // ===========================
+  // STUDENT RECENT ATTEMPTS
+  // ===========================
+  static mapStudentRecentAttempts(
+    recentAttempts: TaskAttempt[],
+  ): StudentAttemptDetailDto[] {
+    const data: StudentAttemptDetailDto[] = recentAttempts.map((ra, idx) => {
+      return {
+        attemptNumber: idx + 1,
+        attemptId: ra.task_attempt_id,
+        classSlug: ra.class.slug,
+        taskSlug: ra.task.slug,
+        score: TaskAttemptHelper.calculateAttemptScore(ra),
+        status: ra.status,
+        completedAt: ra.completed_at,
+      };
+    });
+
+    return data;
   }
 }

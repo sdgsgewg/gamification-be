@@ -1,20 +1,18 @@
-export class TaskAttemptAnalyticsResponseDto {
+export class StudentTaskAttemptAnalyticsResponseDto {
   task: {
     title: string;
     slug: string;
     isRepeatable: boolean;
   };
 
-  studentsAttempted: number;
-  studentsCompleted: number;
+  completedAttemptCount: number;
+  totalAttemptCount: number;
 
   // CLASS SCOPE ONLY DATA
   class?: {
     name: string;
     slug: string;
   };
-
-  totalStudents?: number;
 
   deadline?: string;
 }

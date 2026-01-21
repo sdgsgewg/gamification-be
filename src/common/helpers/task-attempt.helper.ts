@@ -3,6 +3,9 @@ import { TaskAttempt } from 'src/modules/task-attempts/entities/task-attempt.ent
 import { TaskAttemptStatus } from 'src/modules/task-attempts/enums/task-attempt-status.enum';
 import { getTimePeriod } from '../utils/date-modifier.util';
 import { AttemptAnalyticsDto } from 'src/modules/task-attempts/dto/responses/attempt-analytics/attempt-analytics-response.dto';
+import { TaskAttemptScope } from 'src/modules/task-attempts/enums/task-attempt-scope.enum';
+import { ClassTask } from 'src/modules/class-tasks/entities/class-task.entity';
+import { Task } from 'src/modules/tasks/entities/task.entity';
 
 export class TaskAttemptHelper {
   /**
@@ -94,6 +97,92 @@ export class TaskAttemptHelper {
     }
 
     return getTimePeriod(startedAt, endTime);
+  }
+
+  // -----------------------------
+  // OVERVIEW ANALYTICS HELPER
+  // -----------------------------
+
+  static calculateTotalAttempt(attempts: TaskAttempt[]): number {
+    return attempts.length;
+  }
+
+  static calculateCompletedAttempt(attempts: TaskAttempt[]): number {
+    return attempts.filter((a) => a.status === TaskAttemptStatus.COMPLETED)
+      .length;
+  }
+
+  // -----------------------------
+  // DETAIL ANALYTICS HELPER
+  // -----------------------------
+
+  /**
+   * Calculate the maximum point of a task.
+   * @param task The task.
+   * @returns The max point as a number.
+   */
+  static calculateTaskMaxPoint(
+    scope: TaskAttemptScope,
+    item: ClassTask | Task,
+  ): number {
+    return scope === TaskAttemptScope.CLASS
+      ? (item as ClassTask).task.taskQuestions.reduce((a, q) => a + q.point, 0)
+      : (item as Task).taskQuestions.reduce((a, q) => a + q.point, 0);
+  }
+
+  /**
+   * Sort all task attempts by started_at in ascending.
+   * @param attempts All task attempts.
+   * @returns The sorted attempst as a list.
+   */
+  static sortAllAttempts(attempts: TaskAttempt[]): TaskAttempt[] {
+    // DEFAULT: started_at ascending
+    return [...attempts].sort(
+      (a, b) =>
+        new Date(a.started_at).getTime() - new Date(b.started_at).getTime(),
+    );
+  }
+
+  /**
+   * Calculate the score of a task attempt.
+   * @param attempt The task attempt.
+   * @returns The score as a number or null if not applicable.
+   */
+  static calculateAttemptScore(attempt: TaskAttempt): number | null {
+    const maxPoint = attempt.task.taskQuestions.reduce(
+      (a, q) => a + q.point,
+      0,
+    );
+
+    return attempt.points !== null && maxPoint > 0
+      ? Number(((attempt.points / maxPoint) * 100).toFixed(2))
+      : null;
+  }
+
+  /**
+   * Calculate the average score of all attempts
+   * @param scores The score distribution of all atempts.
+   * @returns The average score of all attempts.
+   */
+  static calculateAttemptsAverageScore(scores: number[]): number {
+    return scores.length > 0
+      ? Number((scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(2))
+      : 0;
+  }
+
+  /**
+   * Calculate the improvement from first and last score of all attempts
+   * @param scores The score distribution of all atempts.
+   * @param lastScore The last score of all atempts.
+   * @param firstScore The first score of all atempts.
+   * @returns The score improvement as a number (+/-).
+   */
+  static calculateScoreImprovement(
+    scores: number[],
+    lastScore: number,
+    firstScore: number,
+  ): number {
+    return scores.length > 1 ? Number((lastScore - firstScore).toFixed(2)) : 0;
   }
 
   /**

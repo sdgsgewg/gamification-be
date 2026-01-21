@@ -16,6 +16,7 @@ import { UpdateTaskAttemptDto } from './dto/requests/update-task-attempt.dto';
 import { FilterTaskAttemptDto } from './dto/requests/filter-task-attempt.dto';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { FilterTaskAttemptAnalyticsDto } from './dto/requests/filter-task-attempt-analytics.dto';
+import { FilterStudentRecentAttemptDto } from './dto/requests/filter-student-recent-attempt.dto';
 
 @Controller('/task-attempts')
 export class TaskAttemptController {
@@ -48,6 +49,21 @@ export class TaskAttemptController {
   }
 
   /**
+   * [GET] /recent-attempts
+   * Get recent attempts by user (student)
+   */
+  @Get('/recent-attempts')
+  @UseGuards(JwtAuthGuard)
+  async getStudentRecentAttempts(
+    @Query() filterDto: FilterStudentRecentAttemptDto,
+    @Req() req: any,
+  ) {
+    // Ambil userId dari request (kalau user login)
+    const userId = req.user?.id || null;
+    return this.taskAttemptService.findStudentRecentAttempts(userId, filterDto);
+  }
+
+  /**
    * [GET] /analytics
    * Get all task attempts from each teacher's classes or activity page
    */
@@ -65,6 +81,23 @@ export class TaskAttemptController {
   }
 
   /**
+   * [GET] /analytics/student
+   * Get all task attempts from student on class or activity page
+   */
+  @Get('/analytics/student')
+  @UseGuards(JwtAuthGuard)
+  async getStudentTaskAttemptsAnalytics(
+    @Query() filterDto: FilterTaskAttemptAnalyticsDto,
+    @Req() req: any,
+  ) {
+    const studentId = req.user?.id || null;
+    return this.taskAttemptService.findStudentTaskAttemptsAnalytics(
+      studentId,
+      filterDto,
+    );
+  }
+
+  /**
    * [GET] /analytics/:classSlug/:taskSlug
    * Get student attempts from a task in a class
    */
@@ -77,7 +110,28 @@ export class TaskAttemptController {
     return this.taskAttemptService.findTaskAttemptDetailAnalytics(
       classSlug,
       taskSlug,
-      filterDto
+      filterDto,
+    );
+  }
+
+  /**
+   * [GET] /analytics/student/:classSlug/:taskSlug
+   * Get student attempts from a task in a class
+   */
+  @Get('/analytics/student/:classSlug/:taskSlug')
+  @UseGuards(JwtAuthGuard)
+  async getStudentTaskAttemptDetailAnalytics(
+    @Param('classSlug') classSlug: string,
+    @Param('taskSlug') taskSlug: string,
+    @Query() filterDto: FilterTaskAttemptAnalyticsDto,
+    @Req() req: any,
+  ) {
+    const studentId = req.user?.id || null;
+    return this.taskAttemptService.findStudentTaskAttemptDetailAnalytics(
+      studentId,
+      classSlug,
+      taskSlug,
+      filterDto,
     );
   }
 

@@ -35,6 +35,12 @@ import { TaskAttemptScope } from './enums/task-attempt-scope.enum';
 import { TaskAttemptAnalyticsMapper } from './mapper/task-attempt-analytics.mapper';
 import { TaskAttemptDetailAnalyticsResponseDto } from './dto/responses/attempt-analytics/task-attempt-detail-analytics-response.dto';
 import { TaskAttemptDetailAnalyticsMapper } from './mapper/task-attempt-detail-analytics.mapper';
+import { StudentTaskAttemptAnalyticsMapper } from './mapper/student-task-attempt-analytics-mapper';
+import { StudentTaskAttemptAnalyticsResponseDto } from './dto/responses/attempt-analytics/student-task-attempt-analytics-response.dto';
+import { StudentTaskAttemptDetailAnalyticsMapper } from './mapper/student-task-attempt-detail-analytics-mapper';
+import { StudentTaskAttemptDetailAnalyticsResponseDto } from './dto/responses/attempt-analytics/student-task-attempt-detail-analytics-response.dto';
+import { StudentAttemptDetailDto } from './dto/responses/attempt-analytics/student-attempt-detail-response.dto';
+import { FilterStudentRecentAttemptDto } from './dto/requests/filter-student-recent-attempt.dto';
 
 @Injectable()
 export class TaskAttemptService {
@@ -183,6 +189,33 @@ export class TaskAttemptService {
     return data;
   }
 
+  async findStudentRecentAttempts(
+    studentId: string,
+    filterDto: FilterStudentRecentAttemptDto,
+  ): Promise<StudentAttemptDetailDto[]> {
+    const { classSlug, taskSlug } = filterDto;
+
+    const recentAttempts = await this.taskAttemptRepository.find({
+      where: {
+        student_id: studentId,
+        class: { slug: classSlug ?? '' },
+        task: { slug: taskSlug },
+      },
+      relations: {
+        class: true,
+        task: {
+          taskQuestions: true,
+        },
+        taskSubmission: true,
+      },
+      order: {
+        started_at: 'ASC',
+      },
+    });
+
+    return TaskAttemptResponseMapper.mapStudentRecentAttempts(recentAttempts);
+  }
+
   // -------------------------------------------------
   // Return all attempts from each teacher's classes or activity page
   // -------------------------------------------------
@@ -303,18 +336,22 @@ export class TaskAttemptService {
     }
 
     // Ambil semua attempt
-    const attempts = await this.taskAttemptRepository
-      .createQueryBuilder('ta')
-      .leftJoinAndSelect('ta.student', 's')
-      .leftJoinAndSelect('ta.taskSubmission', 'ts')
-      .where('ta.class_id = :classId', {
-        classId: classTask.class_id,
-      })
-      .andWhere('ta.task_id = :taskId', {
-        taskId: classTask.task_id,
-      })
-      .orderBy('ta.started_at', 'ASC')
-      .getMany();
+    const attempts = await this.taskAttemptRepository.find({
+      where: {
+        class_id: classTask.class_id,
+        task_id: classTask.task_id,
+      },
+      relations: {
+        student: true,
+        task: {
+          taskQuestions: true,
+        },
+        taskSubmission: true,
+      },
+      order: {
+        started_at: 'ASC',
+      },
+    });
 
     if (!attempts.length) {
       return {
@@ -356,13 +393,21 @@ export class TaskAttemptService {
       throw new NotFoundException('Task not found');
     }
 
-    const attempts = await this.taskAttemptRepository
-      .createQueryBuilder('ta')
-      .leftJoinAndSelect('ta.student', 's')
-      .leftJoinAndSelect('ta.taskSubmission', 'ts')
-      .andWhere('ta.task_id = :taskId', { taskId: task.task_id })
-      .orderBy('ta.started_at', 'ASC')
-      .getMany();
+    const attempts = await this.taskAttemptRepository.find({
+      where: {
+        task_id: task.task_id,
+      },
+      relations: {
+        student: true,
+        task: {
+          taskQuestions: true,
+        },
+        taskSubmission: true,
+      },
+      order: {
+        started_at: 'ASC',
+      },
+    });
 
     if (!attempts.length) {
       return {
@@ -382,6 +427,183 @@ export class TaskAttemptService {
       item: task,
       attempts,
     });
+  }
+
+  // -------------------------------------------------
+  // Return all attempts from student on classes or activity page
+  // -------------------------------------------------
+  async findStudentTaskAttemptsAnalytics(
+    studentId: string,
+    filterDto: FilterTaskAttemptAnalyticsDto,
+  ): Promise<StudentTaskAttemptAnalyticsResponseDto[]> {
+    if (filterDto.scope === TaskAttemptScope.CLASS) {
+      return this.getClassScopeStudentAnalytics(studentId);
+    }
+
+    return this.getActivityScopeStudentAnalytics(studentId);
+  }
+
+  // -------------------------------------------------
+  // Return all attempts from each teacher's classes
+  // -------------------------------------------------
+  private async getClassScopeStudentAnalytics(
+    studentId: string,
+  ): Promise<StudentTaskAttemptAnalyticsResponseDto[]> {
+    const classes = await this.classRepository.find({
+      where: { classStudents: { student_id: studentId } },
+      relations: { classStudents: true },
+    });
+
+    if (!classes.length) return [];
+
+    const classIds = classes.map((c) => c.class_id);
+
+    const classTasks = await this.classTaskRepository.find({
+      where: { class: { class_id: In(classIds) } },
+      relations: {
+        class: { classStudents: true },
+        task: { taskType: true },
+      },
+    });
+
+    if (!classTasks.length) return [];
+
+    const attempts = await this.taskAttemptRepository
+      .createQueryBuilder('ta')
+      .leftJoinAndSelect('ta.task', 't')
+      .where('ta.class_id IN (:...classIds)', { classIds })
+      .andWhere('ta.student_id = :studentId', { studentId })
+      .getMany();
+
+    return StudentTaskAttemptAnalyticsMapper.map({
+      scope: TaskAttemptScope.CLASS,
+      items: classTasks,
+      attempts,
+    });
+  }
+
+  // --------------------------
+  // Return all attempts from activity page
+  // --------------------------
+  private async getActivityScopeStudentAnalytics(
+    studentId: string,
+  ): Promise<StudentTaskAttemptAnalyticsResponseDto[]> {
+    const attempts = await this.taskAttemptRepository
+      .createQueryBuilder('ta')
+      .leftJoinAndSelect('ta.task', 't')
+      .where('ta.class_id IS NULL')
+      .andWhere('ta.student_id = :studentId', { studentId })
+      .getMany();
+
+    return StudentTaskAttemptAnalyticsMapper.map({
+      scope: TaskAttemptScope.ACTIVITY,
+      attempts,
+    });
+  }
+
+  // -------------------------------------------------
+  // Return task attempt detail from a task in class or activity page
+  // -------------------------------------------------
+  async findStudentTaskAttemptDetailAnalytics(
+    studentId: string,
+    classSlug: string,
+    taskSlug: string,
+    filterDto: FilterTaskAttemptAnalyticsDto,
+  ): Promise<StudentTaskAttemptDetailAnalyticsResponseDto> {
+    if (filterDto.scope === TaskAttemptScope.CLASS) {
+      return this.getClassScopeAnalyticsStudentDetail(
+        studentId,
+        classSlug,
+        taskSlug,
+      );
+    }
+
+    return this.getActivityScopeAnalyticsStudentDetail(studentId, taskSlug);
+  }
+
+  // --------------------------
+  // Return student attempts from a task in a class
+  // --------------------------
+  async getClassScopeAnalyticsStudentDetail(
+    studentId: string,
+    classSlug: string,
+    taskSlug: string,
+  ): Promise<StudentTaskAttemptDetailAnalyticsResponseDto> {
+    const classTask = await this.classTaskRepository.findOne({
+      where: {
+        class: { slug: classSlug },
+        task: { slug: taskSlug },
+      },
+      relations: {
+        class: true,
+        task: { taskQuestions: true },
+      },
+    });
+
+    if (!classTask) {
+      throw new NotFoundException('Task not found in this class');
+    }
+
+    const attempts = await this.taskAttemptRepository.find({
+      where: {
+        student_id: studentId,
+        class_id: classTask.class_id,
+        task_id: classTask.task_id,
+      },
+      relations: {
+        student: true,
+        class: true,
+        task: {
+          taskQuestions: true,
+        },
+        taskSubmission: true,
+      },
+      order: {
+        started_at: 'ASC',
+      },
+    });
+
+    return StudentTaskAttemptDetailAnalyticsMapper.mapClass(
+      classTask,
+      attempts,
+    );
+  }
+
+  // --------------------------
+  // Return student attempts from a task on activity page
+  // --------------------------
+  async getActivityScopeAnalyticsStudentDetail(
+    studentId: string,
+    taskSlug: string,
+  ): Promise<StudentTaskAttemptDetailAnalyticsResponseDto> {
+    const task = await this.taskRepository.findOne({
+      where: { slug: taskSlug },
+      relations: { taskQuestions: true },
+    });
+
+    if (!task) {
+      throw new NotFoundException('Task not found');
+    }
+
+    const attempts = await this.taskAttemptRepository.find({
+      where: {
+        student_id: studentId,
+        task_id: task.task_id,
+        class_id: null,
+      },
+      relations: {
+        student: true,
+        task: {
+          taskQuestions: true,
+        },
+        taskSubmission: true,
+      },
+      order: {
+        started_at: 'ASC',
+      },
+    });
+
+    return StudentTaskAttemptDetailAnalyticsMapper.mapActivity(task, attempts);
   }
 
   async findTaskAttemptById(attemptId: string) {

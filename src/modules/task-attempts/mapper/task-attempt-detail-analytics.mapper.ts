@@ -29,15 +29,20 @@ export class TaskAttemptDetailAnalyticsMapper {
       studentMap.get(a.student_id)!.push(a);
     });
 
-    const maxScore =
-      input.scope === TaskAttemptScope.CLASS
-        ? input.item.task.taskQuestions.reduce((a, q) => a + q.point, 0)
-        : input.item.taskQuestions.reduce((a, q) => a + q.point, 0);
+    // const maxPoint =
+    //   input.scope === TaskAttemptScope.CLASS
+    //     ? input.item.task.taskQuestions.reduce((a, q) => a + q.point, 0)
+    //     : input.item.taskQuestions.reduce((a, q) => a + q.point, 0);
+
+    const maxPoint = TaskAttemptHelper.calculateTaskMaxPoint(
+      input.scope,
+      input.item,
+    );
 
     const attemptDistributions = TaskAttemptHelper.calculateAttemptDistribution(
       studentMap,
       (a) =>
-        a.points !== null && maxScore > 0 ? (a.points / maxScore) * 100 : null,
+        a.points !== null && maxPoint > 0 ? (a.points / maxPoint) * 100 : null,
     );
 
     let totalScore = 0;
@@ -46,17 +51,15 @@ export class TaskAttemptDetailAnalyticsMapper {
     const students: StudentAttemptAnalyticsDto[] = [];
 
     studentMap.forEach((studentAttempts, studentId) => {
-      const sorted = [...studentAttempts].sort(
-        (a, b) =>
-          new Date(a.started_at).getTime() - new Date(b.started_at).getTime(),
-      );
+      // const sorted = [...studentAttempts].sort(
+      //   (a, b) =>
+      //     new Date(a.started_at).getTime() - new Date(b.started_at).getTime(),
+      // );
+
+      const sorted = TaskAttemptHelper.sortAllAttempts(studentAttempts);
 
       const scores = sorted
-        .map((a) =>
-          a.points !== null && maxScore > 0
-            ? Number(((a.points / maxScore) * 100).toFixed(2))
-            : null,
-        )
+        .map((a) => TaskAttemptHelper.calculateAttemptScore(a))
         .filter((s): s is number => s !== null);
 
       totalScore += scores.reduce((a, b) => a + b, 0);
@@ -93,7 +96,9 @@ export class TaskAttemptDetailAnalyticsMapper {
                 submissionId: a.taskSubmission?.task_submission_id,
                 attemptNumber: idx + 1,
                 attemptId: a.task_attempt_id,
-                score: a.points,
+                classSlug: a.class ? a.class.slug : '',
+                taskSlug: a.task.slug,
+                score: TaskAttemptHelper.calculateAttemptScore(a),
                 status: a.status,
                 completedAt: a.completed_at,
               }))
