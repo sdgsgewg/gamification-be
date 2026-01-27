@@ -8,10 +8,11 @@ import {
   Get,
   // Query,
   BadRequestException,
+  Query,
 } from '@nestjs/common';
 import { UpdateTaskSubmissionDto } from './dto/requests/update-task-submission.dto';
 import { TaskSubmissionService } from './task-submissions.service';
-// import { FilterTaskSubmissionDto } from './dto/requests/filter-task-submission.dto';
+import { FilterTaskSubmissionDto } from './dto/requests/filter-task-submission.dto';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 
 @Controller('/task-submissions')
@@ -22,34 +23,33 @@ export class TaskSubmissionController {
    * [GET]
    * Mendapatkan daftar pengumpulan tugas dari seluruh kelas milik guru
    */
-  // @Get('')
-  // @UseGuards(JwtAuthGuard)
-  // async getAllTaskSubmissions(
-  //   @Req() req: any,
-  //   // @Query() filterDto: FilterTaskSubmissionDto,
-  // ) {
-  //   // Ambil userId dari request (kalau user login)
-  //   const userId = req.user?.id || null;
-  //   // return this.taskSubmissionService.findAllTaskSubmissions(userId, filterDto);
-  //   return this.taskSubmissionService.findAllTaskSubmissions(userId);
-  // }
+  @Get('')
+  @UseGuards(JwtAuthGuard)
+  async getAllTaskSubmissions(
+    @Req() req: any,
+    @Query() filterDto: FilterTaskSubmissionDto,
+  ) {
+    // Ambil userId dari request (kalau user login)
+    const userId = req.user?.id || null;
+    return this.taskSubmissionService.findAllTaskSubmissions(userId, filterDto);
+  }
 
   /**
    * [GET] /classes/:classSlug/tasks/:taskSlug
    * Mendapatkan detail satu task (tanpa pertanyaan)
    */
-  // @Get('/classes/:classSlug/tasks/:taskSlug')
-  // async getTaskSubmissionsInClass(
-  //   @Param('classSlug') classSlug: string,
-  //   @Param('taskSlug') taskSlug: string,
-  //   // @Query() filterDto: FilterTaskSubmissionDto,
-  // ) {
-  //   return this.taskSubmissionService.findTaskSubmissionsInClass(
-  //     classSlug,
-  //     taskSlug,
-  //     // filterDto,
-  //   );
-  // }
+  @Get('/classes/:classSlug/tasks/:taskSlug')
+  async getTaskSubmissionsInClass(
+    @Param('classSlug') classSlug: string,
+    @Param('taskSlug') taskSlug: string,
+    @Query() filterDto: FilterTaskSubmissionDto,
+  ) {
+    return this.taskSubmissionService.findTaskSubmissionsInClass(
+      classSlug,
+      taskSlug,
+      filterDto,
+    );
+  }
 
   /**
    * [GET] /:id

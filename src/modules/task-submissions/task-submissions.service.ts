@@ -19,8 +19,8 @@ import { ActivityLogService } from '../activty-logs/activity-logs.service';
 import { ActivityLogEventType } from '../activty-logs/enums/activity-log-event-type';
 import { getActivityLogDescription } from 'src/common/utils/get-activity-log-description.util';
 import { UserRole } from '../roles/enums/user-role.enum';
-// import { FilterTaskSubmissionDto } from './dto/requests/filter-task-submission.dto';
-// import { GroupedTaskSubmissionResponseDto } from './dto/responses/grouped-task-submission-response.dto';
+import { FilterTaskSubmissionDto } from './dto/requests/filter-task-submission.dto';
+import { GroupedTaskSubmissionResponseDto } from './dto/responses/grouped-task-submission-response.dto';
 import {
   getDateTime,
   getTimePeriod,
@@ -35,6 +35,7 @@ import { TaskSubmissionWithAnswersResponseDto } from './dto/responses/task-submi
 import { TaskDifficultyLabels } from '../tasks/enums/task-difficulty.enum';
 import { Class } from '../classes/entities/class.entity';
 import { ClassTask } from '../class-tasks/entities/class-task.entity';
+import { TaskSubmissionResponseMapper } from './mapper/task-submission-response.mapper';
 
 @Injectable()
 export class TaskSubmissionService {
@@ -55,101 +56,101 @@ export class TaskSubmissionService {
     private readonly activityLogService: ActivityLogService,
   ) {}
 
-  // async findAllTaskSubmissions(
-  //   userId: string,
-  //   filterDto: FilterTaskSubmissionDto,
-  // ): Promise<GroupedTaskSubmissionResponseDto[]> {
-  //   const qb = this.taskSubmissionRepository
-  //     .createQueryBuilder('ts')
-  //     .leftJoinAndSelect('ts.taskAttempt', 'ta')
-  //     .leftJoinAndSelect('ta.class', 'c')
-  //     .leftJoinAndSelect('ta.task', 't')
-  //     .leftJoinAndSelect('ta.student', 's');
+  async findAllTaskSubmissions(
+    userId: string,
+    filterDto: FilterTaskSubmissionDto,
+  ): Promise<GroupedTaskSubmissionResponseDto[]> {
+    const qb = this.taskSubmissionRepository
+      .createQueryBuilder('ts')
+      .leftJoinAndSelect('ts.taskAttempt', 'ta')
+      .leftJoinAndSelect('ta.class', 'c')
+      .leftJoinAndSelect('ta.task', 't')
+      .leftJoinAndSelect('ta.student', 's');
 
-  //   // Filter berdasarkan user id
-  //   qb.where('c.teacher_id = :teacherId', { teacherId: userId });
+    // Filter berdasarkan user id
+    qb.where('c.teacher_id = :teacherId', { teacherId: userId });
 
-  //   // Tambahkan filter status
-  //   if (filterDto.status) {
-  //     qb.andWhere('ts.status = :status', { status: filterDto.status });
-  //   }
+    // Tambahkan filter status
+    if (filterDto.status) {
+      qb.andWhere('ts.status = :status', { status: filterDto.status });
+    }
 
-  //   // Filter berdasarkan nama siswa
-  //   if (filterDto.searchText) {
-  //     qb.andWhere('s.name ILIKE :name', { name: `%${filterDto.searchText}%` });
-  //   }
+    // Filter berdasarkan nama siswa
+    if (filterDto.searchText) {
+      qb.andWhere('s.name ILIKE :name', { name: `%${filterDto.searchText}%` });
+    }
 
-  //   // Sorting dinamis
-  //   const orderBy = filterDto.orderBy ?? 'ts.created_at';
-  //   const orderState = filterDto.orderState ?? 'ASC';
-  //   qb.orderBy(orderBy, orderState as 'ASC' | 'DESC');
+    // Sorting dinamis
+    const orderBy = filterDto.orderBy ?? 'ts.created_at';
+    const orderState = filterDto.orderState ?? 'ASC';
+    qb.orderBy(orderBy, orderState as 'ASC' | 'DESC');
 
-  //   // Eksekusi query
-  //   const submissions = await qb.getMany();
+    // Eksekusi query
+    const submissions = await qb.getMany();
 
-  //   if (!submissions.length) {
-  //     throw new NotFoundException(
-  //       `No submission found for teacher with id ${userId}`,
-  //     );
-  //   }
+    // if (!submissions.length) {
+    //   throw new NotFoundException(
+    //     `No submission found for teacher with id ${userId}`,
+    //   );
+    // }
 
-  //   const groupByGraded = filterDto.status === TaskSubmissionStatus.COMPLETED;
+    const groupByGraded = filterDto.status === TaskSubmissionStatus.COMPLETED;
 
-  //   return TaskSubmissionResponseMapper.mapAndGroupTaskSubmissions(
-  //     submissions,
-  //     groupByGraded,
-  //   );
-  // }
+    return TaskSubmissionResponseMapper.mapAndGroupTaskSubmissions(
+      submissions,
+      groupByGraded,
+    );
+  }
 
-  // async findTaskSubmissionsInClass(
-  //   classSlug: string,
-  //   taskSlug: string,
-  //   filterDto: FilterTaskSubmissionDto,
-  // ): Promise<GroupedTaskSubmissionResponseDto[]> {
-  //   const qb = this.taskSubmissionRepository
-  //     .createQueryBuilder('ts')
-  //     .leftJoinAndSelect('ts.taskAttempt', 'ta')
-  //     .leftJoinAndSelect('ta.class', 'c')
-  //     .leftJoinAndSelect('ta.task', 't')
-  //     .leftJoinAndSelect('ta.student', 's');
+  async findTaskSubmissionsInClass(
+    classSlug: string,
+    taskSlug: string,
+    filterDto: FilterTaskSubmissionDto,
+  ): Promise<GroupedTaskSubmissionResponseDto[]> {
+    const qb = this.taskSubmissionRepository
+      .createQueryBuilder('ts')
+      .leftJoinAndSelect('ts.taskAttempt', 'ta')
+      .leftJoinAndSelect('ta.class', 'c')
+      .leftJoinAndSelect('ta.task', 't')
+      .leftJoinAndSelect('ta.student', 's');
 
-  //   // Filter berdasarkan class dan task slug
-  //   qb.where('c.slug = :classSlug', { classSlug }).andWhere(
-  //     't.slug = :taskSlug',
-  //     { taskSlug },
-  //   );
+    // Filter berdasarkan class dan task slug
+    qb.where('c.slug = :classSlug', { classSlug }).andWhere(
+      't.slug = :taskSlug',
+      { taskSlug },
+    );
 
-  //   // Tambahkan filter status
-  //   if (filterDto.status) {
-  //     qb.andWhere('ts.status = :status', { status: filterDto.status });
-  //   }
+    // Tambahkan filter status
+    if (filterDto.status) {
+      qb.andWhere('ts.status = :status', { status: filterDto.status });
+    }
 
-  //   // Filter berdasarkan nama siswa
-  //   if (filterDto.searchText) {
-  //     qb.andWhere('s.name ILIKE :name', { name: `%${filterDto.searchText}%` });
-  //   }
+    // Filter berdasarkan nama siswa
+    if (filterDto.searchText) {
+      qb.andWhere('s.name ILIKE :name', { name: `%${filterDto.searchText}%` });
+    }
 
-  //   // Sorting dinamis
-  //   const orderBy = filterDto.orderBy ?? 'ts.created_at';
-  //   const orderState = filterDto.orderState ?? 'ASC';
-  //   qb.orderBy(orderBy, orderState as 'ASC' | 'DESC');
+    // Sorting dinamis
+    const orderBy = filterDto.orderBy ?? 'ts.created_at';
+    const orderState = filterDto.orderState ?? 'ASC';
+    qb.orderBy(orderBy, orderState as 'ASC' | 'DESC');
 
-  //   // Eksekusi query
-  //   const submissions = await qb.getMany();
+    // Eksekusi query
+    const submissions = await qb.getMany();
 
-  //   if (!submissions.length) {
-  //     throw new NotFoundException(
-  //       `No submission found for class with slug ${classSlug} and task with slug ${taskSlug}`,
-  //     );
-  //   }
+    if (!submissions.length) {
+      throw new NotFoundException(
+        `No submission found for class with slug ${classSlug} and task with slug ${taskSlug}`,
+      );
+    }
 
-  //   const groupByGraded = filterDto.status === TaskSubmissionStatus.COMPLETED;
+    const groupByGraded = filterDto.status === TaskSubmissionStatus.COMPLETED;
 
-  //   return TaskSubmissionResponseMapper.mapAndGroupTaskSubmissions(
-  //     submissions,
-  //     groupByGraded,
-  //   );
-  // }
+    return TaskSubmissionResponseMapper.mapAndGroupTaskSubmissions(
+      submissions,
+      groupByGraded,
+    );
+  }
 
   async findTaskSubmissionById(
     id: string,
