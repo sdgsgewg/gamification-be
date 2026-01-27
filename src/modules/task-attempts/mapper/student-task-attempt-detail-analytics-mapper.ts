@@ -5,6 +5,7 @@ import { StudentTaskAttemptDetailAnalyticsResponseDto } from '../dto/responses/a
 import { TaskAttemptStatus } from '../enums/task-attempt-status.enum';
 import { TaskAttemptHelper } from 'src/common/helpers/task-attempt.helper';
 import { TaskHelper } from 'src/common/helpers/task.helper';
+import { TaskAttemptResponseMapper } from './task-attempt-response.mapper';
 
 export class StudentTaskAttemptDetailAnalyticsMapper {
   static mapClass(
@@ -94,18 +95,8 @@ export class StudentTaskAttemptDetailAnalyticsMapper {
 
       latestStatus: latest.status,
       latestSubmissionId: latest.taskSubmission?.task_submission_id,
-
-      attempts: sorted.map((a, idx) => ({
-        attemptId: a.task_attempt_id,
-        attemptNumber: idx + 1,
-        classSlug: a.class ? a.class.slug : '',
-        taskSlug: a.task.slug,
-        score: TaskAttemptHelper.calculateAttemptScore(a),
-        status: a.status,
-        completedAt: a.completed_at,
-        submissionId: a.taskSubmission?.task_submission_id,
-      })),
-
+      attempts: TaskAttemptResponseMapper.mapStudentRecentAttempts(sorted),
+      
       ...(classInfo && { class: classInfo }),
     };
   }

@@ -81,6 +81,43 @@ export class TaskAttemptController {
   }
 
   /**
+   * [GET] /analytics/student/:classSlug/:taskSlug
+   * Get student attempts from a task in a class or activity page
+   */
+  @Get('/analytics/student/:classSlug/:taskSlug')
+  @UseGuards(JwtAuthGuard)
+  async getStudentTaskAttemptDetailAnalytics(
+    @Param('classSlug') classSlug: string,
+    @Param('taskSlug') taskSlug: string,
+    @Query() filterDto: FilterTaskAttemptAnalyticsDto,
+    @Req() req: any,
+  ) {
+    const studentId = req.user?.id || null;
+    return this.taskAttemptService.findStudentTaskAttemptDetailAnalytics(
+      studentId,
+      classSlug,
+      taskSlug,
+      filterDto,
+    );
+  }
+
+  @Get('/analytics/student/:taskSlug')
+  @UseGuards(JwtAuthGuard)
+  async getStudentTaskAttemptDetailAnalyticsByTask(
+    @Param('taskSlug') taskSlug: string,
+    @Query() filterDto: FilterTaskAttemptAnalyticsDto,
+    @Req() req: any,
+  ) {
+    const studentId = req.user?.id || null;
+    return this.taskAttemptService.findStudentTaskAttemptDetailAnalytics(
+      studentId,
+      null,
+      taskSlug,
+      filterDto,
+    );
+  }
+
+  /**
    * [GET] /analytics/student
    * Get all task attempts from student on class or activity page
    */
@@ -99,7 +136,7 @@ export class TaskAttemptController {
 
   /**
    * [GET] /analytics/:classSlug/:taskSlug
-   * Get student attempts from a task in a class
+   * Get student attempts from a task in a class or activity page
    */
   @Get('/analytics/:classSlug/:taskSlug')
   async getTaskAttemptDetailAnalytics(
@@ -114,22 +151,13 @@ export class TaskAttemptController {
     );
   }
 
-  /**
-   * [GET] /analytics/student/:classSlug/:taskSlug
-   * Get student attempts from a task in a class
-   */
-  @Get('/analytics/student/:classSlug/:taskSlug')
-  @UseGuards(JwtAuthGuard)
-  async getStudentTaskAttemptDetailAnalytics(
-    @Param('classSlug') classSlug: string,
+  @Get('/analytics/:taskSlug')
+  async getTaskAttemptDetailAnalyticsByTask(
     @Param('taskSlug') taskSlug: string,
     @Query() filterDto: FilterTaskAttemptAnalyticsDto,
-    @Req() req: any,
   ) {
-    const studentId = req.user?.id || null;
-    return this.taskAttemptService.findStudentTaskAttemptDetailAnalytics(
-      studentId,
-      classSlug,
+    return this.taskAttemptService.findTaskAttemptDetailAnalytics(
+      null,
       taskSlug,
       filterDto,
     );

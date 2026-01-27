@@ -41,6 +41,7 @@ import { StudentTaskAttemptDetailAnalyticsMapper } from './mapper/student-task-a
 import { StudentTaskAttemptDetailAnalyticsResponseDto } from './dto/responses/attempt-analytics/student-task-attempt-detail-analytics-response.dto';
 import { StudentAttemptDetailDto } from './dto/responses/attempt-analytics/student-attempt-detail-response.dto';
 import { FilterStudentRecentAttemptDto } from './dto/requests/filter-student-recent-attempt.dto';
+import { TaskStatus } from '../tasks/enums/task-status.enum';
 
 @Injectable()
 export class TaskAttemptService {
@@ -198,7 +199,7 @@ export class TaskAttemptService {
     const recentAttempts = await this.taskAttemptRepository.find({
       where: {
         student_id: studentId,
-        class: { slug: classSlug ?? '' },
+        // class: { slug: classSlug ?? '' },
         task: { slug: taskSlug },
       },
       relations: {
@@ -249,17 +250,28 @@ export class TaskAttemptService {
       where: { class: { class_id: In(classIds) } },
       relations: {
         class: { classStudents: true },
-        task: { taskType: true },
+        task: { taskType: true, taskQuestions: true },
       },
     });
 
     if (!classTasks.length) return [];
 
-    const attempts = await this.taskAttemptRepository
-      .createQueryBuilder('ta')
-      .leftJoinAndSelect('ta.task', 't')
-      .where('ta.class_id IN (:...classIds)', { classIds })
-      .getMany();
+    const attempts = await this.taskAttemptRepository.find({
+      where: {
+        class_id: In(classIds),
+      },
+      relations: {
+        student: true,
+        class: true,
+        task: {
+          taskQuestions: true,
+        },
+        taskSubmission: true,
+      },
+      order: {
+        started_at: 'ASC',
+      },
+    });
 
     return TaskAttemptAnalyticsMapper.map({
       scope: TaskAttemptScope.CLASS,
@@ -275,18 +287,31 @@ export class TaskAttemptService {
     teacherId: string,
   ): Promise<TaskAttemptAnalyticsResponseDto[]> {
     const tasks = await this.taskRepository.find({
-      where: { creator_id: teacherId },
-      relations: { taskType: true },
+      where: { creator_id: teacherId, status: TaskStatus.PUBLISHED },
+      relations: { taskType: true, taskQuestions: true },
     });
 
     if (!tasks.length) return [];
 
-    const attempts = await this.taskAttemptRepository
-      .createQueryBuilder('ta')
-      .leftJoinAndSelect('ta.task', 't')
-      .where('ta.class_id IS NULL')
-      .andWhere('t.creator_id = :teacherId', { teacherId })
-      .getMany();
+    const attempts = await this.taskAttemptRepository.find({
+      where: {
+        task: {
+          creator_id: teacherId,
+        },
+        class_id: IsNull(),
+      },
+      relations: {
+        class: true,
+        student: true,
+        task: {
+          taskQuestions: true,
+        },
+        taskSubmission: true,
+      },
+      order: {
+        started_at: 'ASC',
+      },
+    });
 
     return TaskAttemptAnalyticsMapper.map({
       scope: TaskAttemptScope.ACTIVITY,
@@ -299,11 +324,11 @@ export class TaskAttemptService {
   // Return task attempt detail from a task in class or activity page
   // -------------------------------------------------
   async findTaskAttemptDetailAnalytics(
-    classSlug: string,
+    classSlug: string | null,
     taskSlug: string,
     filterDto: FilterTaskAttemptAnalyticsDto,
   ): Promise<TaskAttemptDetailAnalyticsResponseDto> {
-    if (filterDto.scope === TaskAttemptScope.CLASS) {
+    if (classSlug && filterDto.scope === TaskAttemptScope.CLASS) {
       return this.getClassScopeAnalyticsDetail(classSlug, taskSlug);
     }
 
@@ -353,22 +378,6 @@ export class TaskAttemptService {
       },
     });
 
-    if (!attempts.length) {
-      return {
-        class: {
-          name: classTask.class.name,
-        },
-        task: {
-          title: classTask.task.title,
-          slug: classTask.task.slug,
-        },
-        averageScoreAllStudents: 0,
-        averageAttempts: 0,
-        attempts: [],
-        students: [],
-      };
-    }
-
     return TaskAttemptDetailAnalyticsMapper.map({
       scope: TaskAttemptScope.CLASS,
       item: classTask,
@@ -396,31 +405,18 @@ export class TaskAttemptService {
     const attempts = await this.taskAttemptRepository.find({
       where: {
         task_id: task.task_id,
+        class_id: IsNull(),
       },
       relations: {
         student: true,
         task: {
           taskQuestions: true,
         },
-        taskSubmission: true,
       },
       order: {
         started_at: 'ASC',
       },
     });
-
-    if (!attempts.length) {
-      return {
-        task: {
-          title: task.title,
-          slug: task.slug,
-        },
-        averageScoreAllStudents: 0,
-        averageAttempts: 0,
-        attempts: [],
-        students: [],
-      };
-    }
 
     return TaskAttemptDetailAnalyticsMapper.map({
       scope: TaskAttemptScope.ACTIVITY,
@@ -488,12 +484,22 @@ export class TaskAttemptService {
   private async getActivityScopeStudentAnalytics(
     studentId: string,
   ): Promise<StudentTaskAttemptAnalyticsResponseDto[]> {
-    const attempts = await this.taskAttemptRepository
-      .createQueryBuilder('ta')
-      .leftJoinAndSelect('ta.task', 't')
-      .where('ta.class_id IS NULL')
-      .andWhere('ta.student_id = :studentId', { studentId })
-      .getMany();
+    const attempts = await this.taskAttemptRepository.find({
+      where: {
+        class_id: IsNull(),
+        student_id: studentId,
+      },
+      relations: {
+        student: true,
+        task: {
+          taskType: true,
+          taskQuestions: true,
+        },
+      },
+      order: {
+        started_at: 'ASC',
+      },
+    });
 
     return StudentTaskAttemptAnalyticsMapper.map({
       scope: TaskAttemptScope.ACTIVITY,
@@ -506,11 +512,11 @@ export class TaskAttemptService {
   // -------------------------------------------------
   async findStudentTaskAttemptDetailAnalytics(
     studentId: string,
-    classSlug: string,
+    classSlug: string | null,
     taskSlug: string,
     filterDto: FilterTaskAttemptAnalyticsDto,
   ): Promise<StudentTaskAttemptDetailAnalyticsResponseDto> {
-    if (filterDto.scope === TaskAttemptScope.CLASS) {
+    if (classSlug && filterDto.scope === TaskAttemptScope.CLASS) {
       return this.getClassScopeAnalyticsStudentDetail(
         studentId,
         classSlug,
@@ -589,7 +595,7 @@ export class TaskAttemptService {
       where: {
         student_id: studentId,
         task_id: task.task_id,
-        class_id: null,
+        class_id: IsNull(),
       },
       relations: {
         student: true,

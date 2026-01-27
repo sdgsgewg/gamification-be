@@ -13,6 +13,7 @@ import { CurrentAttemptResponseDto } from '../task-attempts/dto/responses/curren
 import { TaskAttemptService } from '../task-attempts/task-attempts.service';
 import { TaskResponseMapper } from '../tasks/mappers/task-response.mapper';
 import { TaskAttemptResponseMapper } from '../task-attempts/mapper/task-attempt-response.mapper';
+import { TaskStatus } from '../tasks/enums/task-status.enum';
 
 @Injectable()
 export class ActivityService {
@@ -66,8 +67,8 @@ export class ActivityService {
       .where('taskType.scope IN (:...scopes)', {
         scopes: [TaskTypeScope.ACTIVITY, TaskTypeScope.GLOBAL],
       })
-      .andWhere('task.is_published = :isPublished', { isPublished: true })
-      .andWhere('task.is_finalized = :isFinalized', { isFinalized: false })
+      .andWhere('task.status = :status', { status: TaskStatus.FINALIZED })
+      .andWhere('task.status = :status', { status: TaskStatus.PUBLISHED })
       // .andWhere('task.start_time <= :now', { now })
       // .andWhere('task.end_time >= :now', { now })
       .groupBy('task.task_id')

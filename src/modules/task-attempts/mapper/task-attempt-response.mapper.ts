@@ -35,6 +35,7 @@ import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { ClassResponseDto } from '../dto/responses/task-attempt-overview.dto';
 import { StudentAttemptDetailDto } from '../dto/responses/attempt-analytics/student-attempt-detail-response.dto';
+import { TaskAttemptScope } from '../enums/task-attempt-scope.enum';
 
 export class TaskAttemptResponseMapper {
   // ===========================
@@ -428,11 +429,25 @@ export class TaskAttemptResponseMapper {
     recentAttempts: TaskAttempt[],
   ): StudentAttemptDetailDto[] {
     const data: StudentAttemptDetailDto[] = recentAttempts.map((ra, idx) => {
+      const scope = ra.class_id
+        ? TaskAttemptScope.CLASS
+        : TaskAttemptScope.ACTIVITY;
+
+      const modifiedScope = scope.charAt(0).toUpperCase() + scope.slice(1);
+
       return {
         attemptNumber: idx + 1,
         attemptId: ra.task_attempt_id,
-        classSlug: ra.class.slug,
-        taskSlug: ra.task.slug,
+        class: ra.class
+          ? {
+              name: ra.class.name,
+              slug: ra.class.slug,
+            }
+          : null,
+        task: {
+          slug: ra.task.slug,
+        },
+        scope: modifiedScope,
         score: TaskAttemptHelper.calculateAttemptScore(ra),
         status: ra.status,
         completedAt: ra.completed_at,

@@ -4,6 +4,7 @@ import { TaskAttempt } from '../entities/task-attempt.entity';
 import { Task } from 'src/modules/tasks/entities/task.entity';
 import { TaskAttemptAnalyticsResponseDto } from '../dto/responses/attempt-analytics/task-attempt-analytics-response.dto';
 import { TaskAttemptStatus } from '../enums/task-attempt-status.enum';
+import { TaskAttemptHelper } from 'src/common/helpers/task-attempt.helper';
 
 type MapInput =
   | {
@@ -92,8 +93,14 @@ export class TaskAttemptAnalyticsMapper {
 
       if (latest.status === TaskAttemptStatus.COMPLETED) completed++;
 
-      if (latest.points !== null) latestScores.push(latest.points);
-      list.forEach((a) => a.points !== null && allScores.push(a.points));
+      // if (latest.points !== null) latestScores.push(latest.points);
+      // list.forEach((a) => a.points !== null && allScores.push(a.points));
+      if (latest.points !== null)
+        latestScores.push(TaskAttemptHelper.calculateAttemptScore(latest));
+      list.forEach((a) =>
+        // a.points !== null &&
+        allScores.push(TaskAttemptHelper.calculateAttemptScore(a)),
+      );
     });
 
     const base = {
@@ -111,22 +118,12 @@ export class TaskAttemptAnalyticsMapper {
             ? (item as ClassTask).task.taskType.is_repeatable
             : (item as Task).taskType.is_repeatable,
       },
+      totalAttempts: attempts.length,
       studentsAttempted: attemptsByStudent.size,
       studentsCompleted: completed,
-      avgScoreLatestAttempt: latestScores.length
-        ? Number(
-            (
-              latestScores.reduce((a, b) => a + b, 0) / latestScores.length
-            ).toFixed(2),
-          )
-        : 0,
-      avgScoreAllAttempts: allScores.length
-        ? Number(
-            (allScores.reduce((a, b) => a + b, 0) / allScores.length).toFixed(
-              2,
-            ),
-          )
-        : 0,
+      avgScoreLatestAttempt:
+        TaskAttemptHelper.calculateAverageScore(latestScores),
+      avgScoreAllAttempts: TaskAttemptHelper.calculateAverageScore(allScores),
       avgAttemptsPerStudent: attemptsByStudent.size
         ? Number((totalAttempts / attemptsByStudent.size).toFixed(2))
         : 0,

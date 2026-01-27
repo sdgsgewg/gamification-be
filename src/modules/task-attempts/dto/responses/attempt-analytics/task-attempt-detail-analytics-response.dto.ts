@@ -8,6 +8,7 @@ export class TaskAttemptDetailAnalyticsResponseDto {
   };
 
   averageScoreAllStudents: number;
+  totalAttempts: number;
   averageAttempts: number;
 
   attempts: AttemptAnalyticsDto[];

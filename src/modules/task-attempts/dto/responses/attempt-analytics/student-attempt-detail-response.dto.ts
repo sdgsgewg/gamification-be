@@ -3,8 +3,17 @@ import { TaskAttemptStatus } from 'src/modules/task-attempts/enums/task-attempt-
 export class StudentAttemptDetailDto {
   attemptNumber: number;
   attemptId: string;
-  classSlug: string;
-  taskSlug: string;
+
+  class?: {
+    name: string;
+    slug: string;
+  };
+
+  task: {
+    slug: string;
+  };
+
+  scope: string;
   score: number;
   status: TaskAttemptStatus;
   completedAt?: Date;

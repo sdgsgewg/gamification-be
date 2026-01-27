@@ -5,6 +5,7 @@ export class TaskAttemptAnalyticsResponseDto {
     isRepeatable: boolean;
   };
 
+  totalAttempts: number;
   studentsAttempted: number;
   studentsCompleted: number;
 

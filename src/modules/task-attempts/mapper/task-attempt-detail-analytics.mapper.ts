@@ -29,21 +29,8 @@ export class TaskAttemptDetailAnalyticsMapper {
       studentMap.get(a.student_id)!.push(a);
     });
 
-    // const maxPoint =
-    //   input.scope === TaskAttemptScope.CLASS
-    //     ? input.item.task.taskQuestions.reduce((a, q) => a + q.point, 0)
-    //     : input.item.taskQuestions.reduce((a, q) => a + q.point, 0);
-
-    const maxPoint = TaskAttemptHelper.calculateTaskMaxPoint(
-      input.scope,
-      input.item,
-    );
-
-    const attemptDistributions = TaskAttemptHelper.calculateAttemptDistribution(
-      studentMap,
-      (a) =>
-        a.points !== null && maxPoint > 0 ? (a.points / maxPoint) * 100 : null,
-    );
+    const attemptDistributions =
+      TaskAttemptHelper.calculateAttemptDistribution(studentMap);
 
     let totalScore = 0;
     let totalAttempts = 0;
@@ -51,11 +38,6 @@ export class TaskAttemptDetailAnalyticsMapper {
     const students: StudentAttemptAnalyticsDto[] = [];
 
     studentMap.forEach((studentAttempts, studentId) => {
-      // const sorted = [...studentAttempts].sort(
-      //   (a, b) =>
-      //     new Date(a.started_at).getTime() - new Date(b.started_at).getTime(),
-      // );
-
       const sorted = TaskAttemptHelper.sortAllAttempts(studentAttempts);
 
       const scores = sorted
@@ -73,36 +55,41 @@ export class TaskAttemptDetailAnalyticsMapper {
         studentId,
         studentName: sorted[0].student.name,
         totalAttempts: sorted.length,
-        firstAttemptScore:
-          input.scope === TaskAttemptScope.CLASS ? firstScore : undefined,
-        lastAttemptScore:
-          input.scope === TaskAttemptScope.CLASS ? lastScore : undefined,
-        averageScore:
-          scores.length > 0
-            ? Number(
-                (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(2),
-              )
-            : 0,
-        improvement:
-          input.scope === TaskAttemptScope.CLASS && scores.length > 1
-            ? Number((lastScore - firstScore).toFixed(2))
-            : 0,
+        firstAttemptScore: firstScore,
+        lastAttemptScore: lastScore,
+        averageScore: TaskAttemptHelper.calculateAverageScore(scores),
+        improvement: TaskAttemptHelper.calculateScoreImprovement(
+          scores,
+          lastScore,
+          firstScore,
+        ),
         latestStatus: latest.status,
         latestSubmissionId:
           latest.taskSubmission?.task_submission_id ?? undefined,
-        attempts:
-          input.scope === TaskAttemptScope.CLASS
-            ? sorted.map((a, idx) => ({
-                submissionId: a.taskSubmission?.task_submission_id,
-                attemptNumber: idx + 1,
-                attemptId: a.task_attempt_id,
-                classSlug: a.class ? a.class.slug : '',
-                taskSlug: a.task.slug,
-                score: TaskAttemptHelper.calculateAttemptScore(a),
-                status: a.status,
-                completedAt: a.completed_at,
-              }))
-            : [],
+        attempts: sorted.map((a, idx) => {
+          const scope = a.class_id
+            ? TaskAttemptScope.CLASS
+            : TaskAttemptScope.ACTIVITY;
+
+          return {
+            submissionId: a.taskSubmission?.task_submission_id,
+            attemptNumber: idx + 1,
+            attemptId: a.task_attempt_id,
+            class: a.class
+              ? {
+                  name: a.class.name,
+                  slug: a.class.slug,
+                }
+              : null,
+            task: {
+              slug: a.task.slug,
+            },
+            scope,
+            score: TaskAttemptHelper.calculateAttemptScore(a),
+            status: a.status,
+            completedAt: a.completed_at,
+          };
+        }),
       });
     });
 
@@ -119,6 +106,7 @@ export class TaskAttemptDetailAnalyticsMapper {
       },
       averageScoreAllStudents:
         totalAttempts > 0 ? Number((totalScore / totalAttempts).toFixed(2)) : 0,
+      totalAttempts: input.attempts.length,
       averageAttempts:
         students.length > 0
           ? Number((totalAttempts / students.length).toFixed(2))

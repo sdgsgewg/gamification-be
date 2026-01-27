@@ -100,6 +100,21 @@ export class TaskAttemptHelper {
   }
 
   // -----------------------------
+  // OVERVIEW & DETAIL ANALYTICS HELPER
+  // -----------------------------
+
+  /**
+   * Calculate the score of a task attempt.
+   * @param attempt The task attempt.
+   * @returns The score as a number or null if not applicable.
+   */
+  static calculateAverageScore(scores: number[]): number | null {
+    return scores.length > 0
+      ? Number((scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(2))
+      : 0;
+  }
+
+  // -----------------------------
   // OVERVIEW ANALYTICS HELPER
   // -----------------------------
 
@@ -192,7 +207,6 @@ export class TaskAttemptHelper {
    */
   static calculateAttemptDistribution(
     studentMap: Map<string, TaskAttempt[]>,
-    getScore: (attempt: TaskAttempt) => number | null,
   ): AttemptAnalyticsDto[] {
     const attemptScores = new Map<number, number[]>();
 
@@ -203,8 +217,8 @@ export class TaskAttemptHelper {
       );
 
       sorted.forEach((attempt, index) => {
-        const score = getScore(attempt);
-        if (score === null) return;
+        const score = this.calculateAttemptScore(attempt);
+        // if (score === null) return;
 
         const attemptNumber = index + 1;
 
