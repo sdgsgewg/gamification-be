@@ -126,10 +126,16 @@ export class LeaderboardService {
   async findClassStudentsLeaderboard(
     classId: string,
   ): Promise<StudentLeaderboardResponseDto[]> {
-    const results = await this.taskAttemptRepository
-      .createQueryBuilder('attempt')
-      .leftJoin('attempt.student', 'student')
+    const results = await this.userRepository
+      .createQueryBuilder('student')
       .leftJoin('student.role', 'role')
+
+      .leftJoin(
+        'task_attempts',
+        'attempt',
+        'attempt.student_id = student.user_id AND attempt.class_id = :classId',
+        { classId },
+      )
 
       .select('student.user_id', 'id')
       .addSelect('student.name', 'name')
@@ -144,9 +150,9 @@ export class LeaderboardService {
       // ======================
       // TOTAL POINT
       // ======================
-      .addSelect('SUM(best.points)', 'point')
+      .addSelect('COALESCE(SUM(best.points), 0)', 'point')
 
-      .innerJoin(
+      .leftJoin(
         (qb) =>
           qb
             .select('MAX(a.points)', 'points')
@@ -160,7 +166,6 @@ export class LeaderboardService {
         'best.student_id = student.user_id AND best.task_id = attempt.task_id',
       )
 
-      .where('attempt.class_id = :classId', { classId })
       .andWhere('role.name = :role', { role: UserRole.STUDENT })
 
       .groupBy('student.user_id')
@@ -224,7 +229,7 @@ export class LeaderboardService {
         'best',
         'best.class_id = class.class_id',
       )
-      
+
       .groupBy('class.class_id')
       .addGroupBy('class.name')
       .addGroupBy('class.image')
