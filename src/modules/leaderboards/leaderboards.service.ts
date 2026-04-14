@@ -210,7 +210,8 @@ export class LeaderboardService {
       .addSelect('class.name', 'name')
       .addSelect('class.image', 'image')
       .addSelect('COALESCE(SUM(best.points), 0)', 'point')
-      .innerJoin(
+
+      .leftJoin(
         (qb) =>
           qb
             .select('MAX(a.points)', 'points')
@@ -223,6 +224,7 @@ export class LeaderboardService {
         'best',
         'best.class_id = class.class_id',
       )
+      
       .groupBy('class.class_id')
       .addGroupBy('class.name')
       .addGroupBy('class.image')
