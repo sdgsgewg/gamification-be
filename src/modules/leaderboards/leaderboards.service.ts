@@ -62,7 +62,7 @@ export class LeaderboardService {
       .addSelect((qb) => {
         const sub = qb
           .subQuery()
-          .select('SUM(best.points)')
+          .select('COALESCE(SUM(best.points), 0)')
           .from((qb2) => {
             const inner = qb2
               .subQuery()
@@ -84,7 +84,7 @@ export class LeaderboardService {
         return sub;
       }, 'point')
 
-      .orderBy('point', 'DESC')
+      .orderBy('point', 'DESC', 'NULLS LAST')
       .addOrderBy('xp', 'DESC')
       .addOrderBy('name', 'ASC')
       .limit(50);
